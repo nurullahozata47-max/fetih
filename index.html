@@ -155,6 +155,50 @@ canvas {
 #pop button {
   padding: 10px;
 }
+/* Yapı paneli sekmeleri */
+#pop .pt-tabs {
+  display: flex;
+  gap: 4px;
+  min-width: 232px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(127, 140, 150, .16);
+}
+#pop .pt-tabs button {
+  position: relative;
+  flex: 1;
+  padding: 7px 2px 6px;
+  font-size: 12.5px;
+  line-height: 1.15;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  opacity: .75;
+}
+#pop .pt-tabs button.on {
+  background: var(--ink);
+  color: var(--bg);
+  opacity: 1;
+}
+#pop .pt-tabs i {
+  display: block;
+  font-style: normal;
+  font-size: 16px;
+  margin-bottom: 1px;
+}
+#pop .pt-tabs em {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  min-width: 15px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: #3fb98a;
+  color: #fff;
+  font-style: normal;
+  font-size: 10.5px;
+  line-height: 15px;
+}
 #st {
   margin: 10px 0 2px;
   font-size: 16px;
@@ -923,16 +967,19 @@ body.mbg #menu, body.mbg #mnbg {
 :root {
   --hud: rgba(238, 243, 245, .92);
   --hud0: rgba(238, 243, 245, 0);
+  --hudS: rgba(238, 243, 245, .9);
 }
 @media (prefers-color-scheme:dark) {
   :root:not([data-theme="light"]) {
     --hud: rgba(11, 23, 29, .9);
     --hud0: rgba(11, 23, 29, 0);
+    --hudS: rgba(11, 23, 29, .82);
   }
 }
 :root[data-theme="dark"] {
   --hud: rgba(11, 23, 29, .9);
   --hud0: rgba(11, 23, 29, 0);
+  --hudS: rgba(11, 23, 29, .82);
 }
 html, body {
   height: 100%;
@@ -1105,6 +1152,27 @@ main {
 #refah[hidden] {
   display: none;
 }
+#refah {
+  transition: height .35s cubic-bezier(.2, .9, .3, 1.1), width .3s, border-radius .3s, padding .3s, background .3s;
+}
+/* Küçük hali: değeri halka olarak gösteren yuvarlak rozet; refah değişince ya da dokununca büyür */
+#refah.mini {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  gap: 0;
+  justify-content: center;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--hudS) 76%, transparent 79% 100%), conic-gradient(var(--rc, #3fb98a) calc(var(--v, 100) * 1%), rgba(127, 140, 150, .35) 0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .3);
+}
+#refah.mini .rf-bar, #refah.mini .rf-t {
+  display: none;
+}
+#refah.mini .rf-v {
+  font-size: 11.5px;
+  letter-spacing: -.3px;
+}
 .rf-v {
   order: 0;
   font-weight: 800;
@@ -1205,7 +1273,7 @@ main {
     <div id="chips"></div>
   </div>
   <!-- Halkın refahı göstergesi: düşüşler kırmızı "eriyen" bölümle gösterilir; dokununca kurallar açılır -->
-  <div id="refah" role="button" tabindex="0" aria-label="Halkın refahı">
+  <div id="refah" class="mini" role="button" tabindex="0" aria-label="Halkın refahı">
     <span class="rf-t">Refah</span>
     <div class="rf-bar"><i class="rf-ghost"></i><i class="rf-fill"></i><b style="bottom:20%" title="%20 altı: iç savaş"></b><b style="bottom:50%" title="%50 altı: isyanlar"></b></div>
     <span class="rf-v">%100</span>
@@ -4921,6 +4989,13 @@ function drawVolley(e, now) {
     }
   }
 }
+// Sur yükselme animasyonu: sur taş taş örülürken harita 0,7 sn boyunca her karede yeniden çizilir.
+let uiAnimUntil = 0;
+function wallStart(t) {
+  wt0[t] = performance.now();
+  uiAnimUntil = Math.max(uiAnimUntil, wt0[t] + 760);
+  uiSoon();
+}
 // Bölge sınırı boyunca taş sur.
 function drawCityWall(t) {
   const L = wall[t];
@@ -5409,7 +5484,7 @@ function build(t) {
       return lg('Yeterli altının yok.');
     gold[0] -= c;
     wall[t]++;
-    wt0[t] = performance.now();
+    wallStart(t);
     pulse(t, '#cfe3ea');
     lg(`Başkent surları seviye ${wall[t]} oldu.`);
   }
@@ -6420,6 +6495,8 @@ function anim(ts) {
   if (!g || ts - last < 30 || !cen || !bar || !mn)
     return;
   last = ts;
+  if (performance.now() < uiAnimUntil)
+    uiSoon();
   drawWaves2(ts);
   g.clearRect(0, 0, fxc.width, fxc.height);
   const s = ts / 1000;
@@ -6630,6 +6707,11 @@ function cellAt(cx, cy) {
   const r = cv.getBoundingClientRect();
   return [Math.floor((cx - r.left) / r.width * W), Math.floor((cy - r.top) / r.height * H)];
 }
+// Yapı panelinin sekmeleri: her düğme bir kategoriye aittir.
+const POP_TABS = [['y', '🏰', 'Yapılar'], ['o', '⚔️', 'Ordu'], ['d', '⚓', 'Deniz']];
+const POP_CAT = { b: 'y', ub: 'y', m: 'y', um: 'y', w: 'y', u: 'y', uw: 'y', cm: 'y', c: 'o', g: 'o', k: 'o', f: 'o', d: 'd', ud: 'd', ss: 'd', sl: 'd', sf: 'd', mn: 'd', sc: 'd' };
+let popTab = 'y';
+let popT = -1;
 // Bölgeye basılı tutunca açılan panel (inşa, yükseltme, ittifak...).
 function openPop(cx, cy) {
   if (turn != 0 || busy || over)
@@ -6645,14 +6727,16 @@ function openPop(cx, cy) {
     return;
   const o = [];
   let info = '';
+  // Kendi bölgende düğmeler sekmelere ayrılır; açıklamalar da ilgili sekmede görünür.
+  const inf = { y: '', o: '', d: '' };
   if (own[t] == 0) {
     const mc = MC(mn.filter((m, i) => m && own[i] == 0).length);
     o.push(bar[t] ? ['ub', bar[t] >= 3 ? 'Kışla seviye 3 (tam)' : `Kışlayı yükselt: Sv${bar[t] + 1} (${UPC} altın)`, bar[t] < 3 && gold[0] >= UPC] : ['b', `Kışla (${BC})`, gold[0] >= BC]);
     if (bar[t])
-      info += ` Kışla sv${bar[t]}: +${2 * bar[t]} asker/tur.` + (bar[t] >= 3 ? ' Bölge sınırda değilse, asker 10 olunca 1 asker kalacak şekilde en yakın sınıra kendiliğinden gider.' : '');
+      inf.y += ` Kışla sv${bar[t]}: +${2 * bar[t]} asker/tur.` + (bar[t] >= 3 ? ' Bölge sınırda değilse, asker 10 olunca 1 asker kalacak şekilde en yakın sınıra kendiliğinden gider.' : '');
     o.push(mn[t] ? ['um', mn[t] >= 3 ? 'Maden seviye 3 (tam)' : `Madeni yükselt: Sv${mn[t] + 1} (${UPC} altın)`, mn[t] < 3 && gold[0] >= UPC] : ['m', `Maden (${mc})`, gold[0] >= mc]);
     if (mn[t])
-      info += ` Maden sv${mn[t]}: +${MI * mn[t]} altın/tur.`;
+      inf.y += ` Maden sv${mn[t]}: +${MI * mn[t]} altın/tur.`;
     o.push(['w', wall[t] >= 2 ? 'Sur tam' : `Sur (${WC(wall[t])})`, wall[t] < 2 && gold[0] >= WC(wall[t])]);
     if (dock[t])
       o.push(dk[t] ? ['ud', dk[t] >= 3 ? 'İskele seviye 3 (tam)' : `İskeleyi yükselt: Sv${dk[t] + 1} (${dk[t] == 1 ? DC2 : DC3} altın)`, dk[t] < 3 && gold[0] >= (dk[t] == 1 ? DC2 : DC3)] : ['d', `İskele (${DC})`, gold[0] >= DC]);
@@ -6666,11 +6750,11 @@ function openPop(cx, cy) {
         o.push(['mn', mine[t] ? 'Mayın tarlası döşeli' : `Mayın döşe (${MNC} altın)`, !mine[t] && gold[0] >= MNC]);
       if (shS[t] > 0)
         o.push(['sc', 'Keşif seferi', shUsed[t] < shS[t]]);
-      info += ` İskele sv${dk[t]}.${dk[t] >= 3 ? ` Mayınlar bu bölgenin ve en yakın 2 komşu kıyı bölgenin açıklarını korur; çıkarma ya da bombardıman için gelen düşman gemileri batar. Mayın tarlası bir kez patlar.${mine[t] ? ' (Döşeli)' : ''}` : ''} Gemiler: ${shS[t]} küçük (her biri ${CAPS} asker taşır), ${shL[t]} büyük (top atışı). Çıkarma: bu bölgeyi seçip herhangi bir kıyı bölgesine dokun (deniz aşırı fetihte +${LOOT} yağma); kendi kıyı bölgene dokunursan asker taşırsın.`;
+      inf.d += ` İskele sv${dk[t]}.${dk[t] >= 3 ? ` Mayınlar bu bölgenin ve en yakın 2 komşu kıyı bölgenin açıklarını korur; çıkarma ya da bombardıman için gelen düşman gemileri batar. Mayın tarlası bir kez patlar.${mine[t] ? ' (Döşeli)' : ''}` : ''} Gemiler: ${shS[t]} küçük (her biri ${CAPS} asker taşır), ${shL[t]} büyük (top atışı). Çıkarma: bu bölgeyi seçip herhangi bir kıyı bölgesine dokun (deniz aşırı fetihte +${LOOT} yağma); kendi kıyı bölgene dokunursan asker taşırsın.`;
     }
     o.push(tw[t] ? ['uw', tw[t] >= 2 ? 'Okçu Kulesi seviye 2 (tam)' : `Kuleyi yükselt: Sv2 alevli oklar (${TW2} altın)`, tw[t] < 2 && gold[0] >= TW2] : ['u', `Okçu Kulesi (${TWC} altın)`, gold[0] >= TWC]);
     if (tw[t])
-      info += ` Okçu Kulesi sv${tw[t]}: 2 bölge menzil` + (tw[t] >= 2 ? ', alevli oklar %50 daha etkili.' : '. Seviye 2 alevli ok atar.');
+      inf.y += ` Okçu Kulesi sv${tw[t]}: 2 bölge menzil` + (tw[t] >= 2 ? ', alevli oklar %50 daha etkili.' : '. Seviye 2 alevli ok atar.');
     if (bar[t])
       o.push(bar[t] < 2 ? ['c', 'Casus üret (Sv2 kışla gerekir)', false] : ['c', `Casus üret (${SPC} altın)`, spy[t] < 5 && gold[0] >= SPC]);
     if (spy[t] > 0)
@@ -6680,11 +6764,11 @@ function openPop(cx, cy) {
     if (cap[0] != t)
       o.push(['cm', mvd[0] ? 'Başkent taşıma hakkı kullanıldı' : `Başkenti buraya taşı (${CMC} altın)`, !mvd[0] && gold[0] >= CMC]);
     else
-      info += mvd[0] ? ' Başkentin burası.' : ` Başkentin burası. ${CMC} altınla oyunda bir kez başka bölgeye taşıyabilirsin.`;
+      inf.y += mvd[0] ? ' Başkentin burası.' : ` Başkentin burası. ${CMC} altınla oyunda bir kez başka bölgeye taşıyabilirsin.`;
     if (archN(t) > 0)
       o.push(['f', shot[t] ? 'Okçular yoruldu' : `Okçu ateşi (${archN(t)})`, !shot[t]]);
     if (archN(t) > 0)
-      info += ' Okçu menzili 2 bölge; saldırıda ve savunmada otomatik destek verir.';
+      inf.o += ' Okçu menzili 2 bölge; saldırıda ve savunmada otomatik destek verir.';
     if (inc[t] > 0) {
       const keep = new Set(['f', 'g', 'sf', 'sc']);
       for (let i = o.length - 1; i >= 0; i--)
@@ -6723,7 +6807,25 @@ function openPop(cx, cy) {
     return;
   sel = null;
   mv = false;
-  pop.innerHTML = `<b>${own[t] == 0 ? NM[t] : PN[own[t]] + ' krallığı'}</b>` + (info ? `<span>${info}</span>` : '') + o.map(([k, l, ok]) => `<button data-k="${k}" ${ok ? '' : 'disabled'}>${l}</button>`).join('');
+  const btn = ([k, l, ok]) => `<button data-k="${k}" ${ok ? '' : 'disabled'}>${l}</button>`;
+  if (own[t] == 0) {
+    if (popT != t)
+      popTab = 'y';
+    popT = t;
+    const tabs = POP_TABS.filter(([c]) => o.some(e => POP_CAT[e[0]] == c));
+    if (tabs.length && !tabs.some(x => x[0] == popTab))
+      popTab = tabs[0][0];
+    const list = o.filter(e => POP_CAT[e[0]] == popTab);
+    const ti = (inf[popTab] || '').trim();
+    pop.innerHTML = `<b>${NM[t]}</b>` + (info ? `<span>${info.trim()}</span>` : '') +
+      (tabs.length > 1 ? `<div class="pt-tabs">${tabs.map(([c, ic, nm]) => {
+        const n = o.filter(e => POP_CAT[e[0]] == c && e[2]).length;
+        return `<button data-tab="${c}" class="${c == popTab ? 'on' : ''}"><i>${ic}</i>${nm}${n ? `<em>${n}</em>` : ''}</button>`;
+      }).join('')}</div>` : '') +
+      (ti ? `<span>${ti}</span>` : '') + list.map(btn).join('');
+  }
+  else
+    pop.innerHTML = `<b>${PN[own[t]] + ' krallığı'}</b>` + (info ? `<span>${info}</span>` : '') + o.map(btn).join('');
   pop.hidden = false;
   const mr = $('mw').getBoundingClientRect();
   const pw = pop.offsetWidth;
@@ -6738,6 +6840,12 @@ function openPop(cx, cy) {
   pop.style.left = L + 'px';
   pop.style.top = T + 'px';
   pop.onclick = e => {
+    const tb = e.target.closest && e.target.closest('[data-tab]');
+    if (tb) {
+      popTab = tb.dataset.tab;
+      openPop(cx, cy);
+      return;
+    }
     const k = e.target.dataset && e.target.dataset.k;
     if (!k)
       return;
@@ -7401,7 +7509,7 @@ async function ai0(p) {
   if (wall[ct] < 2 && gold[p] >= wc && Math.random() < .9) {
     gold[p] -= wc;
     wall[ct]++;
-    wt0[ct] = performance.now();
+    wallStart(ct);
     pulse(ct, '#cfe3ea');
   }
   else if (gold[p] >= MC(mn.filter((m, t) => m && own[t] == p).length) && Math.random() < .5) {
@@ -8019,7 +8127,7 @@ const TS = [
       tutT = [];
     },
     done: () => bar.some((b, t) => b && own[t] == 0) },
-  { enter: () => { pop.hidden = true; tutT = []; }, t: 'Diğer yapılar', p: 'Aynı panelde başka yapılar da var. Maden her tur altın getirir. Sur bölgeni savunmayı zorlaştırır. Okçu ve kule komşu bölgelere ok atar. İskele ve gemilerle denizden çıkarma yapar, top atarsın. Casus düşmanın askerini gösterir. Bir yapıyı seçtikten sonra panel açık kalır; başka yere dokununca kapanır.', next: 1 },
+  { enter: () => { pop.hidden = true; tutT = []; }, t: 'Diğer yapılar', p: 'Panel sekmelere ayrılmıştır: Yapılar, Ordu ve Deniz (kıyı bölgelerinde). Sekmedeki yeşil sayı, şu an yapabileceğin işlem sayısıdır. Maden her tur altın getirir. Sur bölgeni savunmayı zorlaştırır. Okçu ve kule komşu bölgelere ok atar. İskele ve gemilerle denizden çıkarma yapar, top atarsın. Casus düşmanın askerini gösterir. Bir yapıyı seçtikten sonra panel açık kalır; başka yere dokununca kapanır.', next: 1 },
   { t: 'Asker taşı', p: 'Alttaki "Asker taşı" düğmesine bas. Sonra 2 veya daha fazla askerli bir bölgeni seç ve komşu kendi bölgene dokun; her dokunuş 1 asker taşır. İpucu: bir bölgeye basılı tutarsan toplu taşıma açılır ve birçok bölgeden tek seferde asker toplarsın.', hl: 'mv',
     enter: () => {
       tutT = [];
@@ -8932,15 +9040,25 @@ document.getElementById('mnOn').onclick = () => {
 // ---- Refah göstergesi ----
 let lastRef = null;
 const rfEl = document.getElementById('refah');
+// Refah göstergesi normalde küçük bir rozettir; dokununca büyüyüp kuralları gösterir.
+let rfTimer = 0;
+function rfOpen(on) {
+  clearTimeout(rfTimer);
+  rfEl.classList.toggle('mini', !on);
+  if (!on)
+    document.getElementById('rfInfo').hidden = true;
+}
 rfEl.onclick = () => {
   const i = document.getElementById('rfInfo');
-  i.hidden = !i.hidden;
+  const open = rfEl.classList.contains('mini') || i.hidden;
+  rfOpen(open);
+  i.hidden = !open;
 };
-// Başka bir yere dokununca refah açıklaması kapanır.
+// Başka bir yere dokununca refah açıklaması kapanır, gösterge küçülür.
 document.addEventListener('pointerdown', e => {
   const i = document.getElementById('rfInfo');
   if (!i.hidden && !(e.target.closest && e.target.closest('#refah,#rfInfo')))
-    i.hidden = true;
+    rfOpen(false);
 });
 function refahUI() {
   if (!ref || !cen)
@@ -8951,6 +9069,7 @@ function refahUI() {
     return;
   const col = v >= 70 ? '#3fb98a' : v >= 50 ? '#e0a21f' : v >= 20 ? '#e5566d' : '#c62828';
   rfEl.style.setProperty('--rc', col);
+  rfEl.style.setProperty('--v', v);
   rfEl.classList.toggle('crit', v < 20);
   const fill = rfEl.querySelector('.rf-fill');
   const ghost = rfEl.querySelector('.rf-ghost');
@@ -8966,6 +9085,14 @@ function refahUI() {
   else
     ghost.style.height = v + '%';
   if (lastRef != null && v != lastRef) {
+    // Değişince gösterge birkaç saniyeliğine büyür (eriyen kısım görünsün), sonra küçülür.
+    if (rfEl.classList.contains('mini')) {
+      rfEl.classList.remove('mini');
+      rfTimer = setTimeout(() => {
+        if (document.getElementById('rfInfo').hidden)
+          rfEl.classList.add('mini');
+      }, 2800);
+    }
     const d = document.createElement('span');
     d.className = 'rf-d';
     d.textContent = (v > lastRef ? '+' : '−') + Math.abs(v - lastRef);
