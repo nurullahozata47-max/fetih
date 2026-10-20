@@ -155,6 +155,13 @@ canvas {
 #pop button {
   padding: 10px;
 }
+#pop.fixw {
+  width: min(272px, calc(100vw - 16px));
+  box-sizing: border-box;
+}
+#pop.fixw span {
+  max-width: none;
+}
 /* Vergi seviyesi düğmeleri */
 #pop .tx-row {
   display: flex;
@@ -3938,6 +3945,7 @@ function welfareTick(p, a, w) {
 }
 // 3 fetihten sonra çıkan 'savaş yorgunluğu' uyarısı.
 function warnExt() {
+  pop.classList.remove('fixw');
   pop.innerHTML = `<b>Savaş yorgunluğu</b><span>Bu tur 3 fetih hakkını kullandın. Devam edersen 5'e kadar fethedebilirsin ama her ek fetih halkının refahını %10, her başarısız saldırı %4 düşürür (şu an %${ref[0]}). Refah %50'nin altına inerse kendiliğinden isyanlar çıkar, %20'nin altına inerse ülken ikiye bölünür. Saldırı yapmadığın her tur refah %8 artar.</span><button data-k="ok">Devam et (5 fetihe kadar)</button><button data-k="no">Vazgeç</button>`;
   pop.hidden = false;
   pop.style.left = '50%';
@@ -4483,6 +4491,7 @@ function treaty(q, k) {
 function showOffer(q) {
   if (turn != 0 || busy || over || ally[q] > 0 || cnt(q) == 0)
     return;
+  pop.classList.remove('fixw');
   pop.innerHTML = `<b>${PN[q]} haraç istiyor</b><span>${TT} tur boyunca her tur ${TR} altın öde, o da sana saldırmasın.</span><button data-k="ok" ${gold[0] >= TR ? '' : 'disabled'}>Kabul et</button><button data-k="no">Reddet</button>`;
   pop.hidden = false;
   pop.style.left = '50%';
@@ -5210,11 +5219,13 @@ function lay(t) {
   }
   return (lscV[t] = best);
 }
-const lsc = t => lay(t).s;
+// Sığan en büyük ölçek %10 büyütülür (çok küçük kalmasın diye), tam boyu geçmez.
+const lsc = t => Math.min(1, lay(t).s * 1.1);
 function slotXY(t, k) {
   const L = lay(t);
-  const [ox, oy] = slotOff(k, L.s);
-  return [cen[t][0] * S + L.ox + ox, cen[t][1] * S + L.oy + oy, L.s];
+  const sc = Math.min(1, L.s * 1.1);
+  const [ox, oy] = slotOff(k, sc);
+  return [cen[t][0] * S + L.ox + ox, cen[t][1] * S + L.oy + oy, sc];
 }
 // Bir yapıyı yerine taşıyıp ölçekleyerek çizer (çizim fonksiyonu 0,0 merkezli çalışır).
 function atSlot(ctx, t, k, fn) {
@@ -7156,8 +7167,11 @@ const POP_TABS = [['y', '🏰', 'Yapılar'], ['o', '⚔️', 'Ordu'], ['d', '⚓
 const POP_CAT = { b: 'y', ub: 'y', m: 'y', um: 'y', dp: 'y', udp: 'y', w: 'y', u: 'y', uw: 'y', cm: 'y', c: 'o', g: 'o', k: 'o', f: 'o', d: 'd', ud: 'd', ss: 'd', sl: 'd', sf: 'd', mn: 'd', sc: 'd', tx1: 'v', tx2: 'v', tx3: 'v', tx4: 'v', tx5: 'v', txa: 'v' };
 let popTab = 'y';
 let popT = -1;
+let popPos = null;
 // Bölgeye basılı tutunca açılan panel (inşa, yükseltme, ittifak...).
 function openPop(cx, cy) {
+  // Panel zaten açıkken (satın alma, sekme değişimi) yeniden çizilirse yerinden oynamaz.
+  const wasOpen = !pop.hidden;
   if (turn != 0 || busy || over)
     return;
   if (dr)
@@ -7280,6 +7294,8 @@ function openPop(cx, cy) {
   }
   else
     pop.innerHTML = `<b>${PN[own[t]] + ' krallığı'}</b>` + (info ? `<span>${info}</span>` : '') + o.map(btn).join('');
+  // Kendi bölgemizin paneli sabit genişlikte: sekme ya da satın alma sonrası yana kaymaz.
+  pop.classList.toggle('fixw', own[t] == 0);
   pop.hidden = false;
   const mr = $('mw').getBoundingClientRect();
   const pw = pop.offsetWidth;
@@ -7291,6 +7307,13 @@ function openPop(cx, cy) {
   if (T < 8)
     T = cy + 28;
   T = Math.min(Math.max(T, 8), vh - ph - 8);
+  if (wasOpen && popPos && popPos.t == t) {
+    L = Math.min(popPos.L, Math.max(8, vw - pw - 8));
+    T = popPos.T;
+    if (T + ph > vh - 8)
+      T = Math.max(8, vh - ph - 8);
+  }
+  popPos = { t, L, T };
   pop.style.left = L + 'px';
   pop.style.top = T + 'px';
   pop.onclick = e => {
@@ -7504,6 +7527,12 @@ function openPop(cx, cy) {
     bd = k;
     build(t);
     bd = null;
+    // Sur örülürken animasyon görünsün, ittifak kurulunca da panel kapansın (istersen yeniden açarsın).
+    if (k == 'w' || k == 'a') {
+      pop.hidden = true;
+      ui();
+      return;
+    }
     re();
   };
   ui();
