@@ -756,6 +756,13 @@ button:focus-visible {
 #coach[hidden] {
   display: none;
 }
+#coach.nudge {
+  animation: chNudge .45s ease-in-out;
+}
+@keyframes chNudge {
+  20%, 60% { transform: translateX(-7px); box-shadow: 0 0 0 3px #ffd36b; }
+  40%, 80% { transform: translateX(7px); box-shadow: 0 0 0 3px #ffd36b; }
+}
 #coach .ch-top {
   display: flex;
   justify-content: space-between;
@@ -778,6 +785,12 @@ button:focus-visible {
   margin-bottom: 4px;
   color: #ffd36b;
 }
+#coach p b {
+  display: inline;
+  margin: 0;
+  font-size: inherit;
+  color: #ffd36b;
+}
 #coach p {
   margin: 0;
   font-size: 14.5px;
@@ -793,6 +806,10 @@ button:focus-visible {
   animation: tutPulse 1.1s ease-in-out infinite;
   position: relative;
   z-index: 5;
+}
+#refah.tut-hl {
+  position: absolute;
+  z-index: 12;
 }
 @keyframes tutPulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(242, 177, 52, .9); }
@@ -7204,6 +7221,8 @@ const pop = $('pop');
 // ======================================================================
 // Toplu asker taşıma: kaynakları seç, hedefe basılı tut.
 function bulkPress(cx, cy) {
+  if (TUT && !tutOK('bulk', 0))
+    return;
   const [x, y] = cellAt(cx, cy);
   if (x < 0 || y < 0 || x >= W || y >= H)
     return;
@@ -7276,7 +7295,9 @@ let popTab = 'y';
 let popT = -1;
 let popPos = null;
 // Bölgeye basılı tutunca açılan panel (inşa, yükseltme, ittifak...).
+let popArgs = null;
 function openPop(cx, cy) {
+  popArgs = [cx, cy];
   // Panel zaten açıkken (satın alma, sekme değişimi) yeniden çizilirse yerinden oynamaz.
   const wasOpen = !pop.hidden;
   if (turn != 0 || busy || over)
@@ -7289,6 +7310,10 @@ function openPop(cx, cy) {
     return;
   const t = cell[y * W + x];
   if (t < 0)
+    return;
+  if (TUT && !wasOpen && !tutOK('lp', t))
+    return;
+  if (TUT && wasOpen && popT != t && !tutOK('lp', t))
     return;
   const o = [];
   let info = '';
@@ -7385,7 +7410,10 @@ function openPop(cx, cy) {
     return;
   sel = null;
   mv = false;
-  const btn = ([k, l, ok]) => `<button data-k="${k}" ${ok ? '' : 'disabled'}>${l}</button>`;
+  const btn = ([k, l, ok]) => {
+    const tk = TUT ? tutOK('k', k, true) : true;
+    return `<button data-k="${k}" class="${TUT && tk ? 'tut-hl' : ''}" ${ok && tk ? '' : 'disabled'}>${l}</button>`;
+  };
   if (own[t] == 0) {
     if (popT != t)
       popTab = 'y';
@@ -7398,9 +7426,10 @@ function openPop(cx, cy) {
     pop.innerHTML = `<b>${NM[t]}</b>` + (info ? `<span>${info.trim()}</span>` : '') +
       (tabs.length > 1 ? `<div class="pt-tabs">${tabs.map(([c, ic, nm]) => {
         const n = c == 'v' ? 0 : o.filter(e => POP_CAT[e[0]] == c && e[2]).length;
-        return `<button data-tab="${c}" class="${c == popTab ? 'on' : ''}"><i>${ic}</i>${nm}${n ? `<em>${n}</em>` : ''}</button>`;
+        const tk = !TUT || tutOK('tab', c, true);
+        return `<button data-tab="${c}" class="${c == popTab ? 'on' : ''} ${TUT && tk && c != popTab ? 'tut-hl' : ''}" ${tk ? '' : 'disabled'}><i>${ic}</i>${nm}${n ? `<em>${n}</em>` : ''}</button>`;
       }).join('')}</div>` : '') +
-      (ti ? `<span>${ti}</span>` : '') + (popTab == 'v' ? `<div class="tx-row">${list.filter(e => e[0] == 'tx1' || e[0] == 'tx2').map(([k, l]) => `<button data-k="${k}" class="${+l == tax[t] ? 'on' : ''} ${+l >= 2 && isBorder(t) ? 'hot' : ''}">${l} altın</button>`).join('')}</div>` + list.filter(e => e[0] == 'txa' || e[0] == 'txs').map(btn).join('') : list.map(btn).join(''));
+      (ti ? `<span>${ti}</span>` : '') + (popTab == 'v' ? `<div class="tx-row">${list.filter(e => e[0] == 'tx1' || e[0] == 'tx2').map(([k, l]) => `<button data-k="${k}" class="${+l == tax[t] ? 'on' : ''} ${+l >= 2 && isBorder(t) ? 'hot' : ''}" ${!TUT || tutOK('k', k, true) ? '' : 'disabled'}>${l} altın</button>`).join('')}</div>` + list.filter(e => e[0] == 'txa' || e[0] == 'txs').map(btn).join('') : list.map(btn).join(''));
   }
   else
     pop.innerHTML = `<b>${PN[own[t]] + ' krallığı'}</b>` + (info ? `<span>${info}</span>` : '') + o.map(btn).join('');
@@ -7429,6 +7458,8 @@ function openPop(cx, cy) {
   pop.onclick = e => {
     const tb = e.target.closest && e.target.closest('[data-tab]');
     if (tb) {
+      if (TUT && !tutOK('tab', tb.dataset.tab))
+        return;
       popTab = tb.dataset.tab;
       openPop(cx, cy);
       return;
@@ -7436,6 +7467,9 @@ function openPop(cx, cy) {
     const k = e.target.dataset && e.target.dataset.k;
     if (!k)
       return;
+    if (TUT && !tutOK('k', k))
+      return;
+    tutEvent(k);
     const re = () => {
       ui();
       openPop(cx, cy);
@@ -7832,6 +7866,8 @@ cv.addEventListener('click', async (e) => {
   const t = cell[y * W + x];
   if (t < 0)
     return;
+  if (TUT && !tutOK('tap', t))
+    return;
   if (dr) {
     if (ONLINE)
       onlineCapPick(t);
@@ -7866,7 +7902,7 @@ cv.addEventListener('click', async (e) => {
     miss.push({ t, a });
     fl.push({ t, dx: 0, txt: 'Casus', col: '#9bd1ff', t0: performance.now() });
     pulse(t, '#9bd1ff');
-    $('log').textContent = `${NM[t]} bölgesine casus gönderdin. Yakalanma riski %${Math.round(spyRisk(t) * 100)} (içerilere gittikçe artar). Yakalanmazsa o bölgenin ve bir komşusunun asker ve binaları 2 tur görünür, casus da gelecek tur geri döner.`;
+    $('log').textContent = `${NM[t]} bölgesine casus gönderdin. İçerilere gittikçe yakalanma riski artar. Yakalanmazsa o bölgenin ve bir komşusunun asker ve binaları 2 tur görünür, casus da gelecek tur geri döner.`;
     ui();
     return;
   }
@@ -8084,6 +8120,8 @@ cv.addEventListener('click', async (e) => {
   ui();
 });
 $('end').onclick = () => {
+  if (TUT && !tutOK('btn', 'end'))
+    return;
   if (turn == 0 && phase == 'a' && !busy && !over) {
     sel = null;
     mv = false;
@@ -8093,6 +8131,8 @@ $('end').onclick = () => {
 };
 $('nw').onclick = () => showMenu(true);
 $('mv').onclick = () => {
+  if (TUT && !tutOK('btn', 'mv'))
+    return;
   if (turn == 0 && !busy && !over && !dr) {
     mv = !mv;
     bk = null;
@@ -8737,9 +8777,24 @@ function pickAttack() {
   }
   return best;
 }
+// Öğretici adımları. allow: bu adımda izin verilen hamleler (geri kalan her şey kilitlidir):
+//   tap: haritaya dokunma, lp: basılı tutma (panel), tab: panel sekmeleri, k: panel düğmeleri, btn: alt düğmeler.
+const capOnly = t => t == cap[0];
+// Öğreticide bir yapı adımı: başkente basılı tut, ilgili sekmede tek bir düğmeye izin ver.
+const tutBuild = (title, text, key, tab, cost, done) => ({
+  t: title, p: text,
+  allow: { lp: capOnly, tab: [tab], k: [key] },
+  enter: () => {
+    tutT = [cap[0]];
+    gold[0] = Math.min(capOf(0), Math.max(gold[0], cost));
+    popTab = tab;
+  },
+  done,
+});
 const TS = [
-  { t: 'Hoş geldin!', p: 'Amacın haritadaki bütün toprakları fethetmek. Sen sarı krallıksın; Kızıl, Mor ve Yeşil botlara karşı oynuyorsun. Bu rehber sana temel hamleleri adım adım gösterecek.', next: 1 },
-  { t: 'Başkentini seç', p: 'Oyun bölge seçimiyle başlar. İlk seçtiğin bölge başkentin olur; başkentin düşerse devletin ikiye bölünür. Parlayan bölgeye dokun (istersen kıtadaki başka bir bölgeyi de seçebilirsin).',
+  { t: 'Hoş geldin!', p: 'Amacın haritadaki bütün toprakları fethetmek. Sen <b>sarı</b> krallıksın; Kızıl, Mor ve Yeşil botlara karşı oynuyorsun. Bu rehber oyunun bütün sistemlerini adım adım gösterecek. Rehber bir şey istediğinde sadece o hamleyi yapabilirsin.', next: 1 },
+  { t: 'Başkentini seç', p: 'Oyun bölge seçimiyle başlar. İlk seçtiğin bölge <b>başkentin</b> olur. Başkentler gizlidir: rakipler seninkini, sen de onlarınkini bilmezsin. Başkentin ilk kez düşerse devletin ikiye bölünür, ikinci kez düşerse tamamen yıkılırsın. Parlayan bölgeye dokun.',
+    allow: { tap: t => t == tutT[0] },
     enter: () => {
       let b = -1, bv = -1;
       for (let t = 0; t < N - NI; t++)
@@ -8752,55 +8807,106 @@ const TS = [
     done: () => cap[0] >= 0 },
   { t: 'Bölgeler dağıtılıyor', p: 'Normalde bütün bölgelerini sırayla kendin seçersin. Bu sefer kalanları senin için ben seçiyorum, biraz bekle...',
     done: () => !dr && turn == 0 && !busy && phase == 'r' },
-  { t: 'Takviye', p: 'Her turun başında takviye askerlerin gelir; kaç tane olduğu haritanın altında yazar. Düşmana komşu olan parlayan bölgene dokunarak asker ekle. Her dokunuş 1 asker ekler; hepsini dağıtınca saldırı aşamasına geçersin.',
+  { t: 'Ekranı tanı', p: 'Üstteki kutucuklar devletleri gösterir: renk, bölge sayısı, rakiplerin refahı ve kiminle ittifak kurdukları. Senin kutunda altının ve hazinenin sınırı yazar (örneğin 20/50). Soldaki yuvarlak gösterge: <b>dış halka refahın</b>, <b>iç sarı halka hazinen</b>. Ona dokununca ikisi de çubuk olarak açılır.', hl: 'refah', next: 1 },
+  { t: 'Takviye', p: 'Her turun başında takviye askerlerin gelir; kaç tane kaldığı altta yazar. Parlayan bölgene dokunarak asker ekle: her dokunuş 1 asker. Hepsini dağıtınca saldırı aşamasına geçersin.',
+    allow: { tap: t => t == tutT[0] },
     enter: () => {
       const pa = pickAttack();
       tData.pa = pa;
       tutT = pa ? [pa[0]] : [];
     },
     done: () => phase == 'a' },
-  { t: 'Saldırı', p: 'Önce parlayan kendi bölgene dokunup onu seç, sonra yanındaki parlayan düşman bölgesine dokun. Savaş zarla belirlenir; ne kadar çok askerle saldırırsan şansın o kadar artar. Öğretici olduğu için bu bölgene birkaç ekstra asker verdim.',
+  { t: 'Saldırı', p: 'Önce parlayan kendi bölgene dokunup onu seç, sonra yanındaki parlayan düşman bölgesine dokun. Savaş zarla belirlenir; ne kadar çok askerle saldırırsan kazanman o kadar kolaylaşır. Öğretici olduğu için bu bölgene ekstra asker verdim.',
+    allow: { tap: t => !tData.pa || t == tData.pa[0] || (sel == tData.pa[0] && t == tData.pa[1]) },
     enter: () => {
       let pa = tData.pa;
       if (!pa || own[pa[0]] != 0 || !enemyOf(pa[1]))
         pa = pickAttack();
       tData.pa = pa;
       if (pa) {
-        arm[pa[0]] = Math.max(arm[pa[0]], arm[pa[1]] + 6);
+        arm[pa[0]] = Math.max(arm[pa[0]], arm[pa[1]] + 9);
+        wall[pa[1]] = 0;
         tutT = [pa[0], pa[1]];
       }
       else
         tutT = [];
       tData.att = att[0];
     },
-    done: () => att[0] > (tData.att || 0) && !busy },
-  { t: 'Sis ve fetih hakkı', p: () => (won[0] > 0 ? 'Tebrikler, bölgeyi aldın! ' : 'Bu sefer olmadı; zar her zaman yanında olmayabilir. ') + 'Rakip bölgelerdeki "?" işareti oradaki asker sayısını bilmediğin anlamına gelir; casuslar bunu açığa çıkarır. Her tur en fazla 3 fetih hakkın var. Fazlası ve başarısız saldırılar halkının refahını (soldaki çubuk) düşürür; refah düşerse isyanlar çıkar.', next: 1 },
-  { t: 'Yapı paneli', p: 'Kendi bölgelerinden birine, örneğin parlayan başkentine, parmağını basılı tut. Yapı paneli açılır.',
+    done: () => (!tData.pa || att[0] > (tData.att || 0)) && !busy },
+  { t: 'Sis ve fetih hakkı', p: () => (won[0] > 0 ? 'Tebrikler, bölgeyi aldın! ' : 'Bu sefer olmadı; zar her zaman yanında olmayabilir. ') + 'Rakip bölgelerdeki <b>"?"</b> oradaki asker sayısını bilmediğin anlamına gelir; casuslar bunu açığa çıkarır. Her tur <b>3 fetih hakkın</b> var; istersen 5\'e çıkarabilirsin ama fazladan her fetih ve her başarısız saldırı halkının refahını düşürür.', next: 1 },
+  tutBuild('Yapı paneli: Kışla', 'Kendi bölgene <b>parmağını basılı tutunca</b> yapı paneli açılır. Panel sekmelere ayrılır: Yapılar, Ordu, Deniz (kıyıda) ve Vergi. Parlayan başkentine basılı tut ve <b>Yapılar</b> sekmesinde <b>Kışla</b>\'ya dokun. Kışla her tur o bölgede asker üretir. Altının yetsin diye biraz ekledim.', 'b', 'y', BC, () => bar[cap[0]] >= 1),
+  tutBuild('Seviye sistemi', 'Yapıların 3 seviyesi vardır ve her seviye yeni bir güç açar. <b>Kışla:</b> sv1 +2, sv2 +4 asker/tur ve casus üretimi, sv3 +6 ve dolunca askerleri kendiliğinden sınıra yollar. <b>Maden:</b> her seviye +10 altın. <b>Sandık:</b> 50 / 70 / 100 kapasite. Kule, iskele ve surun da seviyeleri var. Şimdi başkentine basılı tut ve <b>Kışlayı yükselt</b>.', 'ub', 'y', UPC, () => bar[cap[0]] >= 2),
+  tutBuild('Maden', 'Altın üç yerden gelir: bölgelerinden en fazla 15 altın temel gelir, madenler ve vergi. Madenler gelirini büyütmenin en güvenli yoludur. Başkentine basılı tut ve <b>Maden</b> kur.', 'm', 'y', MC(0), () => mn[cap[0]] >= 1),
+  tutBuild('Altın sandığı', 'Altının bir sınırı vardır: <b>altın sandıklarının toplam kapasitesi</b>. Başkentinde 50\'lik bir sandık hazır gelir; sığmayan altın kaybolur. Sandığı yükseltebilir ya da başka bölgelere yenisini kurabilirsin. Dikkat: sandıklı bir bölge fethedilirse içindeki altının yarısı yağmalanır! Başkentine basılı tut ve <b>Sandığı yükselt</b>.', 'udp', 'y', DPU[1], () => dep[cap[0]] >= 2),
+  { t: 'Vergi', p: 'Her bölgen <b>2 turda bir</b> vergi verir. <b>İç bölgeler</b> 2 altın verebilir; <b>sınır bölgeleri</b> 1 altın vermeli. Sınır bölgesinden 2 altın istersen halk kızar: refah düşer ve orada isyan çıkabilir. Başkentine basılı tut, <b>Vergi</b> sekmesini aç ve <b>Akıllı vergi</b>ye dokun: iç bölgeler 2, sınırlar 1 olur.',
+    allow: { lp: capOnly, tab: ['v'], k: ['txs'] },
     enter: () => {
       tutT = [cap[0]];
+      tData.ev = new Set();
     },
-    done: () => !pop.hidden },
-  { t: 'Kışla kur', p: 'Panelden "Kışla"ya dokun. Kışla her tur o bölgede yeni asker üretir; seviyesini yükselttikçe daha çok üretir. Altının yetsin diye sana biraz altın ekledim.',
+    done: () => tData.ev && tData.ev.has('txs') },
+  tutBuild('Sur', 'Sur bölgeni korur: <b>düşman okları surun içine işlemez</b>. Suru 2. seviyeye yükseltirsen üstüne <b>okçular</b> çıkar: yakındaki saldırılarına ve savunmana ok atarlar, ayrıca o bölgeye <b>en az 15 askerle</b> saldırılabilir. Başkentine basılı tut ve <b>Sur</b> ör; panel kapanınca surun örülüşünü izle.', 'w', 'y', WC(0), () => wall[cap[0]] >= 1),
+  { t: 'Ordu ve deniz', p: '<b>Ordu</b> sekmesi: okçu eğitirsin (komşu bölgelere ok atar), kışla 2. seviyedeyse <b>casus</b> üretirsin; casus düşman bölgesindeki askerleri ve binaları gösterir ama içerilere gittikçe yakalanabilir. <b>Okçu kulesi</b> 2 bölge uzağa ok atar, 2. seviyede alevli ok fırlatır. <b>Deniz</b> sekmesi (kıyıda): iskele kur; küçük gemiler denizden asker taşır ve çıkarma yapar, büyük gemiler top atar, 3. seviye iskele kıyına mayın döşer.', next: 1 },
+  { t: 'Asker taşı', p: 'Alttaki <b>"Asker taşı"</b> düğmesine bas. Sonra parlayan bölgene, ardından yanındaki parlayan bölgene dokun; her dokunuş 1 asker taşır. İpucu: taşıma açıkken bir bölgeye basılı tutarsan toplu taşıma açılır.', hl: 'mv',
+    allow: { btn: ['mv'], tap: t => mv && (t == tData.mvA || (sel == tData.mvA && t == tData.mvB)) },
     enter: () => {
-      gold[0] = Math.max(gold[0], 60);
-      tutT = [];
-    },
-    done: () => bar.some((b, t) => b && own[t] == 0) },
-  { enter: () => { pop.hidden = true; tutT = []; }, t: 'Diğer yapılar', p: 'Panel sekmelere ayrılmıştır: Yapılar, Ordu ve Deniz (kıyı bölgelerinde). Sekmedeki yeşil sayı, şu an yapabileceğin işlem sayısıdır. Altının bir sınırı var: altın sandıkları bu sınırı belirler (başkentinde bir tane hazır). Sandıklı bölge fethedilirse içindeki altının yarısı yağmalanır. Vergi sekmesinden her bölgenin vergisini (2 turda bir 1 ya da 2 altın) ayarlarsın; sınır bölgelerinden 2 altın istemek isyan çıkarabilir. Maden her tur altın getirir. Sur bölgeni savunmayı zorlaştırır. Okçu ve kule komşu bölgelere ok atar. İskele ve gemilerle denizden çıkarma yapar, top atarsın. Casus düşmanın askerini gösterir. Bir yapıyı seçtikten sonra panel açık kalır; başka yere dokununca kapanır.', next: 1 },
-  { t: 'Asker taşı', p: 'Alttaki "Asker taşı" düğmesine bas. Sonra 2 veya daha fazla askerli bir bölgeni seç ve komşu kendi bölgene dokun; her dokunuş 1 asker taşır. İpucu: bir bölgeye basılı tutarsan toplu taşıma açılır ve birçok bölgeden tek seferde asker toplarsın.', hl: 'mv',
-    enter: () => {
-      tutT = [];
       tData.mv = mvCount;
       pop.hidden = true;
+      let A = -1;
+      let B = -1;
+      for (let a = 0; a < N && A < 0; a++)
+        if (own[a] == 0 && !inc[a])
+          for (const u of adj[a])
+            if (own[u] == 0 && !inc[u] && landHit(a, u)) {
+              A = a;
+              B = u;
+              break;
+            }
+      if (A >= 0)
+        arm[A] = Math.max(arm[A], 4);
+      tData.mvA = A;
+      tData.mvB = B;
+      tutT = A >= 0 ? [A, B] : [];
     },
-    done: () => mvCount > (tData.mv || 0) },
-  { t: 'Turu bitir', p: 'Hamlelerin bitince "Turu bitir" düğmesine bas. Ardından botlar sırayla oynar; senin sıran gelince devam ederiz.', hl: 'end',
+    done: () => tData.mvA < 0 || mvCount > (tData.mv || 0) },
+  { t: 'Turu bitir', p: 'Hamlelerin bitince <b>"Turu bitir"</b> düğmesine bas. Ardından botlar sırayla oynar; senin sıran gelince devam ederiz.', hl: 'end',
+    allow: { btn: ['end'] },
     enter: () => {
+      tutT = [];
+      mv = false;
+      sel = null;
       tData.rd = rd;
     },
     done: () => rd > tData.rd && turn == 0 && !busy },
-  { t: 'Hazırsın!', p: 'Yeni turun başladı: önce takviye, sonra saldırı. Unutma: başkentini koru, isyan çıkan bölgelerine asker gönder (bir fetih hakkı harcar) ve refahını %50 üstünde tut. Bir bölgeye basılı tutarak her zaman ne yapabileceğini görebilirsin. İyi fetihler!', next: 2 },
+  { t: 'Refah ve isyan', p: 'Saldırmadığın her tur refah artar; başarısız saldırılar, fazladan fetihler ve sınırlardan yüksek vergi onu düşürür. Refah <b>%50</b>\'nin altına inerse kendiliğinden isyanlar çıkar: isyanlı bölgeye 2 tur içinde asker taşıman gerekir (bir fetih hakkı harcar) ve oraya bir şey inşa edemezsin. <b>%20</b>\'nin altında ülken ikiye bölünür.', hl: 'refah', next: 1 },
+  { t: 'Hazırsın!', p: 'Özetle: takviye dağıt, saldır, yapılarını seviye seviye büyüt, hazineni sandıklarla genişlet, vergini akıllı ayarla ve başkentini koru. Bir bölgeye basılı tutarak her zaman ne yapabileceğini görebilirsin. İyi fetihler!', next: 2 },
 ];
+// Öğretici: bu hamleye izin var mı? İzin yoksa rehber kartı sallanır ve uyarı verir.
+function tutOK(kind, v, quiet) {
+  if (!TUT)
+    return true;
+  if (kind == 'btn' && v == 'nw')
+    return true;
+  const st = TS[tStep];
+  const a = st && st.allow && st.allow[kind];
+  const ok = !!a && (typeof a == 'function' ? a(v) : a.includes(v));
+  if (!ok && !quiet)
+    tutNudge();
+  return ok;
+}
+function tutNudge() {
+  coachEl.classList.remove('nudge');
+  void coachEl.offsetWidth;
+  coachEl.classList.add('nudge');
+  if (navigator.vibrate)
+    navigator.vibrate(30);
+  setTxt('log', TS[tStep] && TS[tStep].next ? 'Öğretici: devam etmek için rehber kartındaki "İleri"ye bas.' : 'Öğretici: önce rehberin gösterdiği hamleyi yap.');
+}
+// Öğreticide panelde yapılan işlemleri kaydeder (bazı adımlar bunu bekler).
+function tutEvent(k) {
+  if (TUT && tData.ev)
+    tData.ev.add(k);
+}
 const coachEl = document.getElementById('coach');
 function tutHide() {
   coachEl.hidden = true;
@@ -8835,7 +8941,12 @@ function tutEnter() {
   if (st.enter)
     st.enter();
   tutRender();
-  setTimeout(() => ui(), 0);
+  setTimeout(() => {
+    ui();
+    // Panel açıksa yeni adımın izinleriyle yeniden çizilir (yoksa eski düğmeler kilitli kalır).
+    if (!pop.hidden && popArgs)
+      openPop(popArgs[0], popArgs[1]);
+  }, 0);
   setTimeout(tutView, 80);
 }
 // Öğreticinin gösterdiği bölge ekran dışında kaldıysa kamerayı oraya kaydırır.
