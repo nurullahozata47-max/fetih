@@ -1390,7 +1390,7 @@ input, textarea {
       <span class="gd-v">0/50</span>
     </div>
   </div>
-  <div id="rfInfo" hidden>Barışta (saldırmadığın her tur) refah +8 artar. Her başarısız saldırı −4, bir turda 3'ten fazla fetih her biri için −10 düşürür. Vergi 2 turda bir toplanır: sınır bölgelerinden 2 altın istemek refahı düşürür ve isyan çıkarabilir; 1 altın vergide halk memnundur. <b>%50</b> altında kendiliğinden isyanlar çıkar, <b>%20</b> altında ülken ikiye bölünür.</div>
+  <div id="rfInfo" hidden>Barışta (saldırmadığın her tur) refah +8 artar. Her başarısız saldırı −4, bir turda 3'ten fazla fetih her biri için −10 düşürür. Vergi 2 turda bir toplanır: sınır bölgelerinden 2 altın istemek refahı düşürür ve isyan çıkarabilir; 1 altın vergide halk memnundur. <b>%50</b> altında isyanlar çıkar: kötü huylu olanlar yayılır, bastırılmayan isyanlar bağımsız devlet kurar. <b>%20</b> altında ülken ikiye bölünür.</div>
   <!-- Harita alanı: deniz (wv), harita (m) ve animasyon katmanı (fxc) üst üste -->
   <div id="mw">
     <div id="bn"></div>
@@ -1595,6 +1595,12 @@ let sparks;
 let straits;
 let inc;
 let ib;
+// İsyan türü: ik 1 iyi huylu (yayılmaz), 2 kötü huylu (yayılır). rcl: kötü huylu isyanın çıktığı bölge
+// (aynı isyanın parçaları), rcm: o isyanın en fazla kaç bölgeye yayılabileceği, rst: isyandan doğan devlet.
+let ik;
+let rcl;
+let rcm;
+let rst;
 let rev;
 let bt;
 let foc;
@@ -1678,11 +1684,8 @@ function taxCollect(p) {
   ref[p] = Math.max(0, Math.min(100, o + d));
   let rv0 = 0;
   for (const t of hot)
-    if (cap[p] != t && Math.random() < .2) {
-      inc[t] = 2;
-      ib[t] = arm[t];
-      fl.push({ t, dx: 0, txt: 'Vergi isyanı!', col: '#ff7a3d', t0: performance.now() + 400 });
-      pulse(t, '#ff7a3d');
+    if (cap[p] != t && !inc[t] && Math.random() < .2) {
+      startRevolt(t, Math.random() < .25 ? 2 : 1);
       rv0++;
     }
   if (p == 0 && (d || rv0))
@@ -3499,6 +3502,10 @@ function init(noDraft, seed) {
   dk = Array(N).fill(0);
   inc = Array(N).fill(0);
   ib = Array(N).fill(0);
+  ik = Array(N).fill(0);
+  rcl = Array(N).fill(-1);
+  rcm = Array(N).fill(0);
+  rst = Array(N).fill(-1);
   rev = Z();
   bt = Z();
   foc = new Set();
@@ -3993,16 +4000,91 @@ function civilSplit(p) {
   return true;
 }
 // Düşük refahta kendiliğinden çıkan isyan.
+// Yer seçimi: önce yüksek vergili sınır bölgeleri, sonra diğer sınır bölgeleri, en son iç bölgeler.
 function autoRevolt(p) {
-  const L = [...Array(N).keys()].filter(t => own[t] == p && cap[p] != t && !inc[t]).sort((a, b) => arm[a] - arm[b]);
+  const L = [...Array(N).keys()].filter(t => own[t] == p && cap[p] != t && !inc[t]);
   if (!L.length)
     return;
-  const t = L[Math.floor(Math.random() * Math.max(1, Math.ceil(L.length / 3)))];
-  inc[t] = 2;
-  ib[t] = arm[t];
-  fl.push({ t, dx: 0, txt: 'Ayaklanma!', col: '#ff7a3d', t0: performance.now() });
-  pulse(t, '#ff7a3d');
-  hl += p == 0 ? ` Halk ayaklandı: ${NM[t]} bölgende isyan çıktı (refah %${ref[0]}). 2 tur içinde oraya asker taşı (bir fetih hakkı harcar).` : ` ${PN[p]} ülkesinde halk ayaklandı.`;
+  const w = t => (isBorder(t) ? 3 : 1) * (tax[t] >= 2 && isBorder(t) ? 3 : 1);
+  let sum = L.reduce((a, t) => a + w(t), 0) * Math.random();
+  let t = L[0];
+  for (const u of L) {
+    sum -= w(u);
+    if (sum <= 0) {
+      t = u;
+      break;
+    }
+  }
+  startRevolt(t, Math.random() < .25 ? 2 : 1);
+}
+// ---- İsyanlar ----
+// İsyan çıkınca bölgedeki askerler (1 tanesi hariç) en yakın güvenli bölgeye kendiliğinden çekilir.
+function retreat(t) {
+  const p = own[t];
+  const k = arm[t] - 1;
+  if (k <= 0)
+    return;
+  const dist = new Map([[t, 0]]);
+  const q = [t];
+  for (let i = 0; i < q.length; i++)
+    for (const u of adj[q[i]])
+      if (own[u] == p && !dist.has(u)) {
+        dist.set(u, dist.get(q[i]) + 1);
+        q.push(u);
+      }
+  let best = -1;
+  let bs = 1e9;
+  for (const [u, d] of dist)
+    if (u != t && !inc[u]) {
+      const sc = d * 10 + (isBorder(u) ? 4 : 0);
+      if (sc < bs) {
+        bs = sc;
+        best = u;
+      }
+    }
+  // Kendi topraklarından ulaşılamıyorsa (kopuk bölge) en yakın kendi bölgesine çekilir.
+  if (best < 0)
+    for (let u = 0; u < N; u++)
+      if (u != t && own[u] == p && !inc[u] && HD[t][u] * 10 < bs) {
+        bs = HD[t][u] * 10;
+        best = u;
+      }
+  if (best < 0)
+    return;
+  arm[best] += k;
+  arm[t] = 1;
+  const now = performance.now();
+  nav.push({ k: 'march', x0: cen[t][0] * S, y0: cen[t][1] * S, x1: cen[best][0] * S, y1: cen[best][1] * S, n: Math.min(10, k), t0: now, dur: 900 + Math.min(600, HD[t][best] * 120) });
+  fl.push({ t: best, dx: 0, txt: `+${k} çekildi`, col: '#fff', t0: now + 900 });
+}
+// İsyan başlat. kind 1: iyi huylu (yerinde kalır), 2: kötü huylu (yayılır). org: kötü huylu isyanın kaynağı.
+function startRevolt(t, kind, org) {
+  const p = own[t];
+  if (p < 0 || p >= P || inc[t])
+    return;
+  ik[t] = kind;
+  if (kind == 2) {
+    if (org == null || org < 0) {
+      org = t;
+      rcm[t] = Math.random() < .5 ? 3 : 4;
+    }
+    rcl[t] = org;
+    inc[t] = 3;
+    ib[t] = 4 + Math.floor(Math.random() * 4);
+  }
+  else {
+    rcl[t] = -1;
+    inc[t] = 2;
+    ib[t] = 2 + Math.floor(Math.random() * 3);
+  }
+  retreat(t);
+  const now = performance.now();
+  fl.push({ t, dx: 0, txt: kind == 2 ? 'Kötü huylu isyan!' : 'Ayaklanma!', col: kind == 2 ? '#ff4d4d' : '#ff7a3d', t0: now });
+  pulse(t, kind == 2 ? '#ff3030' : '#ff7a3d');
+  if (p == 0)
+    hl += kind == 2 ? ` ⚠ ${NM[t]} bölgende KÖTÜ HUYLU isyan çıktı! Askerlerin çekildi. Bastırmazsan her tur yayılır ve sonunda bağımsız bir devlet kurar.` : ` ${NM[t]} bölgende isyan çıktı, askerlerin çekildi. ${inc[t]} tur içinde isyancılardan fazla asker taşıyıp bastır (bir fetih hakkı harcar), yoksa bölge bağımsız bir devlet olur.`;
+  else if (Vg && Vg.has && Vg.has(t))
+    hl += ` ${PN[p]} ülkesinde ${kind == 2 ? 'kötü huylu bir ' : ''}isyan çıktı.`;
 }
 // Tur sonu refah hesabı: barış +8, başarısız saldırı -4, 3'ten fazla fetih -10.
 function welfareTick(p, a, w) {
@@ -4634,35 +4716,122 @@ function incite(p, t) {
       return lg(`${NM[t]}: isyan çıkmadı, bölgede çok fazla asker vardı. ${INC} altın boşa gitti.`);
     }
   }
-  inc[t] = 2;
-  ib[t] = arm[t];
-  fl.push({ t, dx: 0, txt: 'İsyan!', col: '#ff7a3d', t0: performance.now() });
-  pulse(t, '#ff7a3d');
+  startRevolt(t, 1);
   if (p == 0)
-    lg(`${NM[t]} bölgesinde isyan çıktı. ${PN[q]} 2 tur içinde asker göndermezse bölge boşa düşer.`);
+    lg(`${NM[t]} bölgesinde isyan çıktı. ${PN[q]} 2 tur içinde bastıramazsa bölge bağımsız bir devlet olur.`);
   else
     hl += ` ${PN[p]} ${NM[t]} bölgende isyan çıkardı! 2 tur içinde oraya asker gönder.`;
 }
-// İsyan süresi: asker gönderilmezse bölge boş toprağa düşer.
+// Her turun sonunda isyanlar: yeterli askerle bastırılır; bastırılmazsa kötü huylu isyan güçlenip yayılır,
+// süresi dolan isyanlı bölgeler bağımsız küçük bir devlet kurar.
 function incTick(p) {
+  const sec = [];
   for (let t = 0; t < N; t++) {
     if (inc[t] <= 0 || own[t] != p)
       continue;
     if (arm[t] > ib[t] && Math.random() < ((arm[t] - ib[t]) >= 5 ? .8 : .5)) {
       inc[t] = 0;
-      hl += p == 0 ? ` ${NM[t]} bölgene asker gönderdin, isyan bastırıldı.` : ` ${PN[p]} ${NM[t]} bölgesine asker gönderdi, isyan bastırıldı.`;
+      ik[t] = 0;
+      rcl[t] = -1;
+      fl.push({ t, dx: 0, txt: 'İsyan bastırıldı', col: '#3fb98a', t0: performance.now() });
+      hl += p == 0 ? ` ${NM[t]} bölgendeki isyan bastırıldı.` : '';
+      continue;
     }
-    else {
-      if (arm[t] > ib[t]) {
-        const lost = Math.floor((arm[t] - ib[t]) / 2);
-        arm[t] = Math.max(1, arm[t] - lost);
-        hl += ` ${NM[t]}: isyancılar karşı koydu, gelen asker geri püskürtüldü.`;
-        ib[t] = arm[t];
+    if (arm[t] > 1) {
+      const sent = arm[t] - 1;
+      const lost = Math.ceil(sent / 2);
+      arm[t] = Math.max(1, arm[t] - lost);
+      ib[t] = Math.max(1, ib[t] - Math.floor(sent / 3));
+      if (p == 0)
+        hl += ` ${NM[t]}: isyancılar karşı koydu, askerlerin geri püskürtüldü.`;
+    }
+    if (ik[t] == 2)
+      ib[t] = Math.min(12, ib[t] + 1);
+    inc[t]--;
+    if (inc[t] == 0)
+      sec.push(t);
+  }
+  // Kötü huylu isyanlar yayılır: her isyan kaynağı tur başına bir komşu bölgeye sıçrar.
+  const done = new Set();
+  for (let t = 0; t < N; t++) {
+    if (own[t] != p || !(inc[t] > 0) || ik[t] != 2 || done.has(rcl[t]))
+      continue;
+    const o = rcl[t];
+    done.add(o);
+    const mem = [...Array(N).keys()].filter(u => own[u] == p && inc[u] > 0 && ik[u] == 2 && rcl[u] == o);
+    if (mem.length >= (rcm[o] || 3))
+      continue;
+    const cand = [];
+    mem.forEach(m => adj[m].forEach(u => {
+      if (own[u] == p && !inc[u] && cap[p] != u && !cand.includes(u))
+        cand.push(u);
+    }));
+    if (!cand.length)
+      continue;
+    cand.sort((x, y) => (tax[y] - tax[x]) || ((isBorder(y) ? 1 : 0) - (isBorder(x) ? 1 : 0)));
+    const u = cand[Math.random() < .7 ? 0 : Math.floor(Math.random() * cand.length)];
+    const tl = Math.max(...mem.map(m => inc[m]));
+    startRevolt(u, 2, o);
+    inc[u] = Math.max(1, tl);
+    nav.push({ k: 'clash', t: u, col: '#ff3030', t0: performance.now(), dur: 600 });
+    if (p == 0)
+      hl += ` İsyan ${NM[u]} bölgene sıçradı!`;
+  }
+  if (sec.length)
+    secede(p, sec);
+}
+// Süresi dolan isyanlı bölgeler bağımsızlığını ilan eder. Aynı isyandan çıkanlar tek devlet olur.
+function secede(p, list) {
+  const groups = new Map();
+  for (const t of list) {
+    const key = ik[t] == 2 && rcl[t] >= 0 ? 'k' + rcl[t] : 't' + t;
+    if (!groups.has(key))
+      groups.set(key, []);
+    groups.get(key).push(t);
+  }
+  for (const [key, G] of groups) {
+    const o = key[0] == 'k' ? +key.slice(1) : -1;
+    // Aynı isyandan daha önce doğmuş ve hâlâ yaşayan devlet varsa ona katılır.
+    let r = o >= 0 && rst[o] >= 0 && cnt(rst[o]) > 0 ? rst[o] : -1;
+    if (r < 0) {
+      if (P >= PM) {
+        G.forEach(t => neutralize(t, p));
+        continue;
       }
-      inc[t]--;
-      if (inc[t] == 0)
-        neutralize(t, p);
+      r = P++;
+      mvd[r] = 0;
+      spl[r] = 1;
+      ally[r] = tru[r] = att[r] = won[r] = pen[r] = hp[r] = hb[r] = tcd[r] = rev[r] = bt[r] = 0;
+      bp[r] = Array(PM).fill(0);
+      for (let q = 0; q < PM; q++)
+        bp[q][r] = 0;
+      gold[r] = 15;
+      ref[r] = 75;
+      cap[r] = G[0];
+      if (o >= 0)
+        rst[o] = r;
     }
+    G.forEach(t => {
+      own[t] = r;
+      arm[t] = Math.max(2, ib[t]);
+      inc[t] = 0;
+      ik[t] = 0;
+      rcl[t] = -1;
+      tax[t] = 1;
+      if (dep[t] && p < P)
+        clampGold(p);
+      fadeTo(t, p, 10, 45);
+    });
+    if (cap[r] < 0 || own[cap[r]] != r)
+      cap[r] = G[0];
+    capChest(r);
+    const tm = G[0];
+    nav.push({ k: 'split', t: tm, c1: COL[p], c2: COL[r], t0: performance.now(), dur: 1600 });
+    fl.push({ t: tm, dx: 0, txt: 'Bağımsızlık!', col: '#ffb38a', t0: performance.now() + 200 });
+    const nm = G.map(t => NM[t]).join(', ');
+    hl += p == 0 ? ` İsyan bastırılamadı: ${nm} bağımsızlığını ilan etti, ${PN[r]} devleti kuruldu!` : (G.some(t => Vg.has(t)) ? ` ${PN[p]} ülkesinde isyancılar ${PN[r]} devletini kurdu.` : '');
+    if (p == 0)
+      setTimeout(() => banner(`${PN[r]} devleti kuruldu!`, COL[r]), 300);
   }
 }
 function neutralize(t, old) {
@@ -4786,16 +4955,39 @@ function drawFx(now) {
     g.globalAlpha = 1;
   });
 }
-function drawInc(x, y, n) {
+// İsyan işareti: kalan tur, kötü huyluysa kırmızı; görünürse isyancı sayısı.
+function drawInc(x, y, n, bad, reb) {
+  const col = bad ? '#ff2a2a' : '#ff7a3d';
   c.save();
+  if (bad) {
+    c.fillStyle = 'rgba(255,40,40,.16)';
+    c.beginPath();
+    c.arc(x, y, 30, 0, 7);
+    c.fill();
+  }
   c.setLineDash([3, 3]);
   c.beginPath();
   c.arc(x, y, 17, 0, 7);
   c.lineWidth = 2.5;
-  c.strokeStyle = '#ff7a3d';
+  c.strokeStyle = col;
   c.stroke();
   c.setLineDash([]);
-  c.fillStyle = '#ff7a3d';
+  if (reb != null) {
+    // İsyancı sayısı: koyu bir etiket içinde
+    c.font = 'bold 11px sans-serif';
+    const lbl = '✊' + reb;
+    const w0 = c.measureText(lbl).width + 8;
+    c.fillStyle = 'rgba(16,34,43,.92)';
+    c.beginPath();
+    c.roundRect ? c.roundRect(x - 22 - w0 / 2, y - 31, w0, 15, 7) : c.rect(x - 22 - w0 / 2, y - 31, w0, 15);
+    c.fill();
+    c.strokeStyle = col;
+    c.lineWidth = 1.2;
+    c.stroke();
+    c.fillStyle = '#fff';
+    c.fillText(lbl, x - 22, y - 23);
+  }
+  c.fillStyle = col;
   c.beginPath();
   c.moveTo(x, y - 33);
   c.lineTo(x + 9, y - 18);
@@ -4804,8 +4996,8 @@ function drawInc(x, y, n) {
   c.fill();
   c.fillStyle = '#fff';
   c.font = 'bold 11px sans-serif';
-  c.fillText('!', x, y - 22);
-  c.fillStyle = '#ff7a3d';
+  c.fillText(bad ? '‼' : '!', x, y - 22);
+  c.fillStyle = col;
   c.fillText(n, x + 16, y - 24);
   c.font = 'bold 15px sans-serif';
   c.restore();
@@ -7104,13 +7296,16 @@ function anim(ts) {
       wallArchers(t, s);
     if (inc[t] > 0) {
       drawRiot2(t, s);
-      const ph = (s * 1.2 + t) % 1;
-      g.globalAlpha = (1 - ph) * .7;
-      g.strokeStyle = '#ff7a3d';
-      g.lineWidth = 2;
-      g.beginPath();
-      g.arc(cx * S, cy * S, 14 + ph * 14, 0, 7);
-      g.stroke();
+      const bad = ik[t] == 2;
+      for (let r2 = 0; r2 < (bad ? 2 : 1); r2++) {
+        const ph = (s * (bad ? 1.6 : 1.2) + t + r2 * .5) % 1;
+        g.globalAlpha = (1 - ph) * (bad ? .85 : .7);
+        g.strokeStyle = bad ? '#ff2a2a' : '#ff7a3d';
+        g.lineWidth = bad ? 2.6 : 2;
+        g.beginPath();
+        g.arc(cx * S, cy * S, 14 + ph * (bad ? 22 : 14), 0, 7);
+        g.stroke();
+      }
       g.globalAlpha = 1;
     }
     if (dk[t] >= 2 && dock[t] && Vg.has(t)) {
@@ -7377,7 +7572,8 @@ function openPop(cx, cy) {
       for (let i = o.length - 1; i >= 0; i--)
         if (!keep.has(o[i][0]))
           o.splice(i, 1);
-      info = ' İsyan bastırılmadan bu bölgeye hiçbir şey inşa edilemez ve üretilemez.' + info;
+      info = (ik[t] == 2 ? ' <b style="color:#ff4d4d">Kötü huylu isyan!</b> Bastırılmazsa her tur komşu bölgelere yayılır (en fazla 4 bölge) ve isyancılar güçlenir.' : ' <b style="color:#ff7a3d">İyi huylu isyan:</b> yayılmaz.') +
+        ` İsyancılar: ${ib[t]}. Bastırmak için buraya isyancılardan fazla asker taşı (bir fetih hakkı harcar). ${inc[t]} tur içinde bastırılmazsa bölge bağımsız bir devlet kurar. İsyan sürerken burada hiçbir şey inşa edilemez.` + info;
     }
   }
   else if (own[t] != 0 && own[t] != NEU) {
@@ -7397,7 +7593,7 @@ function openPop(cx, cy) {
       o.push(['x', `İttifaktan çık (${EXC} altın)`, gold[0] >= EXC]);
     if (canInc3(0, t) && (!visSet().has(t) || canInc2(0, t))) {
       o.push(['i', `İsyan çıkar (${INC} altın)`, gold[0] >= INC]);
-      info += ` ${NM[t]}: isyan çıkar. Rakip asker gönderirse bastırabilir; ne kadar çok gönderirse o kadar kolay. 2 tur hiç asker göndermezse bölge boş kalır.`;
+      info += ` ${NM[t]}: isyan çıkar. Rakip asker gönderirse bastırabilir; ne kadar çok gönderirse o kadar kolay. 2 tur içinde bastıramazsa bölge bağımsız küçük bir devlet olur.`;
     }
     if (ONLINE) {
       for (let i = o.length - 1; i >= 0; i--)
@@ -8315,11 +8511,11 @@ async function ai0(p) {
     else
       rev[p]--;
   }
-  mine().filter(t => inc[t] > 0).forEach(t => {
-    if (sup[p] < 2 && Math.random() < .6) {
-      const dn = [...adj[t]].filter(u => own[u] == p && arm[u] >= 3 && u != ct).sort((a, b) => arm[b] - arm[a])[0];
+  mine().filter(t => inc[t] > 0).sort((a, b) => ik[b] - ik[a]).forEach(t => {
+    if (sup[p] < 2 && Math.random() < (ik[t] == 2 ? .85 : .6)) {
+      const dn = [...adj[t]].filter(u => own[u] == p && arm[u] >= 3 && u != ct && !inc[u]).sort((a, b) => arm[b] - arm[a])[0];
       if (dn != null) {
-        const k = Math.min(Math.floor(R(2, 7)), arm[dn] - 1);
+        const k = Math.min(ib[t] + 3, arm[dn] - 1);
         arm[dn] -= k;
         arm[t] += k;
         sup[p]++;
@@ -8494,7 +8690,7 @@ function ui(msg) {
     c.fillStyle = '#fff';
     c.fillText(V.has(t) ? arm[t] : '?', x * S, y * S + 1);
     if (inc[t] > 0)
-      drawInc(x * S, y * S, inc[t]);
+      drawInc(x * S, y * S, inc[t], ik[t] == 2, V.has(t) ? ib[t] : null);
     if (capVis(t)) {
       c.fillStyle = '#ffd36b';
       c.font = 'bold 20px sans-serif';
@@ -8878,7 +9074,7 @@ const TS = [
       tData.rd = rd;
     },
     done: () => rd > tData.rd && turn == 0 && !busy },
-  { t: 'Refah ve isyan', p: 'Saldırmadığın her tur refah artar; başarısız saldırılar, fazladan fetihler ve sınırlardan yüksek vergi onu düşürür. Refah <b>%50</b>\'nin altına inerse kendiliğinden isyanlar çıkar: isyanlı bölgeye 2 tur içinde asker taşıman gerekir (bir fetih hakkı harcar) ve oraya bir şey inşa edemezsin. <b>%20</b>\'nin altında ülken ikiye bölünür.', hl: 'refah', next: 1 },
+  { t: 'Refah ve isyan', p: 'Saldırmadığın her tur refah artar; başarısız saldırılar, fazladan fetihler ve sınırlardan yüksek vergi onu düşürür. Refah <b>%50</b>\'nin altına inerse isyanlar çıkar ve oradaki askerlerin en yakın güvenli bölgeye çekilir. <b>İyi huylu</b> isyan yerinde kalır; <b>kötü huylu</b> isyan (kırmızı) her tur komşu bölgelere yayılır ve güçlenir. İsyanı bastırmak için oraya isyancılardan (✊) fazla asker taşı; bastıramazsan bölgeler bağımsız bir devlet kurar. <b>%20</b>\'nin altında ülken ikiye bölünür.', hl: 'refah', next: 1 },
   { t: 'Hazırsın!', p: 'Özetle: takviye dağıt, saldır, yapılarını seviye seviye büyüt, hazineni sandıklarla genişlet, vergini akıllı ayarla ve başkentini koru. Bir bölgeye basılı tutarak her zaman ne yapabileceğini görebilirsin. İyi fetihler!', next: 2 },
 ];
 // Öğretici: bu hamleye izin var mı? İzin yoksa rehber kartı sallanır ve uyarı verir.
@@ -9261,7 +9457,7 @@ function LocalNet() {
 }
 // --- Durum anlık görüntüsü: SW ile kendi bakış açısından global numaralara çevrilir ---
 const PARR = ['gold', 'cap', 'att', 'won', 'pen', 'mvd', 'spl', 'ref', 'bt', 'tru', 'hp', 'hb', 'tcd', 'rev', 'sup', 'ally'];
-const GARR = { own: () => own, arm: () => arm, wall: () => wall, bar: () => bar, mn: () => mn, dep: () => dep, tax: () => tax, arch: () => arch, tw: () => tw, spy: () => spy, dk: () => dk, shS: () => shS, shL: () => shL, shUsed: () => shUsed, sfire: () => sfire, shot: () => shot, inc: () => inc, ib: () => ib, ruin: () => ruin, mine: () => mine };
+const GARR = { own: () => own, arm: () => arm, wall: () => wall, bar: () => bar, mn: () => mn, dep: () => dep, tax: () => tax, ik: () => ik, rcl: () => rcl, rcm: () => rcm, rst: () => rst, arch: () => arch, tw: () => tw, spy: () => spy, dk: () => dk, shS: () => shS, shL: () => shL, shUsed: () => shUsed, sfire: () => sfire, shot: () => shot, inc: () => inc, ib: () => ib, ruin: () => ruin, mine: () => mine };
 const PVARS = { gold: () => gold, cap: () => cap, att: () => att, won: () => won, pen: () => pen, mvd: () => mvd, spl: () => spl, ref: () => ref, bt: () => bt, tru: () => tru, hp: () => hp, hb: () => hb, tcd: () => tcd, rev: () => rev, sup: () => sup, ally: () => ally };
 function swapIdx(a) {
   if (!ONLINE || !myG)
