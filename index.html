@@ -2825,6 +2825,55 @@ function drawDockShips(s) {
 }
 // Hareketli olayların animasyonları: fetih patlaması, çarpışma, gemi seferi, top atışı,
 // batma, başkent taşıma, bölünme, asker yürüyüşü, casus dönüşü...
+// Savaş sancağı: direk, sahibinin renginde dalgalanan bayrak ve üzerinde çapraz kılıçlar.
+function warBanner(x, y, col, s, k) {
+  g.save();
+  g.translate(x, y);
+  g.scale(k, k);
+  g.fillStyle = 'rgba(0,0,0,.28)';
+  g.beginPath();
+  g.ellipse(1.5, 1, 6, 2, 0, 0, 7);
+  g.fill();
+  g.fillStyle = '#4a3220';
+  g.fillRect(-1.2, -30, 2.4, 31);
+  g.fillStyle = '#d9b45a';
+  g.beginPath();
+  g.arc(0, -31, 2.2, 0, 7);
+  g.fill();
+  const w1 = Math.sin(s * 5) * 2;
+  const w2 = Math.sin(s * 5 + 1.4) * 2.4;
+  g.fillStyle = col;
+  g.strokeStyle = 'rgba(10,20,26,.75)';
+  g.lineWidth = 1;
+  g.beginPath();
+  g.moveTo(1.2, -29);
+  g.bezierCurveTo(7, -31 + w1, 12, -27 - w1, 19, -29 + w2);
+  g.lineTo(16, -21 + w2 * .6);
+  g.lineTo(19, -14 + w2);
+  g.bezierCurveTo(12, -12 - w1, 7, -16 + w1, 1.2, -14);
+  g.closePath();
+  g.fill();
+  g.stroke();
+  // Çapraz kılıçlar
+  g.strokeStyle = '#f4efe2';
+  g.lineWidth = 1.5;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(6, -26 + w1 * .3);
+  g.lineTo(13, -17 + w1 * .3);
+  g.moveTo(13, -26 + w1 * .3);
+  g.lineTo(6, -17 + w1 * .3);
+  g.stroke();
+  g.strokeStyle = '#ffd36b';
+  g.lineWidth = 1.2;
+  g.beginPath();
+  g.moveTo(5, -18 + w1 * .3);
+  g.lineTo(8, -21 + w1 * .3);
+  g.moveTo(14, -18 + w1 * .3);
+  g.lineTo(11, -21 + w1 * .3);
+  g.stroke();
+  g.restore();
+}
 function drawNav(now) {
   nav = nav.filter(e => now - e.t0 < e.dur + (e.k == 'sail' ? 800 : 0));
   const s = now / 1000;
@@ -2986,46 +3035,42 @@ function drawNav(now) {
       return;
     }
     if (e.k == 'order') {
+      // Müttefik emri: hedef bölgeye müttefikin savaş sancağı iner ve yere saplanır.
       if (u < 0 || u > 1)
         return;
-      // Müttefik emri: müttefikten hedefe doğru uzanan kesik ok ve çapraz kılıçlar
-      const ez = Math.min(1, u * 2.2);
-      const xe = e.x0 + (e.x1 - e.x0) * ez;
-      const ye = e.y0 + (e.y1 - e.y0) * ez;
-      const al = u > .8 ? (1 - u) / .2 : 1;
+      const x = e.x1;
+      const y = e.y1 - 6;
+      const dq = Math.min(1, u / .22);
+      const drop = (1 - (1 - dq) * (1 - dq)) ;
+      const yOff = -70 * (1 - drop);
+      const al = u > .82 ? (1 - u) / .18 : 1;
       g.save();
       g.globalAlpha = al;
-      g.setLineDash([7, 5]);
-      g.lineDashOffset = -u * 60;
-      g.strokeStyle = 'rgba(10,20,26,.6)';
-      g.lineWidth = 7;
-      g.lineCap = 'round';
-      g.beginPath();
-      g.moveTo(e.x0, e.y0);
-      g.lineTo(xe, ye);
-      g.stroke();
-      g.strokeStyle = e.col;
-      g.lineWidth = 4.5;
-      g.beginPath();
-      g.moveTo(e.x0, e.y0);
-      g.lineTo(xe, ye);
-      g.stroke();
-      g.setLineDash([]);
-      const an = Math.atan2(e.y1 - e.y0, e.x1 - e.x0);
-      g.fillStyle = e.col;
-      g.beginPath();
-      g.moveTo(xe + Math.cos(an) * 8, ye + Math.sin(an) * 8);
-      g.lineTo(xe + Math.cos(an + 2.5) * 8, ye + Math.sin(an + 2.5) * 8);
-      g.lineTo(xe + Math.cos(an - 2.5) * 8, ye + Math.sin(an - 2.5) * 8);
-      g.closePath();
-      g.fill();
-      if (ez >= 1) {
-        const sc2 = 1 + Math.sin(u * 30) * .08;
-        g.font = `${Math.round(30 * sc2)}px sans-serif`;
-        g.textAlign = 'center';
-        g.textBaseline = 'middle';
-        g.fillText('⚔️', e.x1, e.y1 - 26);
+      if (dq >= 1) {
+        // Saplanınca: yerde halka ve toz
+        const q2 = (u - .22) / .78;
+        for (let r = 0; r < 2; r++) {
+          const qq = (q2 * 1.6 + r * .35) % 1;
+          g.globalAlpha = al * (1 - qq) * .8;
+          g.strokeStyle = e.col;
+          g.lineWidth = 3;
+          g.beginPath();
+          g.ellipse(x, y + 4, 10 + qq * 34, (10 + qq * 34) * .45, 0, 0, 7);
+          g.stroke();
+        }
+        g.globalAlpha = al;
+        if (q2 < .35) {
+          for (let k = 0; k < 6; k++) {
+            const aa = k * 1.05;
+            const d = q2 / .35 * 16;
+            g.fillStyle = `rgba(160,140,110,${(1 - q2 / .35).toFixed(3)})`;
+            g.beginPath();
+            g.arc(x + Math.cos(aa) * d, y + 4 + Math.sin(aa) * d * .4, 3, 0, 7);
+            g.fill();
+          }
+        }
       }
+      warBanner(x, y + yOff, e.col, u * 3, 1.7);
       g.restore();
       return;
     }
@@ -5817,12 +5862,30 @@ function lay(t) {
   return (lscV[t] = best);
 }
 // Sığan en büyük ölçek %33 büyütülür (çok küçük kalmasın diye), tam boyu geçmez.
-const lsc = t => Math.min(1, lay(t).s * 1.33);
+// Yapı boyu bölgedeki yapı sayısına göre: tek yapı tam boy, yapı eklendikçe hepsi biraz küçülür.
+function bCount(t) {
+  let n = 0;
+  if (bar[t])
+    n++;
+  if (mn[t])
+    n++;
+  if (dep && dep[t] && depSeen(t))
+    n++;
+  if (arch[t])
+    n++;
+  if (spy[t])
+    n++;
+  if (tw[t])
+    n++;
+  if (cat && cat[t])
+    n++;
+  return n;
+}
+const lsc = t => [1, 1, .9, .8, .72, .65, .6, .56][Math.min(7, bCount(t))];
 function slotXY(t, k) {
-  const L = lay(t);
-  const sc = Math.min(1, L.s * 1.33);
+  const sc = lsc(t);
   const [ox, oy] = slotOff(k, sc);
-  return [cen[t][0] * S + L.ox + ox, cen[t][1] * S + L.oy + oy, sc];
+  return [cen[t][0] * S + ox, cen[t][1] * S + oy, sc];
 }
 // Bir yapıyı yerine taşıyıp ölçekleyerek çizer (çizim fonksiyonu 0,0 merkezli çalışır).
 function atSlot(ctx, t, k, fn) {
@@ -7568,7 +7631,7 @@ function drawTowerAnim(t, s) {
   const [bx, by] = twp[t];
   const col = COL[own[t]];
   const lv = tw[t];
-  const Z = (lv >= 2 ? .47 : .425) * (.55 + .45 * lsc(t));
+  const Z = (lv >= 2 ? .47 : .425) * lsc(t);
   const iz = 1 / Z;
   let wa = -.6;
   let bdist = 99;
@@ -7901,6 +7964,10 @@ function anim(ts) {
       taxBadge(t);
     if (cat[t] > 0 && Vg.has(t) && own[t] < P)
       drawCatapult(t, s);
+    // Müttefike verilen saldırı emrinin hedefi: küçük savaş sancağı
+    for (let q = 1; q < P; q++)
+      if (ordT[q] == t && ord[q] >= 0 && own[t] == ord[q] && ally[q] > 0 && !tru[q])
+        warBanner(cx * S + 14, cy * S - 8, COL[q], s, .9);
     if (inc[t] > 0) {
       drawRiot2(t, s);
       const bad = ik[t] == 2;
@@ -8083,7 +8150,9 @@ function bulkPress(cx, cy) {
   lg(`${tot} asker ${NM[t]} bölgesine toplandı.` + (skip.length ? ` Bağlantısız olduğu için taşınamadı: ${skip.join(', ')}.` : ''));
   if (tot)
     mvCount++;
+  // Toplama bitti: mod kapanır (eski tek tek taşıma moduna düşmesin).
   bk = null;
+  mv = false;
   ui();
 }
 function cellAt(cx, cy) {
@@ -8917,6 +8986,9 @@ cv.addEventListener('click', async (e) => {
     ui();
     return;
   }
+  // Toplu taşıma açıkken dokunuşlar her zaman toplama kaynağı seçer.
+  if (mv && !bk)
+    bk = { src: new Set() };
   if (phase == 'r' && !mv) {
     if (own[t] == 0) {
       if (inc[t] > 0)
