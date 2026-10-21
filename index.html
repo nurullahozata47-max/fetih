@@ -42,6 +42,11 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
+  /* Uzun basınca yazı seçilip Google aramasının açılmasını engeller (oyun basılı tutmayı kullanıyor) */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   font-family: Bahnschrift,"Segoe UI",system-ui,sans-serif;
 }
 main {
@@ -1339,6 +1344,10 @@ main {
 }
 #rfInfo[hidden] {
   display: none;
+}
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 </style>
 </head>
@@ -9793,6 +9802,15 @@ addEventListener('appinstalled', () => {
 // Çevrimdışı çalışma için önbellek görevlisi (yalnızca kendi sitesinde, sw.js varsa).
 if ('serviceWorker' in navigator && window.isSecureContext && document.querySelector('link[rel=manifest]'))
   navigator.serviceWorker.register('sw.js').catch(() => { });
+// Uzun basmada telefonun "kopyala / Google'da ara" menüsü açılmasın (yazı kutuları hariç).
+document.addEventListener('contextmenu', e => {
+  if (!(e.target.closest && e.target.closest('input,textarea')))
+    e.preventDefault();
+});
+document.addEventListener('selectstart', e => {
+  if (!(e.target.closest && e.target.closest('input,textarea')))
+    e.preventDefault();
+});
 // Oyunu başlat: arka planda bir harita üret ve ana menüyü göster.
 try {
   const v = localStorage.getItem('fetih_dif');
