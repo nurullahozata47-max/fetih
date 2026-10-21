@@ -5410,8 +5410,9 @@ function leaveAlly(q) {
   pulse(cap[q], '#e5566d');
   lg(`${PN[q]} ile ittifaktan çıktın (${EXC} altın).`);
 }
-// Başkent koruması (ilk 5 tur) ve gizli başkent kuralları
-const prot = t => rd <= 5 && cap.some((q, p) => q == t && own[t] == p);
+// Başkent koruması (ilk CAPT tur) ve gizli başkent kuralları
+const CAPT = 3;
+const prot = t => rd <= CAPT && cap.some((q, p) => q == t && own[t] == p);
 let kc = new Set();
 let mvd = [];
 let spl = [];
@@ -5448,7 +5449,7 @@ function protHit(t) {
   kc.add(t);
   pulse(t, '#ffd36b');
   fl.push({ t, dx: 0, txt: 'Başkent!', col: '#ffd36b', t0: performance.now() });
-  $('log').textContent = `${NM[t]}, ${PN[own[t]]} krallığının başkentiymiş! Başkentlere ilk 5 tur saldırılamaz.`;
+  $('log').textContent = `${NM[t]}, ${PN[own[t]]} krallığının başkentiymiş! Başkentlere ilk ${CAPT} tur saldırılamaz.`;
 }
 // Saldırı menzili: kendi ve müttefik topraklarından ulaşılabilen bölgeler.
 const reach2 = a => {
@@ -5815,11 +5816,11 @@ function lay(t) {
   }
   return (lscV[t] = best);
 }
-// Sığan en büyük ölçek %21 büyütülür (çok küçük kalmasın diye), tam boyu geçmez.
-const lsc = t => Math.min(1, lay(t).s * 1.21);
+// Sığan en büyük ölçek %33 büyütülür (çok küçük kalmasın diye), tam boyu geçmez.
+const lsc = t => Math.min(1, lay(t).s * 1.33);
 function slotXY(t, k) {
   const L = lay(t);
-  const sc = Math.min(1, L.s * 1.21);
+  const sc = Math.min(1, L.s * 1.33);
   const [ox, oy] = slotOff(k, sc);
   return [cen[t][0] * S + L.ox + ox, cen[t][1] * S + L.oy + oy, sc];
 }
@@ -9092,7 +9093,7 @@ async function ai0(p) {
   await sleep(500);
   const mine = () => [...Array(N).keys()].filter(t => own[t] == p);
   const bord = () => mine().filter(t => !inc[t] && [...adj[t]].some(b => own[b] != p));
-  if (!mvd[p] && gold[p] >= CMC && rd > 5) {
+  if (!mvd[p] && gold[p] >= CMC && rd > CAPT) {
     const c0 = cap[p];
     const th = [...adj[c0]].filter(u => own[u] != p && own[u] != NEU && !friend(p, own[u])).reduce((a, u) => a + est(p, u), 0);
     if (th >= arm[c0] + 2 && Math.random() < .7) {
@@ -9521,7 +9522,7 @@ function ui(msg) {
       c.font = 'bold 20px sans-serif';
       c.fillText('★', x * S, y * S - 22);
       c.font = 'bold 15px sans-serif';
-      if (rd <= 5) {
+      if (rd <= CAPT) {
         c.beginPath();
         c.arc(x * S, y * S, 29, 0, 7);
         c.lineWidth = 2;
@@ -9572,7 +9573,7 @@ function ui(msg) {
   if (gold && !dr)
     for (let p = 0; p < P; p++)
       clampGold(p);
-  setTxt('ttl', dr ? 'Fetih, bölge seçimi' : `Fetih, tur ${rd}` + (rd <= 5 ? ` (başkentler ${6 - rd} tur daha dokunulmaz)` : ''));
+  setTxt('ttl', dr ? 'Fetih, bölge seçimi' : `Fetih, tur ${rd}` + (rd <= CAPT ? ` (başkentler ${CAPT + 1 - rd} tur daha dokunulmaz)` : ''));
   setHTML('chips', PN.slice(0, P).map((n, p) => cnt(p) == 0 && p > 3 ? '' : `<span class="${p == turn && !over ? 'on' : ''}" style="--c:${COL[p]}">${n} ${cnt(p)}<em style="font-style:normal;font-size:.85em;margin-left:4px;color:${ref[p] < 20 ? '#d63a3a' : ref[p] < 50 ? '#e5566d' : ref[p] < 70 ? '#c98a12' : '#3a9a6c'}">${p == 0 ? '' : '%' + ref[p]}</em>${p == 0 ? ` (${gold[0]}/${capOf(0)} altın)` : ally[p] > 0 ? (tru[p] ? ` (haraç: ${ally[p]} tur)` : ` (ittifak: ${ally[p]} tur)`) : ''}${p > 0 && bp[p].some(v => v > 0) ? ` (+${bp[p].map((v, q) => v > 0 ? PN[q] : '').filter(Boolean).join(', ')})` : ''}</span>`).join('') + (cnt(NEU) ? `<span style="--c:#9aa3a8">Boş ${cnt(NEU)}</span>` : ''));
   setTxt('st', msg || (ctk && sel != null && turn == 0 ? `Mancınıklar hazır (${NM[sel]}). Komşu bir düşman bölgesine dokun.` : ordSel != null && turn == 0 ? `${PN[ordSel]} için hedef seç: ortak bir düşmanın bölgesine dokun.` : dr ? (turn == 0 && !busy ? `Bölge seç (${N - dnx} kaldı)` + (cap[0] < 0 ? ': ilk seçimin başkent olur.' : '.') : `${PN[turn]} seçiyor…`) : bd && turn == 0 ? ({ b: 'Kışla kurmak için kendi bölgene dokun.', m: 'Maden kurmak için kendi bölgene dokun.', a: 'İttifak için o krallığın herhangi bir bölgesine dokun.', w: 'Sur için başkentine (★) dokun.' }[bd]) : turn != 0 ? `${PN[turn]} oynuyor…` : cn ? `Büyük gemiler hazır (${NM[sel]}). Kıyıdaki düşman bölgesine dokun.` : sco ? `Keşif gemisi hazır (${NM[sel]}). Kıyıdaki bir bölgeye dokun.` : sp ? `Casus hazır (${NM[sel]}). Herhangi bir düşman bölgesine dokun; içerilere gittikçe yakalanma riski artar.` : ak ? `Okçular hazır (${NM[sel]}). menzildeki düşmana dokun (2 bölge).` : phase == 'r' && !mv ? `Takviye: ${pool} birlik. Dokun: asker ekle. Basılı tut: inşa et.` : mv && bk ? (bk.src.size ? `Toplu taşıma: ${bk.src.size} bölgeden ${[...bk.src].reduce((a, u) => a + arm[u] - 1, 0)} asker seçildi. Şimdi hedef bölgeye basılı tut.` : 'Toplu taşıma: asker toplanacak bölgelere dokun, sonra hedefe basılı tut.') : mv ? (sel == null ? 'Taşımak için 2+ birlikli bölgeni seç. Basılı tut: toplu taşıma.' : `${NM[sel]} seçili. Hedef bölgene dokun, her dokunuş 1 birlik taşır.`) : sel == null ? `Saldırmak için 2+ birlikli bölgeni seç. (Fetih: ${won[0] + sup[0]}/${ext ? 5 : 3}, refah %${ref[0]})` : `${NM[sel]} seçili. Kendi bölgene dokun: asker taşı. Düşmana dokun: saldır.${shipCap(sel) > 0 ? ` Gemilerle ${Math.min(arm[sel] - 1, shipCap(sel))} asker taşıyabilirsin: denizin ötesindeki bir kıyıya dokun.` : ''} Koyu renkli düşmana dokun; bağlantılı bölgelerinden de saldırabilirsin.`));
   const ok = turn == 0 && phase == 'a' && !busy && !over;
