@@ -6064,71 +6064,148 @@ function slotOff(k, sc) {
   const d = 13 + r * sc + (d0 - 13 - r);
   return [x / d0 * d, y / d0 * d];
 }
-// Sığma testi: yapıların ve yanlarındaki hareketli sahnelerin kapladığı alanlar (yapının yerine göre, ölçek 1'de).
-// Daireler [yapı, x, y, yarıçap], dikdörtgenler [yapı, x0, y0, x1, y1]. Kışla sahnesi sağa, maden sahnesi sola taşar.
-const FOOTC = [['b', 0, 0, 11], ['m', 0, 0, 11], ['a', 0, 0, 9], ['s', 0, 0, 9], ['b', 0, 13, 5], ['m', 0, 13, 5]];
-const FOOTR = [['b', -2, -22, 42, 13], ['m', -49, -19, -5, 10], ['d', -12, -21, 13, 10]];
-let lscCell = null;
-let lscV = [];
-// Bölgenin yapılarını komşuya taşmadan gösterebilecek en büyük ölçek ve küçük bir kaydırma.
-// Harita başına bir kez hesaplanır, böylece yapılar oyun boyunca yer değiştirmez.
-function lay(t) {
-  if (lscCell !== cell) {
-    lscCell = cell;
-    lscV = [];
+// ---- Yapı yerleşim çözücüsü ----
+// Her yapının (yanındaki hareketli sahnesiyle birlikte) kapladığı dikdörtgenler, ölçek 1'de, yapının yerine göre.
+const FOOT = {
+  b: [[-11, -11, 11, 17], [-2, -22, 42, 13]],
+  m: [[-11, -11, 11, 17], [-49, -19, -5, 10]],
+  d: [[-12, -21, 13, 10]],
+  a: [[-11, -14, 14, 11]],
+  s: [[-11, -14, 14, 11]],
+  c: [[-21, -19, 21, 9]],
+  tw: [[-7, -23, 7, 3]]
+};
+// Yerleşim sırası: büyük sahneli yapılar önce yer seçer.
+const FORD = ['b', 'm', 'd', 'c', 'tw', 'a', 's'];
+// Asker sayısı dairesi ve başkent yıldızı için ayrılan alan (bölge merkezine göre).
+const BADGE = [[-15, -15, 15, 15], [-9, -33, 9, -15]];
+let layCell = null;
+let layC = [];
+let regPts = [];
+function bKeys(t) {
+  const k = [];
+  if (bar[t])
+    k.push('b');
+  if (mn[t])
+    k.push('m');
+  if (dep && dep[t] && depSeen(t))
+    k.push('d');
+  if (cat && cat[t])
+    k.push('c');
+  if (tw[t])
+    k.push('tw');
+  if (arch[t])
+    k.push('a');
+  if (spy[t])
+    k.push('s');
+  return k;
+}
+// Bölgedeki yapıları birbirinin ve asker dairesinin üstüne binmeden, bölge sınırının içine yerleştirir.
+// Her yapı kendi alışık yerine (SLOT) en yakın uygun noktaya konur; sığmazsa hepsi biraz küçülür.
+// Sonuç yapı seti değişene kadar saklanır, böylece yapılar kendi kendine yer değiştirmez.
+function layout(t) {
+  if (layCell !== cell) {
+    layCell = cell;
+    layC = [];
+    regPts = [];
   }
-  if (lscV[t])
-    return lscV[t];
+  const ks = bKeys(t);
+  const key = ks.join(',');
+  const L0 = layC[t];
+  if (L0 && L0.key == key)
+    return L0;
+  if (!regPts[t]) {
+    const a = [];
+    for (let i = 0; i < cell.length; i++)
+      if (cell[i] == t)
+        a.push([(i % W) * S + S / 2, ((i / W) | 0) * S + S / 2]);
+    regPts[t] = a;
+  }
   const X = cen[t][0] * S;
   const Y = cen[t][1] * S;
-  // Komşu bölgeye taşmak 1, denize taşmak yarım ceza sayılır.
-  const outW = (px, py) => {
+  const inR = (px, py) => {
     const cx = Math.floor(px / S);
     const cy = Math.floor(py / S);
-    if (cx < 0 || cy < 0 || cx >= W || cy >= H)
-      return .5;
-    const v = cell[cy * W + cx];
-    return v == t ? 0 : v < 0 ? .5 : 1;
+    return cx >= 0 && cy >= 0 && cx < W && cy < H && cell[cy * W + cx] == t;
   };
-  // Verilen ölçekte örnek noktalar: dairelerin merkezi ve çevresi, dikdörtgenlerin içi.
-  const ptsAt = sc => {
-    const pts = [];
-    for (const [k, x, y, r] of FOOTC) {
-      const [sx, sy] = slotOff(k, sc);
-      const cx = sx + x * sc;
-      const cy = sy + y * sc;
-      pts.push([cx, cy]);
-      for (let a = 0; a < 8; a++)
-        pts.push([cx + Math.cos(a * .785) * r * sc * .9, cy + Math.sin(a * .785) * r * sc * .9]);
-    }
-    for (const [k, x0, y0, x1, y1] of FOOTR) {
-      const [sx, sy] = slotOff(k, sc);
-      for (let y = y0; y <= y1 + .1; y += (y1 - y0) / 4)
-        for (let x = x0; x <= x1 + .1; x += (x1 - x0) / 6)
-          pts.push([sx + x * sc, sy + y * sc]);
-    }
-    return pts;
-  };
-  const offs = [[0, 0]];
-  for (const d of [4, 8, 12])
-    for (let a = 0; a < 8; a++)
-      offs.push([Math.round(Math.cos(a * .785) * d), Math.round(Math.sin(a * .785) * d)]);
-  let best = { s: .38, ox: 0, oy: 0 };
-  outer: for (const sc of [1, .92, .84, .76, .68, .6, .53, .45, .38]) {
-    const pts = ptsAt(sc);
-    const tol = pts.length * .06;
-    for (const [ox, oy] of offs) {
-      let miss = 0;
-      for (const [x, y] of pts)
-        if ((miss += outW(X + ox + x, Y + oy + y)) > tol)
-          break;
-      if (miss <= tol) {
-        best = { s: sc, ox, oy };
-        break outer;
+  // Dikdörtgenin içinde kalmayan örnek noktaların oranı.
+  const outF = (x0, y0, x1, y1) => {
+    let n = 0;
+    let o = 0;
+    const sx = Math.max(1, Math.ceil((x1 - x0) / 3));
+    const sy = Math.max(1, Math.ceil((y1 - y0) / 3));
+    for (let a = 0; a <= sx; a++)
+      for (let b = 0; b <= sy; b++) {
+        n++;
+        if (!inR(x0 + (x1 - x0) * a / sx, y0 + (y1 - y0) * b / sy))
+          o++;
       }
+    return o / n;
+  };
+  const hit = (r, R) => r[0] < R[2] + 1 && r[2] > R[0] - 1 && r[1] < R[3] + 1 && r[3] > R[1] - 1;
+  const pref = (k, sc) => {
+    if (k == 'tw') {
+      if (!twp[t])
+        twp[t] = pickTowerSpot(t);
+      return twp[t];
     }
-  }
-  return (lscV[t] = best);
+    if (k == 'c') {
+      const [x, y] = slotOff('b', sc);
+      return [X + x + 30 * sc, Y + y + 19 * sc];
+    }
+    const [x, y] = slotOff(k, sc);
+    return [X + x, Y + y];
+  };
+  const tryAt = (sc, force) => {
+    const used = BADGE.map(([a, b, c2, d]) => [X + a, Y + b, X + c2, Y + d]);
+    const res = { key };
+    let pen = 0;
+    for (const k of FORD) {
+      if (!ks.includes(k))
+        continue;
+      const [qx, qy] = pref(k, sc);
+      const F = FOOT[k];
+      const C = regPts[t].map(([x, y]) => [x, y, (x - qx) ** 2 + (y - qy) ** 2]).sort((u, v) => u[2] - v[2]);
+      let best = null;
+      let bs = 1e9;
+      for (const [x, y, d2] of C) {
+        const rs = F.map(([a, b, c2, d]) => [x + a * sc, y + b * sc, x + c2 * sc, y + d * sc]);
+        const ov = rs.some(r => used.some(R => hit(r, R)));
+        if (!force && ov)
+          continue;
+        const of = Math.max(...rs.map(r => outF(...r)));
+        if (!force) {
+          if (of <= .06) {
+            best = [x, y, rs];
+            break;
+          }
+          continue;
+        }
+        const sc2 = of * 40 + (ov ? 25 : 0) + Math.sqrt(d2) * .02;
+        if (sc2 < bs) {
+          bs = sc2;
+          best = [x, y, rs];
+        }
+      }
+      if (!best) {
+        if (!force)
+          return null;
+        best = [qx, qy, F.map(([a, b, c2, d]) => [qx + a * sc, qy + b * sc, qx + c2 * sc, qy + d * sc])];
+      }
+      res[k] = [best[0], best[1], sc];
+      used.push(...best[2]);
+      pen += bs < 1e9 ? bs : 0;
+    }
+    return res;
+  };
+  const s0 = lsc(t);
+  let R = null;
+  for (const f of [1, .9, .8, .72, .64, .57])
+    if ((R = tryAt(s0 * f, false)))
+      break;
+  if (!R)
+    R = tryAt(s0 * .57, true);
+  return (layC[t] = R);
 }
 // Sığan en büyük ölçek %33 büyütülür (çok küçük kalmasın diye), tam boyu geçmez.
 // Yapı boyu bölgedeki yapı sayısına göre: tek yapı tam boy, yapı eklendikçe hepsi biraz küçülür.
@@ -6152,6 +6229,11 @@ function bCount(t) {
 }
 const lsc = t => [1, 1, .9, .8, .72, .65, .6, .56][Math.min(7, bCount(t))];
 function slotXY(t, k) {
+  const L = cell && cen && cen[t] ? layout(t)[k] : null;
+  if (L)
+    return L;
+  if (!SLOT[k])
+    return [cen[t][0] * S, cen[t][1] * S - 12, lsc(t)];
   const sc = lsc(t);
   const [ox, oy] = slotOff(k, sc);
   return [cen[t][0] * S + ox, cen[t][1] * S + oy, sc];
@@ -7709,6 +7791,9 @@ function taxBadge(t) {
 // ---- Mancınık ----
 // Mancınıkların durduğu yer: kışla sahnesinin yanı.
 function catPos(t) {
+  const L = layout(t).c;
+  if (L)
+    return L;
   const [bx, by, sc] = slotXY(t, 'b');
   return [bx + 30 * sc, by + 19 * sc, sc];
 }
@@ -7895,12 +7980,10 @@ function wallArchers(t, s) {
 }
 // Okçu kulesi animasyonu.
 function drawTowerAnim(t, s) {
-  if (!twp[t])
-    twp[t] = pickTowerSpot(t);
-  const [bx, by] = twp[t];
+  const [bx, by, tsc] = slotXY(t, 'tw');
   const col = COL[own[t]];
   const lv = tw[t];
-  const Z = (lv >= 2 ? .47 : .425) * lsc(t);
+  const Z = (lv >= 2 ? .47 : .425) * tsc;
   const iz = 1 / Z;
   let wa = -.6;
   let bdist = 99;
