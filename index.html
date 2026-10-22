@@ -72,6 +72,10 @@ h1 {
   border-radius: 4px;
   font-size: 14px;
 }
+#chips span.dead {
+  opacity: .45;
+  text-decoration: line-through;
+}
 #chips span.on {
   outline: 2px solid var(--c);
 }
@@ -1619,7 +1623,7 @@ const WALLMIN1 = 10;
 // Mancınık: kışla sv3 gerekir, kışla başına en fazla CATMAX, 2 turda bir taş atar.
 const CTC = 70;
 const CATMAX = 2;
-const MI = 10;
+const MI = 5;
 const AC = 20;
 const TR = 20;
 const TT = 2;
@@ -1643,7 +1647,7 @@ const SSC = 20;
 const SLC = 40;
 const LOOT = 15;
 const SEAR = 85;
-const MC = n => 40;
+const MC = n => 40 + 10 * n;
 // Altın sandığı: devletin altın sınırı sandıkların kapasitelerinin toplamıdır (sv1 50, sv2 70, sv3 100).
 // Başkentte her zaman en az 1. seviye bir sandık bulunur. DPC sandık kurma, DPU[sv] yükseltme ücreti.
 // Sandıklı bölge fethedilirse içindeki altının yarısı yağmalanır.
@@ -4741,6 +4745,54 @@ async function capLost(old, me, t) {
   await Promise.all(Q.map((u, i) => sleep(i * 60).then(() => fadeTo(u, old, 10, 45))));
 }
 const isFront = (p, u) => [...adj[u]].some(v => own[v] != p && !friend(p, own[v]));
+// Botlar: iç bölgelerde biriken askerler kendi toprakları üzerinden en yakın cepheye yürür.
+// Başkentte savunma için 4 asker kalır.
+async function marchFront(p, ct) {
+  const foe = u => own[u] != p && !friend(p, own[u]);
+  const T = [...Array(N).keys()].filter(u => own[u] == p && !inc[u]);
+  const isF = u => [...adj[u]].some(foe);
+  const Fr = T.filter(isF);
+  if (!Fr.length)
+    return;
+  const dist = new Map();
+  const dst = new Map();
+  const q = [];
+  Fr.forEach(u => {
+    dist.set(u, 0);
+    dst.set(u, u);
+    q.push(u);
+  });
+  for (let k = 0; k < q.length; k++) {
+    const u = q[k];
+    adj[u].forEach(v => {
+      if (own[v] == p && !inc[v] && !dist.has(v)) {
+        dist.set(v, dist.get(u) + 1);
+        dst.set(v, dst.get(u));
+        q.push(v);
+      }
+    });
+  }
+  let an = 0;
+  for (const u of T) {
+    if (isF(u) || !dst.has(u))
+      continue;
+    // Kolay modda botlar fazlalığın yarısını yollar (oyuncunun müttefikleri hep tamamını).
+    let n = arm[u] - (u == ct ? 4 : 1);
+    if (DIF == 0 && !(ally[p] > 0 && !tru[p]))
+      n = Math.floor(n / 2);
+    if (n < 2)
+      continue;
+    const v = dst.get(u);
+    arm[u] -= n;
+    arm[v] += n;
+    if ((Vg.has(u) || Vg.has(v)) && an++ < 6)
+      nav.push({ k: 'march', x0: cen[u][0] * S, y0: cen[u][1] * S, x1: cen[v][0] * S, y1: cen[v][1] * S, n: Math.min(10, n), col: COL[p], t0: performance.now(), dur: 900 });
+  }
+  if (an) {
+    ui();
+    await sleep(500);
+  }
+}
 // 3. seviye kışla: 10+ asker birikince sınırda değilse en yakın sınıra gider.
 function autoMarch(p) {
   const V = visSet();
@@ -9506,7 +9558,7 @@ async function ai0(p) {
   for (const t of mine())
     tax[t] = ref[p] < 50 || isBorder(t) ? 1 : 2;
   // Hazinesi dolmak üzere olan bot depo kurar ya da yükseltir (en güvenli bölgeye).
-  if (gold[p] >= capOf(p) * .7) {
+  if (gold[p] >= capOf(p) * .85 && capOf(p) < 300) {
     const ds = mine().filter(t => dep[t] && dep[t] < 3 && !inc[t]);
     if (ds.length && gold[p] >= DPU[dep[ds[0]]]) {
       gold[p] -= DPU[dep[ds[0]]];
@@ -9525,48 +9577,79 @@ async function ai0(p) {
     }
   }
   const ct = cap[p];
-  const wc = WC(wall[ct]);
-  if (wall[ct] < 2 && gold[p] >= wc && Math.random() < .9) {
-    gold[p] -= wc;
-    wall[ct]++;
-    wallStart(ct);
-    pulse(ct, '#cfe3ea');
-  }
-  else if (gold[p] >= MC(mn.filter((m, t) => m && own[t] == p).length) && Math.random() < .5) {
-    const o = mine().filter(t => !mn[t] && !inc[t]);
-    if (o.length) {
-      const k = o[Math.floor(Math.random() * o.length)];
-      gold[p] -= MC(mn.filter((m, t) => m && own[t] == p).length);
-      mn[k] = 1;
-      pulse(k, '#ffd36b');
+  // İnşa: hazine doluysa tur başına birden çok yapı alır. Yapılacak yeri olmayan seçenek listeye girmez (tur boşa gitmez).
+  const nb = gold[p] >= capOf(p) * .8 ? 3 : gold[p] >= capOf(p) * .5 ? 2 : 1;
+  for (let k = 0; k < nb; k++) {
+    const o0 = mine().filter(t => !inc[t]);
+    const frw = o0.filter(t => wall[t] < 2 && gold[p] >= WC(wall[t]) + 20 && arm[t] >= 4 && [...adj[t]].some(v => own[v] != p && own[v] != NEU && !friend(p, own[v])));
+    const nMn = mn.filter((m, t) => m && own[t] == p).length;
+    const twN = [ct, ...near2(ct)].filter(u => own[u] == p && !tw[u] && !inc[u]);
+    const opts = [];
+    if (wall[ct] < 2 && gold[p] >= WC(wall[ct]))
+      opts.push(['wc', 9]);
+    if (gold[p] >= MC(nMn) && o0.some(t => !mn[t]))
+      opts.push(['m', 2.5]);
+    if (gold[p] >= BC && o0.some(t => !bar[t]))
+      opts.push(['b', 3]);
+    if (gold[p] >= TWC && (twN.length || o0.some(t => tw[t] == 1)))
+      opts.push(['tw', 1]);
+    if (gold[p] >= UPC && o0.some(t => bar[t] && bar[t] < 3))
+      opts.push(['ub', 3]);
+    if (gold[p] >= UPC && o0.some(t => mn[t] && mn[t] < 3))
+      opts.push(['um', 1.2]);
+    if (rd > CAPT + 2 && frw.length)
+      opts.push(['wf', 2]);
+    if (!opts.length)
+      break;
+    let r0 = Math.random() * opts.reduce((a, o) => a + o[1], 0);
+    const ty = opts.find(o => (r0 -= o[1]) < 0)?.[0] ?? opts[0][0];
+    if (ty == 'wc') {
+      gold[p] -= WC(wall[ct]);
+      wall[ct]++;
+      wallStart(ct);
+      pulse(ct, '#cfe3ea');
     }
-  }
-  else if (gold[p] >= BC && Math.random() < .5) {
-    const o = mine().filter(t => !bar[t] && !inc[t]);
-    if (o.length) {
+    else if (ty == 'm') {
+      const o = o0.filter(t => !mn[t]);
+      gold[p] -= MC(nMn);
+      mn[o[Math.floor(Math.random() * o.length)]] = 1;
+    }
+    else if (ty == 'b') {
+      const o = o0.filter(t => !bar[t]);
       bar[o[Math.floor(Math.random() * o.length)]] = 1;
       gold[p] -= BC;
     }
-  }
-  else if (gold[p] >= TWC && Math.random() < .25) {
-    const up = mine().filter(u => tw[u] == 1 && !inc[u]);
-    const o0 = [ct, ...near2(ct)].filter(u => own[u] == p && !tw[u] && !inc[u]);
-    if (up.length && gold[p] >= TW2 && Math.random() < .4) {
-      tw[up[0]] = 2;
-      gold[p] -= TW2;
+    else if (ty == 'tw') {
+      const up = o0.filter(u => tw[u] == 1);
+      if (up.length && gold[p] >= TW2 && (!twN.length || Math.random() < .4)) {
+        tw[up[0]] = 2;
+        gold[p] -= TW2;
+      }
+      else if (twN.length) {
+        tw[twN[Math.floor(Math.random() * twN.length)]] = 1;
+        gold[p] -= TWC;
+      }
     }
-    else if (o0.length) {
-      tw[o0[Math.floor(Math.random() * o0.length)]] = 1;
-      gold[p] -= TWC;
+    else if (ty == 'ub') {
+      // Önce sınırdaki ve seviyesi yüksek kışlalar: sv3 kışla mancınık açar.
+      const o = o0.filter(t => bar[t] && bar[t] < 3).sort((x, y) => ((isFront(p, y) ? 2 : 0) + bar[y]) - ((isFront(p, x) ? 2 : 0) + bar[x]));
+      bar[o[0]]++;
+      gold[p] -= UPC;
+      pulse(o[0], '#ffffff');
     }
-  }
-  else if (gold[p] >= UPC && Math.random() < .35) {
-    const o = [...mine().filter(t => bar[t] && bar[t] < 3 && !inc[t]).map(t => ['b', t]), ...mine().filter(t => mn[t] && mn[t] < 3 && !inc[t]).map(t => ['m', t])];
-    if (o.length) {
-      const [ty, t1] = o[Math.floor(Math.random() * o.length)];
-      (ty == 'b' ? bar : mn)[t1]++;
+    else if (ty == 'um') {
+      const o = o0.filter(t => mn[t] && mn[t] < 3);
+      const t1 = o[Math.floor(Math.random() * o.length)];
+      mn[t1]++;
       gold[p] -= UPC;
       pulse(t1, '#ffffff');
+    }
+    else if (ty == 'wf') {
+      const t1 = frw.sort((x, y) => arm[y] - arm[x])[0];
+      gold[p] -= WC(wall[t1]);
+      wall[t1]++;
+      wallStart(t1);
+      pulse(t1, '#cfe3ea');
     }
   }
   if (ally[p] > 0 && !tru[p]) {
@@ -9653,7 +9736,9 @@ async function ai0(p) {
       }
     }
   });
-  if (gold[p] >= AC && Math.random() < .35) {
+  for (let k = 0, na = gold[p] >= capOf(p) * .6 ? 3 : 1; k < na; k++) {
+    if (!(gold[p] >= AC && Math.random() < (na > 1 ? .8 : .35)))
+      break;
     const b0 = mine().filter(t => bar[t] && arch[t] < 5 && !inc[t]);
     const nc = b0.filter(t => t == ct || near2(ct).has(t));
     const b2 = nc.length ? nc : b0;
@@ -9728,6 +9813,7 @@ async function ai0(p) {
       pool = 0;
     }
   }
+  await marchFront(p, ct);
   defendCapital(p, ct);
   ui();
   await sleep(400);
@@ -9974,7 +10060,7 @@ function ui(msg) {
     for (let p = 0; p < P; p++)
       clampGold(p);
   setTxt('ttl', dr ? 'Fetih, bölge seçimi' : `Fetih, tur ${rd}` + (rd <= CAPT ? ` (başkentler ${CAPT + 1 - rd} tur daha dokunulmaz)` : ''));
-  setHTML('chips', PN.slice(0, P).map((n, p) => cnt(p) == 0 && p > 3 ? '' : `<span class="${p == turn && !over ? 'on' : ''}" style="--c:${COL[p]}">${n} ${cnt(p)}<em style="font-style:normal;font-size:.85em;margin-left:4px;color:${ref[p] < 20 ? '#d63a3a' : ref[p] < 50 ? '#e5566d' : ref[p] < 70 ? '#c98a12' : '#3a9a6c'}">${p == 0 ? '' : '%' + ref[p]}</em>${p == 0 ? ` (${gold[0]}/${capOf(0)} altın)` : ally[p] > 0 ? (tru[p] ? ` (haraç: ${ally[p]} tur)` : ` (ittifak: ${ally[p]} tur)`) : ''}${p > 0 && bp[p].some(v => v > 0) ? ` (+${bp[p].map((v, q) => v > 0 ? PN[q] : '').filter(Boolean).join(', ')})` : ''}</span>`).join('') + (cnt(NEU) ? `<span style="--c:#9aa3a8">Boş ${cnt(NEU)}</span>` : ''));
+  setHTML('chips', PN.slice(0, P).map((n, p) => cnt(p) == 0 ? (p > 3 ? '' : `<span class="dead" style="--c:${COL[p]}">${n}</span>`) : `<span class="${p == turn && !over ? 'on' : ''}" style="--c:${COL[p]}">${n} ${cnt(p)}<em style="font-style:normal;font-size:.85em;margin-left:4px;color:${ref[p] < 20 ? '#d63a3a' : ref[p] < 50 ? '#e5566d' : ref[p] < 70 ? '#c98a12' : '#3a9a6c'}">${p == 0 ? '' : '%' + ref[p]}</em>${p == 0 ? ` (${gold[0]}/${capOf(0)} altın)` : ally[p] > 0 ? (tru[p] ? ` (haraç: ${ally[p]} tur)` : ` (ittifak: ${ally[p]} tur)`) : ''}${p > 0 && bp[p].some(v => v > 0) ? ` (+${bp[p].map((v, q) => v > 0 ? PN[q] : '').filter(Boolean).join(', ')})` : ''}</span>`).join('') + (cnt(NEU) ? `<span style="--c:#9aa3a8">Boş ${cnt(NEU)}</span>` : ''));
   setTxt('st', msg || (ctk && sel != null && turn == 0 ? `Mancınıklar hazır (${NM[sel]}). Komşu bir düşman bölgesine dokun.` : ordSel != null && turn == 0 ? `${PN[ordSel]} için hedef seç: ortak bir düşmanın bölgesine dokun.` : dr ? (turn == 0 && !busy ? `Bölge seç (${N - dnx} kaldı)` + (cap[0] < 0 ? ': ilk seçimin başkent olur.' : '.') : `${PN[turn]} seçiyor…`) : bd && turn == 0 ? ({ b: 'Kışla kurmak için kendi bölgene dokun.', m: 'Maden kurmak için kendi bölgene dokun.', a: 'İttifak için o krallığın herhangi bir bölgesine dokun.', w: 'Sur için başkentine (★) dokun.' }[bd]) : turn != 0 ? `${PN[turn]} oynuyor…` : cn ? `Büyük gemiler hazır (${NM[sel]}). Kıyıdaki düşman bölgesine dokun.` : sco ? `Keşif gemisi hazır (${NM[sel]}). Kıyıdaki bir bölgeye dokun.` : sp ? `Casus hazır (${NM[sel]}). Herhangi bir düşman bölgesine dokun; içerilere gittikçe yakalanma riski artar.` : ak ? `Okçular hazır (${NM[sel]}). menzildeki düşmana dokun (2 bölge).` : phase == 'r' && !mv ? `Takviye: ${pool} birlik. Dokun: asker ekle. Basılı tut: inşa et.` : mv && bk ? (bk.src.size ? `Toplu taşıma: ${bk.src.size} bölgeden ${[...bk.src].reduce((a, u) => a + arm[u] - 1, 0)} asker seçildi. Şimdi hedef bölgeye basılı tut.` : 'Toplu taşıma: asker toplanacak bölgelere dokun, sonra hedefe basılı tut.') : mv ? (sel == null ? 'Taşımak için 2+ birlikli bölgeni seç. Basılı tut: toplu taşıma.' : `${NM[sel]} seçili. Hedef bölgene dokun, her dokunuş 1 birlik taşır.`) : sel == null ? `Saldırmak için 2+ birlikli bölgeni seç. (Fetih: ${won[0] + sup[0]}/${ext ? 5 : 3}, refah %${ref[0]})` : `${NM[sel]} seçili. Kendi bölgene dokun: asker taşı. Düşmana dokun: saldır.${shipCap(sel) > 0 ? ` Gemilerle ${Math.min(arm[sel] - 1, shipCap(sel))} asker taşıyabilirsin: denizin ötesindeki bir kıyıya dokun.` : ''} Koyu renkli düşmana dokun; bağlantılı bölgelerinden de saldırabilirsin.`));
   const ok = turn == 0 && phase == 'a' && !busy && !over;
   $('end').disabled = !ok;
@@ -10257,7 +10343,7 @@ const TS = [
     done: () => (!tData.pa || att[0] > (tData.att || 0)) && !busy },
   { t: 'Sis ve fetih hakkı', p: () => (won[0] > 0 ? 'Tebrikler, bölgeyi aldın! ' : 'Bu sefer olmadı; zar her zaman yanında olmayabilir. ') + 'Rakip bölgelerdeki <b>"?"</b> oradaki asker sayısını bilmediğin anlamına gelir; casuslar bunu açığa çıkarır. Her tur <b>3 fetih hakkın</b> var; istersen 5\'e çıkarabilirsin ama fazladan her fetih ve her başarısız saldırı halkının refahını düşürür.', next: 1 },
   tutBuild('Yapı paneli: Kışla', 'Kendi bölgene <b>parmağını basılı tutunca</b> yapı paneli açılır. Panel sekmelere ayrılır: Yapılar, Ordu, Deniz (kıyıda) ve Vergi. Parlayan başkentine basılı tut ve <b>Yapılar</b> sekmesinde <b>Kışla</b>\'ya dokun. Kışla her tur o bölgede asker üretir. Altının yetsin diye biraz ekledim.', 'b', 'y', BC, () => bar[cap[0]] >= 1),
-  tutBuild('Seviye sistemi', 'Yapıların 3 seviyesi vardır ve her seviye yeni bir güç açar. <b>Kışla:</b> sv1 +2, sv2 +4 asker/tur ve casus üretimi, sv3 +6 ve dolunca askerleri kendiliğinden sınıra yollar. <b>Maden:</b> her seviye +10 altın. <b>Sandık:</b> 50 / 70 / 100 kapasite. Kule, iskele ve surun da seviyeleri var. Şimdi başkentine basılı tut ve <b>Kışlayı yükselt</b>.', 'ub', 'y', UPC, () => bar[cap[0]] >= 2),
+  tutBuild('Seviye sistemi', 'Yapıların 3 seviyesi vardır ve her seviye yeni bir güç açar. <b>Kışla:</b> sv1 +2, sv2 +4 asker/tur ve casus üretimi, sv3 +6 ve dolunca askerleri kendiliğinden sınıra yollar. <b>Maden:</b> her seviye +' + MI + ' altın; her yeni maden bir öncekinden pahalıdır. <b>Sandık:</b> 50 / 70 / 100 kapasite. Kule, iskele ve surun da seviyeleri var. Şimdi başkentine basılı tut ve <b>Kışlayı yükselt</b>.', 'ub', 'y', UPC, () => bar[cap[0]] >= 2),
   tutBuild('Maden', 'Altın üç yerden gelir: bölgelerinden en fazla 15 altın temel gelir, madenler ve vergi. Madenler gelirini büyütmenin en güvenli yoludur. Başkentine basılı tut ve <b>Maden</b> kur.', 'm', 'y', MC(0), () => mn[cap[0]] >= 1),
   tutBuild('Altın sandığı', 'Altının bir sınırı vardır: <b>altın sandıklarının toplam kapasitesi</b>. Başkentinde 50\'lik bir sandık hazır gelir; sığmayan altın kaybolur. Sandığı yükseltebilir ya da başka bölgelere yenisini kurabilirsin. Dikkat: sandıklı bir bölge fethedilirse içindeki altının yarısı yağmalanır! Başkentine basılı tut ve <b>Sandığı yükselt</b>.', 'udp', 'y', DPU[1], () => dep[cap[0]] >= 2),
   { t: 'Vergi', p: 'Her bölgen <b>2 turda bir</b> vergi verir. <b>İç bölgeler</b> 2 altın verebilir; <b>sınır bölgeleri</b> 1 altın vermeli. Sınır bölgesinden 2 altın istersen halk kızar: refah düşer ve orada isyan çıkabilir. Başkentine basılı tut, <b>Vergi</b> sekmesini aç ve <b>Akıllı vergi</b>ye dokun: iç bölgeler 2, sınırlar 1 olur.',
