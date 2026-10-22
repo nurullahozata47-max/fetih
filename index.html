@@ -1647,13 +1647,15 @@ const SSC = 20;
 const SLC = 40;
 const LOOT = 15;
 const SEAR = 85;
-const MC = n => 40 + 10 * n;
+const MC = n => Math.min(80, 40 + 5 * n);
 // Altın sandığı: devletin altın sınırı sandıkların kapasitelerinin toplamıdır (sv1 50, sv2 70, sv3 100).
 // Başkentte her zaman en az 1. seviye bir sandık bulunur. DPC sandık kurma, DPU[sv] yükseltme ücreti.
 // Sandıklı bölge fethedilirse içindeki altının yarısı yağmalanır.
 const DEPV = [0, 50, 70, 100];
 const DPC = 30;
 const DPU = [0, 25, 35];
+// Sandık yağmasında seviyeye göre ek ganimet.
+const LOOTB = [0, 10, 20, 35];
 // Gelir: bölgelerden gelen temel gelir en fazla INC0 olur; üstüne maden ve vergi eklenir.
 // Vergi: her bölge 2 turda bir, seçilen miktarda (1 ya da 2) altın verir.
 const INC0 = 15;
@@ -4315,10 +4317,13 @@ async function battle(a, t, sea, F) {
       await sleep(wd);
     }
     // Depo yağması: depodaki altının yarısı fethedene geçer.
+    // Sandık yağması: sahibi sandıktaki altının yarısını kaybeder; fetheden bunun %70'ini ve sandık seviyesine göre ek ganimet alır.
     let lootD = 0;
+    let lootG = 0;
     if (dep[t] && old < P) {
       lootD = Math.floor(depGold(t) / 2);
       gold[old] -= lootD;
+      lootG = Math.round(lootD * .7) + LOOTB[dep[t]];
     }
     own[t] = me;
     won[me]++;
@@ -4326,13 +4331,13 @@ async function battle(a, t, sea, F) {
     archV[t] = 0;
     cat[t] = 0;
     catXp[t] = 0;
-    if (lootD > 0) {
-      gold[me] += lootD;
+    if (lootG > 0) {
+      gold[me] += lootG;
       clampGold(me);
-      fl.push({ t, dx: 0, dy: -30, txt: `+${lootD} ganimet`, col: '#ffd36b', t0: performance.now() + 450 });
+      fl.push({ t, dx: 0, dy: -30, txt: `+${lootG} ganimet`, col: '#ffd36b', t0: performance.now() + 450 });
       if (me == 0) {
-        banner(`💰 Ganimet: +${lootD} altın`, '#f2b134');
-        $('log').textContent += ` ${NM[t]} sandığından ${lootD} altın ganimet aldın.`;
+        banner(`💰 Ganimet: +${lootG} altın`, '#f2b134');
+        $('log').textContent += ` ${NM[t]} sandığından ${lootG} altın ganimet aldın.`;
       }
       else if (old == 0)
         hl += ` ${PN[me]}, ${NM[t]} sandığını yağmaladı: ${lootD} altın kaybettin.`;
@@ -4697,10 +4702,12 @@ function warnExt() {
     ui();
   };
 }
-// Başkent düşünce: ilk seferde devlet ikiye bölünür, ikincide tümüyle düşer.
+// Başkent düşünce: toplam askeri 50'den az olan (zayıf) devlet tümüyle işgal edilir; 50 ve üstüyse ikiye bölünür.
+const WEAK = 50;
+const armyOf = p => arm.reduce((a, v, u) => a + (own[u] == p ? v : 0), 0);
 async function capLost(old, me, t) {
   const rest = [...Array(N).keys()].filter(u => own[u] == old);
-  if (spl[old] || P >= PM) {
+  if (armyOf(old) < WEAK || P >= PM) {
     await fall(old, me, t);
     return;
   }
@@ -4744,7 +4751,7 @@ async function capLost(old, me, t) {
   fl.push({ t, dx: 0, txt: 'Bölündü!', col: '#ffd36b', t0: performance.now() + 200 });
   riftFx(K, Q, COL[old], COL[r]);
   banner(`${PN[old]} ikiye bölündü!`, COL[r]);
-  const msg = old == 0 ? `Başkentin düştü! Devletin ikiye bölündü: ${NM[cap[0]]} yeni başkentin. Kopan topraklarda ${PN[r]} devleti kuruldu.` : `${PN[old]} başkentini kaybetti ve ikiye bölündü! Kopan topraklarda ${PN[r]} devleti kuruldu. İki devletin de yeni başkenti gizli; birinin başkentini bir daha alırsan tümüyle düşer.`;
+  const msg = old == 0 ? `Başkentin düştü! Devletin ikiye bölündü: ${NM[cap[0]]} yeni başkentin. Kopan topraklarda ${PN[r]} devleti kuruldu.` : `${PN[old]} başkentini kaybetti ve ikiye bölündü! Kopan topraklarda ${PN[r]} devleti kuruldu. İki devletin de yeni başkenti gizli. Askeri 50'nin altına düşen bir devletin başkentini alırsan tümüyle işgal edersin.`;
   $('log').textContent = msg;
   if (turn != 0 || old == 0)
     hl += ' ' + msg;
@@ -4868,7 +4875,9 @@ function moveCap(p, t) {
 }
 // Başkent ikinci kez düşünce bütün topraklar fethedene geçer.
 async function fall(old, me, t) {
-  $('log').textContent = `${PN[old]} başkentini kaybetti! Tüm toprakları ${PN[me]} tarafına geçti.`;
+  $('log').textContent = `${PN[old]} başkentini kaybetti! Ordusu zayıftı (50 askerden az), tüm toprakları ${PN[me]} tarafına geçti.`;
+  if (old != 0 && (me == 0 || Vg.has(t)))
+    setTimeout(() => banner(`${PN[old]} tümüyle işgal edildi!`, COL[me]), 200);
   const ord = [];
   const seen = new Set([t]);
   let q = [t];
@@ -5261,7 +5270,8 @@ function treaties() {
   foc = new Set();
   hp = hp.map(v => Math.max(0, v - .5));
   hb = hb.map(v => Math.max(0, v - .5));
-  const al = bots().filter(q => cnt(q) > 0);
+  // Oyuncunun müttefiki başka botla ittifak kurmaz (oyuncunun düşmanıyla müttefik olmasın diye).
+  const al = bots().filter(q => cnt(q) > 0 && !(ally[q] > 0 && !tru[q]));
   if (al.length > 1 && Math.random() < .7) {
     const q = al[Math.floor(Math.random() * al.length)];
     const o = al.filter(x => x != q);
@@ -5315,6 +5325,18 @@ function treaty(q, k) {
     }
   }
 }
+// Oyuncuyla ittifak kuran bot, diğer botlarla olan ittifaklarını bozar.
+function breakPacts(q) {
+  const out = [];
+  for (let r = 1; r < P; r++)
+    if (r != q && bp[q][r] > 0) {
+      bp[q][r] = bp[r][q] = 0;
+      if (cnt(r) > 0)
+        out.push(r);
+    }
+  return out;
+}
+const pactsOf = q => q > 0 && q < P ? [...Array(P).keys()].filter(r => r > 0 && r != q && bp[q][r] > 0 && cnt(r) > 0) : [];
 function showOffer(q) {
   if (turn != 0 || busy || over || ally[q] > 0 || cnt(q) == 0)
     return;
@@ -6104,7 +6126,7 @@ function slotOff(k, sc) {
 const FOOT = {
   b: [[-11, -11, 11, 17], [-2, -22, 42, 13]],
   m: [[-11, -11, 11, 17], [-49, -19, -5, 10]],
-  d: [[-12, -21, 13, 10]],
+  d: [[-13, -15, 13, 15]],
   a: [[-11, -14, 14, 11]],
   s: [[-11, -14, 14, 11]],
   c: [[-21, -19, 21, 9]],
@@ -6845,10 +6867,11 @@ function build(t) {
     ally[q] = 6;
     tru[q] = 0;
     ord[q] = -1;
+    const bk = breakPacts(q);
     pulse(t, '#3fb98a');
     fl.push({ t, dx: 0, txt: 'İttifak!', col: '#7ef0c0', t0: performance.now() });
     allyAnim(q);
-    return lg(`${PN[q]} teklifini kabul etti: 6 tur ittifak kuruldu.`);
+    return lg(`${PN[q]} teklifini kabul etti: 6 tur ittifak kuruldu.` + (bk.length ? ` ${PN[q]}, senin yanında olmak için ${bk.map(r => PN[r]).join(' ve ')} ile ittifakını bozdu.` : ''));
   }
   if (bd == 'u') {
     if (own[t] != 0)
@@ -7630,164 +7653,227 @@ function pickTowerSpot(t) {
   }
   return [(bi % W) * S + S / 2, ((bi / W) | 0) * S + S / 2];
 }
-// ---- Altın deposu: seviyeye göre ahşap ambar / taş hazine / altın kubbeli hazine ----
-// f: doluluk (0-1, yavaşça hedefe yaklaşır), dv: bu karedeki artış (altın düşen sikke animasyonu), col: sahibin rengi.
+// ---- Altın sandığı: kapağı açık hazine sandığı; içindeki altın yığını doluluğa göre yükselir ----
+// Sv1 demir kuşaklı ahşap sandık, Sv2 perçinli çelik kuşaklı ceviz sandık, Sv3 altın işlemeli kırmızı hazine sandığı.
+// f: doluluk (0-1, yavaşça hedefe yaklaşır), dv: bu karedeki artış (düşen sikkeler), col: sahibinin rengi (kilit taşı).
 function depotAnim(lv, f, dv, s, col) {
-  const w = lv >= 3 ? 15 : lv == 2 ? 13.5 : 12;
-  const top = lv >= 3 ? -7 : -5;
-  const base = 11;
+  const w = lv >= 3 ? 14.5 : lv == 2 ? 13.5 : 12.5;
+  const rim = -1;
+  const base = 10;
+  const ff = Math.max(0, Math.min(1, f));
+  const P3 = lv >= 3;
+  const wood = P3 ? ['#a8322c', '#6e1914'] : lv == 2 ? ['#7a4a2a', '#4e2c16'] : ['#a46a3a', '#6f4322'];
+  const band = P3 ? '#e8b53a' : lv == 2 ? '#7d878e' : '#4f545a';
+  const bandD = P3 ? '#a8730c' : lv == 2 ? '#525b62' : '#34383d';
   g.save();
   g.lineJoin = 'round';
-  g.fillStyle = 'rgba(0,0,0,.28)';
+  // Gölge
+  g.fillStyle = 'rgba(0,0,0,.3)';
   g.beginPath();
-  g.ellipse(1.5, base + 1, w + 3, 3.5, 0, 0, 7);
+  g.ellipse(1, base + 1.5, w + 3, 3.2, 0, 0, 7);
   g.fill();
-  // Gövde
-  if (lv == 1) {
-    g.fillStyle = '#8a5a32';
-    g.fillRect(-w, top, w * 2, base - top);
-    g.fillStyle = '#714626';
-    for (let x = -w + 3.5; x < w; x += 3.5)
-      g.fillRect(x, top, .8, base - top);
-  }
-  else {
-    g.fillStyle = lv >= 3 ? '#c9d1d5' : '#a7b0b5';
-    g.fillRect(-w, top, w * 2, base - top);
-    g.fillStyle = lv >= 3 ? '#a9b3b9' : '#87929a';
-    for (let r = 0, y = top + 3.4; y < base; y += 3.4, r++) {
-      g.fillRect(-w, y, w * 2, .7);
-      for (let x = -w + (r % 2 ? 2 : 4.5); x < w; x += 5)
-        g.fillRect(x, y - 3.4, .7, 3.4);
-    }
-    if (lv >= 3) {
-      g.fillStyle = '#e0a21f';
-      g.fillRect(-w - 1, top - 1.5, w * 2 + 2, 2.2);
-    }
-    g.fillStyle = '#3b464e';
-    g.fillRect(-w + 2, top, 1.4, base - top);
-    g.fillRect(w - 3.4, top, 1.4, base - top);
-  }
-  g.strokeStyle = 'rgba(20,14,8,.55)';
-  g.lineWidth = 1;
-  g.strokeRect(-w, top, w * 2, base - top);
-  // Çatı
-  let peak;
-  if (lv == 1) {
-    g.fillStyle = '#5c3a22';
+  // Doluyken sıcak parıltı (hazine taşmak üzere)
+  if (ff > .985) {
+    g.globalAlpha = .35 + .3 * Math.sin(s * 6);
+    const gl = g.createRadialGradient(0, rim - 4, 2, 0, rim - 4, w + 9);
+    gl.addColorStop(0, 'rgba(255,214,90,.9)');
+    gl.addColorStop(1, 'rgba(255,140,40,0)');
+    g.fillStyle = gl;
     g.beginPath();
-    g.moveTo(-w - 2.5, top + .5);
-    g.lineTo(0, top - 9);
-    g.lineTo(w + 2.5, top + .5);
-    g.closePath();
+    g.arc(0, rim - 4, w + 9, 0, 7);
     g.fill();
-    g.fillStyle = '#7a4e2e';
-    g.beginPath();
-    g.moveTo(-w - 2.5, top + .5);
-    g.lineTo(0, top - 9);
-    g.lineTo(0, top - 6.5);
-    g.lineTo(-w + 1, top + .5);
-    g.closePath();
-    g.fill();
-    peak = top - 9;
+    g.globalAlpha = 1;
   }
-  else if (lv == 2) {
-    g.fillStyle = '#4d5d69';
-    g.beginPath();
-    g.moveTo(-w - 2.5, top + .5);
-    g.lineTo(-w + 3, top - 8);
-    g.lineTo(w - 3, top - 8);
-    g.lineTo(w + 2.5, top + .5);
-    g.closePath();
-    g.fill();
-    g.strokeStyle = '#3a4752';
-    g.lineWidth = .7;
-    for (let x = -w + 1; x < w; x += 3) {
-      g.beginPath();
-      g.moveTo(x, top);
-      g.lineTo(x + 1.5, top - 7.5);
-      g.stroke();
-    }
-    peak = top - 8;
-  }
-  else {
-    const gr = g.createLinearGradient(0, top - 13, 0, top);
-    gr.addColorStop(0, '#ffe08a');
-    gr.addColorStop(1, '#c98a12');
-    g.fillStyle = gr;
-    g.beginPath();
-    g.arc(0, top, w * .82, Math.PI, 0);
-    g.closePath();
-    g.fill();
-    g.strokeStyle = 'rgba(120,70,0,.6)';
-    g.lineWidth = .8;
-    g.stroke();
-    g.fillStyle = 'rgba(255,255,255,.45)';
-    g.beginPath();
-    g.ellipse(-w * .3, top - w * .45, 2, 3.5, -.5, 0, 7);
-    g.fill();
-    peak = top - w * .82;
-  }
-  // Sahibinin bayrağı
-  const fh = lv >= 3 ? 9 : 7;
-  g.strokeStyle = '#3a2a1c';
-  g.lineWidth = 1;
+  // Açık kapak (arkaya yatık): iç yüzü koyu, kenarı kuşaklı
+  const lt = rim - 13;
+  g.fillStyle = wood[1];
   g.beginPath();
-  g.moveTo(0, peak + .5);
-  g.lineTo(0, peak - fh);
-  g.stroke();
-  const wv = Math.sin(s * 5) * 1.2;
-  g.fillStyle = col;
-  g.beginPath();
-  g.moveTo(0, peak - fh);
-  g.quadraticCurveTo(3.5, peak - fh - 1 + wv, 7, peak - fh + 1.5 + wv);
-  g.lineTo(0, peak - fh + 4);
+  g.moveTo(-w + .5, rim);
+  g.lineTo(-w + 1.5, lt + 3);
+  g.quadraticCurveTo(0, lt - 3, w - 1.5, lt + 3);
+  g.lineTo(w - .5, rim);
   g.closePath();
   g.fill();
-  // Ön camlı kasa: altın seviyesi
-  const gw = lv >= 3 ? 7 : 6;
-  const gy0 = top + 2.5;
-  const gy1 = base - 2;
-  const gh = gy1 - gy0;
-  g.fillStyle = '#24170d';
-  g.fillRect(-gw, gy0, gw * 2, gh);
-  const fy = gy1 - gh * Math.max(0, Math.min(1, f));
-  if (f > .01) {
-    const gg = g.createLinearGradient(0, fy, 0, gy1);
-    gg.addColorStop(0, '#ffe58f');
-    gg.addColorStop(1, '#d4920f');
+  g.fillStyle = 'rgba(0,0,0,.35)';
+  g.beginPath();
+  g.moveTo(-w + 2.5, rim);
+  g.lineTo(-w + 3.2, lt + 4.5);
+  g.quadraticCurveTo(0, lt, w - 3.2, lt + 4.5);
+  g.lineTo(w - 2.5, rim);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = band;
+  g.lineWidth = 1.4;
+  g.beginPath();
+  g.moveTo(-w + 1.5, lt + 3);
+  g.quadraticCurveTo(0, lt - 3, w - 1.5, lt + 3);
+  g.stroke();
+  // Altın yığını: kenardan yukarı doğru tümsek, doluluk arttıkça yükselir
+  const hh = 1 + ff * 10;
+  if (ff > .01) {
+    const gg = g.createLinearGradient(0, rim - hh, 0, rim + 2);
+    gg.addColorStop(0, '#fff0a8');
+    gg.addColorStop(.45, '#ffd04a');
+    gg.addColorStop(1, '#c98a12');
     g.fillStyle = gg;
-    g.fillRect(-gw, fy, gw * 2, gy1 - fy);
-    // Yüzeydeki sikke tümsekleri
-    g.fillStyle = '#ffd36b';
-    for (let x = -gw + 1.5; x < gw; x += 3) {
+    g.beginPath();
+    g.moveTo(-w + 1, rim + 2);
+    g.quadraticCurveTo(-w * .55, rim - hh * .9, 0, rim - hh);
+    g.quadraticCurveTo(w * .55, rim - hh * .9, w - 1, rim + 2);
+    g.closePath();
+    g.fill();
+    // Yığındaki sikkeler
+    g.strokeStyle = 'rgba(150,95,5,.75)';
+    g.lineWidth = .5;
+    const nc = 3 + Math.round(ff * 7);
+    for (let c0 = 0; c0 < nc; c0++) {
+      const u = ((c0 * 0.618) % 1) * 2 - 1;
+      const x = u * (w - 3.5);
+      const y = rim - hh * (1 - u * u) * .85 + (c0 % 3) * .8 + .6;
+      g.fillStyle = c0 % 2 ? '#ffe27a' : '#f5c040';
       g.beginPath();
-      g.arc(x, fy + .3, 1.5, Math.PI, 0);
+      g.ellipse(x, y, 1.9, 1.1, 0, 0, 7);
       g.fill();
+      g.stroke();
+    }
+    // Sv3: yığında mücevherler
+    if (P3 && ff > .3) {
+      [['#4fd1ff', -w * .35, rim - hh * .55], ['#ff5a7a', w * .3, rim - hh * .6], ['#7dff9a', 0, rim - hh * .92]].forEach(([gc, x, y]) => {
+        g.fillStyle = gc;
+        g.beginPath();
+        g.moveTo(x, y - 1.6);
+        g.lineTo(x + 1.4, y);
+        g.lineTo(x, y + 1.6);
+        g.lineTo(x - 1.4, y);
+        g.closePath();
+        g.fill();
+      });
     }
     // Kayan parıltı
     const sh = ((s * .5) % 1.6) - .3;
     if (sh > 0 && sh < 1) {
-      g.fillStyle = 'rgba(255,255,255,.45)';
-      g.fillRect(-gw + sh * gw * 2 - 1, fy, 1.6, gy1 - fy);
+      g.globalAlpha = .55;
+      g.fillStyle = '#fff';
+      g.beginPath();
+      g.ellipse(-w + 2 + sh * (w * 2 - 4), rim - hh * .7, .9, hh * .35 + .5, .3, 0, 7);
+      g.fill();
+      g.globalAlpha = 1;
+    }
+    // Taşan sikkeler (dolu sandık)
+    if (ff > .9) {
+      g.fillStyle = '#ffd04a';
+      [[-w - 1.5, base - 1], [w + 1.2, base - 2], [-w + 2, base + 1]].forEach(([x, y]) => {
+        g.beginPath();
+        g.ellipse(x, y, 1.8, 1, 0, 0, 7);
+        g.fill();
+        g.stroke();
+      });
     }
   }
-  g.strokeStyle = lv == 1 ? '#3a2a1c' : '#2f383e';
-  g.lineWidth = 1.3;
-  g.strokeRect(-gw, gy0, gw * 2, gh);
+  // Gövde (ön yüz)
+  const bg = g.createLinearGradient(0, rim, 0, base);
+  bg.addColorStop(0, wood[0]);
+  bg.addColorStop(1, wood[1]);
+  g.fillStyle = bg;
   g.beginPath();
-  g.moveTo(0, gy0);
-  g.lineTo(0, gy1);
-  g.lineWidth = .7;
+  g.moveTo(-w, rim);
+  g.lineTo(w, rim);
+  g.lineTo(w, base - 1.5);
+  g.quadraticCurveTo(w, base, w - 1.5, base);
+  g.lineTo(-w + 1.5, base);
+  g.quadraticCurveTo(-w, base, -w, base - 1.5);
+  g.closePath();
+  g.fill();
+  if (lv == 1) {
+    g.fillStyle = 'rgba(60,35,15,.5)';
+    for (let x = -w + 4; x < w - 1; x += 4)
+      g.fillRect(x, rim + .5, .7, base - rim - 1);
+  }
+  if (P3) {
+    // Altın işleme
+    g.strokeStyle = 'rgba(255,215,110,.55)';
+    g.lineWidth = .6;
+    g.beginPath();
+    g.moveTo(-w * .55, base - 3);
+    g.quadraticCurveTo(-w * .3, rim + 2, -3.5, base - 3.5);
+    g.moveTo(w * .55, base - 3);
+    g.quadraticCurveTo(w * .3, rim + 2, 3.5, base - 3.5);
+    g.stroke();
+  }
+  // Ağız kenarı ve kuşaklar
+  g.fillStyle = band;
+  g.fillRect(-w - .5, rim - .8, w * 2 + 1, 2);
+  g.fillStyle = bandD;
+  g.fillRect(-w - .5, rim + .9, w * 2 + 1, .5);
+  [-w + 2.2, w - 4.2].forEach(x => {
+    g.fillStyle = band;
+    g.fillRect(x, rim, 2, base - rim);
+    g.fillStyle = bandD;
+    g.fillRect(x + 1.5, rim, .5, base - rim);
+    if (lv >= 2) {
+      g.fillStyle = P3 ? '#fff1b8' : '#c3ccd2';
+      for (let y = rim + 2.5; y < base - 1; y += 3) {
+        g.beginPath();
+        g.arc(x + 1, y, .55, 0, 7);
+        g.fill();
+      }
+    }
+  });
+  // Köşe kapakları (Sv3)
+  if (P3) {
+    g.fillStyle = '#e8b53a';
+    [[-w, base], [w, base]].forEach(([x, y]) => {
+      g.beginPath();
+      g.moveTo(x, y - 3.5);
+      g.lineTo(x, y);
+      g.lineTo(x + (x < 0 ? 3.5 : -3.5), y);
+      g.closePath();
+      g.fill();
+    });
+  }
+  // Kilit: plaka, anahtar deliği, sahibinin renginde taş
+  const lw = P3 ? 3.6 : 3.1;
+  g.fillStyle = lv == 1 ? '#5a5f66' : '#e0a92a';
+  g.beginPath();
+  g.moveTo(-lw, rim + 1);
+  g.lineTo(lw, rim + 1);
+  g.lineTo(lw, rim + 5);
+  g.quadraticCurveTo(0, rim + 8.5, -lw, rim + 5);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = 'rgba(40,25,5,.6)';
+  g.lineWidth = .5;
   g.stroke();
-  // Dolarken kasaya düşen sikkeler
+  g.fillStyle = col;
+  g.beginPath();
+  g.arc(0, rim + 3, 1.5, 0, 7);
+  g.fill();
+  g.fillStyle = 'rgba(255,255,255,.6)';
+  g.beginPath();
+  g.arc(-.5, rim + 2.5, .5, 0, 7);
+  g.fill();
+  g.fillStyle = '#20150a';
+  g.fillRect(-.35, rim + 5, .7, 1.6);
+  // Dış çizgi
+  g.strokeStyle = 'rgba(20,12,5,.6)';
+  g.lineWidth = .9;
+  g.beginPath();
+  g.moveTo(-w, rim);
+  g.lineTo(-w, base - 1.5);
+  g.quadraticCurveTo(-w, base, -w + 1.5, base);
+  g.lineTo(w - 1.5, base);
+  g.quadraticCurveTo(w, base, w, base - 1.5);
+  g.lineTo(w, rim);
+  g.stroke();
+  // Dolarken sandığa düşen sikkeler
   if (dv > .0008) {
-    for (let k = 0; k < 3; k++) {
-      const ph = (s * 1.6 + k / 3) % 1;
-      const cy0 = peak - 6 + ph * (fy - peak + 4);
+    for (let c0 = 0; c0 < 3; c0++) {
+      const ph = (s * 1.6 + c0 / 3) % 1;
+      const y = lt - 6 + ph * (rim - hh - lt + 6);
       g.globalAlpha = 1 - ph * .3;
       g.fillStyle = '#ffd36b';
       g.beginPath();
-      g.ellipse((k - 1) * 3, cy0, 1.8, 1.3 + Math.abs(Math.sin(s * 9 + k)) * .6, 0, 0, 7);
+      g.ellipse((c0 - 1) * 3.5, y, 1.8, .6 + Math.abs(Math.sin(s * 9 + c0)) * 1.1, 0, 0, 7);
       g.fill();
       g.strokeStyle = '#a86d06';
       g.lineWidth = .5;
@@ -7795,32 +7881,25 @@ function depotAnim(lv, f, dv, s, col) {
     }
     g.globalAlpha = 1;
   }
-  // Ara sıra parlayan yıldız
+  // Ara sıra yığında parlayan yıldız
   const tw0 = (s * .7) % 1;
-  if (f > .05 && tw0 < .25) {
+  if (ff > .05 && tw0 < .25) {
     const a = Math.sin(tw0 / .25 * Math.PI);
+    const sx = -w + 4 + ((Math.floor(s * .7) * 37) % (w * 2 - 8));
+    const sy = rim - hh * .75;
     g.globalAlpha = a;
     g.fillStyle = '#fff';
-    const sx = -gw + 2 + ((Math.floor(s * .7) * 37) % (gw * 2 - 4));
     g.beginPath();
-    g.moveTo(sx, fy - 2.5);
-    g.lineTo(sx + .7, fy - .7);
-    g.lineTo(sx + 2.5, fy);
-    g.lineTo(sx + .7, fy + .7);
-    g.lineTo(sx, fy + 2.5);
-    g.lineTo(sx - .7, fy + .7);
-    g.lineTo(sx - 2.5, fy);
-    g.lineTo(sx - .7, fy - .7);
+    g.moveTo(sx, sy - 2.8);
+    g.lineTo(sx + .7, sy - .7);
+    g.lineTo(sx + 2.8, sy);
+    g.lineTo(sx + .7, sy + .7);
+    g.lineTo(sx, sy + 2.8);
+    g.lineTo(sx - .7, sy + .7);
+    g.lineTo(sx - 2.8, sy);
+    g.lineTo(sx - .7, sy - .7);
     g.closePath();
     g.fill();
-    g.globalAlpha = 1;
-  }
-  // Depo doluysa kasanın etrafı kırmızımsı yanıp söner
-  if (f > .985) {
-    g.globalAlpha = .45 + .45 * Math.sin(s * 6);
-    g.strokeStyle = '#ff7a3d';
-    g.lineWidth = 1.6;
-    g.strokeRect(-gw - 1.5, gy0 - 1.5, gw * 2 + 3, gh + 3);
     g.globalAlpha = 1;
   }
   g.restore();
@@ -8409,7 +8488,7 @@ function anim(ts) {
       dfill[t] = prev + (tgt - prev) * .06;
       g.save();
       g.translate(dx0, dy0);
-      g.scale(.7 * sc, .7 * sc);
+      g.scale(.8 * sc, .8 * sc);
       depotAnim(dep[t], dfill[t], tgt - prev, s + t * .41, COL[own[t]]);
       g.restore();
     }
@@ -8731,6 +8810,8 @@ const mySpies = () => spy.reduce((s0, v, i) => s0 + (own[i] == 0 ? v : 0), 0);
 const spyTarget = t => own[t] > 0 && own[t] < P && !allied(0, own[t]) && mySpies() > 0 && turn == 0 && !busy;
 function spyPick(t, cx, cy) {
   const n = mySpies();
+  if (n < 1)
+    return;
   const here = miss.some(m => m.t == t);
   pop.classList.remove('fixw');
   pop.innerHTML = `<b>${PN[own[t]]} krallığı · ${NM[t]}</b><span>Hazır casusun: ${n}. Casus bu bölgeyi ve bir komşusunu 2 tur boyunca gösterir; içerilere gittikçe yakalanma riski artar. ${spyRank()}</span>` +
@@ -8803,7 +8884,7 @@ function openPop(cx, cy) {
     if (mn[t])
       inf.y += ` Maden sv${mn[t]}: +${MI * mn[t]} altın/tur.`;
     o.push(dep[t] ? ['udp', dep[t] >= 3 ? 'Altın sandığı seviye 3 (tam)' : `Sandığı yükselt: Sv${dep[t] + 1}, ${DEPV[dep[t] + 1]} kapasite (${DPU[dep[t]]} altın)`, dep[t] < 3 && gold[0] >= DPU[dep[t]]] : ['dp', `Altın sandığı: ${DEPV[1]} kapasite (${DPC} altın)`, gold[0] >= DPC]);
-    inf.y += dep[t] ? ` Altın sandığı sv${dep[t]}: ${DEPV[dep[t]]} kapasite, içinde ~${depGold(t)} altın var. Bölge fethedilirse yarısı yağmalanır.` : ` Hazine sınırı: ${capOf(0)} altın (sandıklarının toplamı).`;
+    inf.y += dep[t] ? ` Altın sandığı sv${dep[t]}: ${DEPV[dep[t]]} kapasite, içinde ~${depGold(t)} altın var. Bölge fethedilirse bunun yarısını kaybedersin; fetheden ayrıca seviyeye göre ek ganimet alır.` : ` Hazine sınırı: ${capOf(0)} altın (sandıklarının toplamı).`;
     o.push(['w', wall[t] >= 2 ? 'Okçulu sur (tam)' : wall[t] ? `Suru yükselt: Sv2 okçulu (${WC(1)} altın)` : `Sur (${WC(0)} altın)`, wall[t] < 2 && gold[0] >= WC(wall[t])]);
     inf.y += wall[t] >= 2 ? ` Okçulu sur: surdaki okçular yakındaki saldırılarına ve savunmana destek verir. Bu bölgeye en az ${WALLMIN} askerle saldırılabilir. Düşman okları içeri işlemez.` : wall[t] ? ` Sur sv1: düşman okları içeri işlemez, en az ${WALLMIN1} askerle saldırılabilir. Sv2'de surun üstüne okçular çıkar.` : '';
     if (dock[t])
@@ -8868,6 +8949,10 @@ function openPop(cx, cy) {
   else if (own[t] != 0 && own[t] != NEU) {
     const q = own[t];
     info = ally[q] > 0 ? (tru[q] ? `Haraç antlaşması: ${ally[q]} tur kaldı` : `${PN[q]} ile ittifak: ${ally[q]} tur kaldı`) : `İttifak ücretsiz ama ${PN[q]} reddedebilir. Ona saldırdıysan kabul etmesi zorlaşır.`;
+    const pq = pactsOf(q);
+    info += pq.length ? ` <b>${PN[q]} şu an ${pq.map(r => PN[r]).join(' ve ')} ile müttefik.</b>${!ally[q] ? ' Seninle ittifak kurarsa bu ittifakları bozar.' : ''}` : ` ${PN[q]} şu an kimseyle müttefik değil.`;
+    if (armyOf(q) < WEAK)
+      info += ` <b style="color:#ff8a8a">Zayıf devlet:</b> başkenti düşerse tümüyle işgal edilir.`;
     if (!ally[q]) {
       o.push(['a', tcd[q] == rd ? 'İttifak (bu tur reddetti)' : 'İttifak teklif et', tcd[q] != rd]);
       o.push(['t', 'Haraç iste', tcd[q] != rd]);
@@ -10249,7 +10334,7 @@ function ui(msg) {
         lvPips(0, 13, mn[t]);
       });
     if (V.has(t) && dep[t] && depSeen(t))
-      atSlot(c, t, 'd', () => lvPips(0, 9, dep[t]));
+      atSlot(c, t, 'd', () => lvPips(0, 12, dep[t]));
     if (V.has(t) && arch[t])
       atSlot(c, t, 'a', () => drawArch(0, 0, arch[t], COL[own[t]], archVet(t)));
     if (V.has(t) && spy[t])
@@ -10262,7 +10347,7 @@ function ui(msg) {
     for (let p = 0; p < P; p++)
       clampGold(p);
   setTxt('ttl', dr ? 'Fetih, bölge seçimi' : `Fetih, tur ${rd}` + (rd <= CAPT ? ` (başkentler ${CAPT + 1 - rd} tur daha dokunulmaz)` : ''));
-  setHTML('chips', PN.slice(0, P).map((n, p) => cnt(p) == 0 && !dr ? (p > 3 ? '' : `<span class="dead" style="--c:${COL[p]}">${n}</span>`) : `<span class="${p == turn && !over ? 'on' : ''}" style="--c:${COL[p]}">${n} ${cnt(p)}<em style="font-style:normal;font-size:.85em;margin-left:4px;color:${ref[p] < 20 ? '#d63a3a' : ref[p] < 50 ? '#e5566d' : ref[p] < 70 ? '#c98a12' : '#3a9a6c'}">${p == 0 ? '' : '%' + ref[p]}</em>${p == 0 ? ` (${gold[0]}/${capOf(0)} altın)` : ally[p] > 0 ? (tru[p] ? ` (haraç: ${ally[p]} tur)` : ` (ittifak: ${ally[p]} tur)`) : ''}${p > 0 && bp[p].some(v => v > 0) ? ` (+${bp[p].map((v, q) => v > 0 ? PN[q] : '').filter(Boolean).join(', ')})` : ''}</span>`).join('') + (cnt(NEU) ? `<span style="--c:#9aa3a8">Boş ${cnt(NEU)}</span>` : ''));
+  setHTML('chips', PN.slice(0, P).map((n, p) => cnt(p) == 0 && !dr ? (p > 3 ? '' : `<span class="dead" style="--c:${COL[p]}">${n}</span>`) : `<span class="${p == turn && !over ? 'on' : ''}" style="--c:${COL[p]}">${n} ${cnt(p)}<em style="font-style:normal;font-size:.85em;margin-left:4px;color:${ref[p] < 20 ? '#d63a3a' : ref[p] < 50 ? '#e5566d' : ref[p] < 70 ? '#c98a12' : '#3a9a6c'}">${p == 0 ? '' : '%' + ref[p]}</em>${armyOf(p) < WEAK && !dr ? '<em style="font-style:normal;font-size:.8em;margin-left:4px;color:#e5566d">zayıf</em>' : ''}${p == 0 ? ` (${gold[0]}/${capOf(0)} altın)` : ally[p] > 0 ? (tru[p] ? ` (haraç: ${ally[p]} tur)` : ` (ittifak: ${ally[p]} tur)`) : ''}${p > 0 && bp[p].some(v => v > 0) ? ` (+${bp[p].map((v, q) => v > 0 ? PN[q] : '').filter(Boolean).join(', ')})` : ''}</span>`).join('') + (cnt(NEU) ? `<span style="--c:#9aa3a8">Boş ${cnt(NEU)}</span>` : ''));
   setTxt('st', msg || (ctk && sel != null && turn == 0 ? `Mancınıklar hazır (${NM[sel]}). Komşu bir düşman bölgesine dokun.` : ordSel != null && turn == 0 ? `${PN[ordSel]} için hedef seç: ortak bir düşmanın bölgesine dokun.` : dr ? (turn == 0 && !busy ? `Bölge seç (${N - dnx} kaldı)` + (cap[0] < 0 ? ': ilk seçimin başkent olur.' : '.') : `${PN[turn]} seçiyor…`) : bd && turn == 0 ? ({ b: 'Kışla kurmak için kendi bölgene dokun.', m: 'Maden kurmak için kendi bölgene dokun.', a: 'İttifak için o krallığın herhangi bir bölgesine dokun.', w: 'Sur için başkentine (★) dokun.' }[bd]) : turn != 0 ? `${PN[turn]} oynuyor…` : cn ? `Büyük gemiler hazır (${NM[sel]}). Kıyıdaki düşman bölgesine dokun.` : sco ? `Keşif gemisi hazır (${NM[sel]}). Kıyıdaki bir bölgeye dokun.` : sp ? `Casus hazır (${NM[sel]}). Herhangi bir düşman bölgesine dokun; içerilere gittikçe yakalanma riski artar.` : ak ? `Okçular hazır (${NM[sel]}). menzildeki düşmana dokun (2 bölge).` : phase == 'r' && !mv ? `Takviye: ${pool} birlik. Dokun: asker ekle. Basılı tut: inşa et.` : mv && bk ? (bk.src.size ? `Toplu taşıma: ${bk.src.size} bölgeden ${[...bk.src].reduce((a, u) => a + arm[u] - 1, 0)} asker seçildi. Şimdi hedef bölgeye basılı tut.` : 'Toplu taşıma: asker toplanacak bölgelere dokun, sonra hedefe basılı tut.') : mv ? (sel == null ? 'Taşımak için 2+ birlikli bölgeni seç. Basılı tut: toplu taşıma.' : `${NM[sel]} seçili. Hedef bölgene dokun, her dokunuş 1 birlik taşır.`) : sel == null ? `Saldırmak için 2+ birlikli bölgeni seç. (Fetih: ${won[0] + sup[0]}/${ext ? 5 : 3}, refah %${ref[0]})` : `${NM[sel]} seçili. Kendi bölgene dokun: asker taşı. Düşmana dokun: saldır.${shipCap(sel) > 0 ? ` Gemilerle ${Math.min(arm[sel] - 1, shipCap(sel))} asker taşıyabilirsin: denizin ötesindeki bir kıyıya dokun.` : ''} Koyu renkli düşmana dokun; bağlantılı bölgelerinden de saldırabilirsin.`));
   const ok = turn == 0 && phase == 'a' && !busy && !over;
   const adr = dr && !ONLINE && !TUT;
@@ -10313,6 +10398,9 @@ function menuRefresh() {
 }
 function showMenu(canContinue) {
   tutSel = false;
+  // Oyun bittiyse ya da yeni oyuna dönülüyorsa arka plana yeni bir tanıtım haritası gelir (son oyunun haritası kalmaz).
+  if ((!canContinue || over) && !demo && !ONLINE)
+    init(true);
   menuRefresh();
   document.getElementById('mnCont').hidden = !(canContinue && cap && cap[0] >= 0 && !over);
   pop.hidden = true;
@@ -10505,7 +10593,7 @@ const tutBuild = (title, text, key, tab, cost, done) => ({
 });
 const TS = [
   { t: 'Hoş geldin!', p: 'Amacın haritadaki bütün toprakları fethetmek. Sen <b>sarı</b> krallıksın; Kızıl, Mor ve Yeşil botlara karşı oynuyorsun. Bu rehber oyunun bütün sistemlerini adım adım gösterecek. Rehber bir şey istediğinde sadece o hamleyi yapabilirsin.', next: 1 },
-  { t: 'Başkentini seç', p: 'Oyun bölge seçimiyle başlar. İlk seçtiğin bölge <b>başkentin</b> olur. Başkentler gizlidir: rakipler seninkini, sen de onlarınkini bilmezsin. Başkentin ilk kez düşerse devletin ikiye bölünür, ikinci kez düşerse tamamen yıkılırsın. Parlayan bölgeye dokun.',
+  { t: 'Başkentini seç', p: 'Oyun bölge seçimiyle başlar. İlk seçtiğin bölge <b>başkentin</b> olur. Başkentler gizlidir: rakipler seninkini, sen de onlarınkini bilmezsin. Başkentin düştüğünde toplam askerin 50 ve üstüyse devletin ikiye bölünür; 50\'den azsa (zayıf devlet) tamamen yıkılırsın. Parlayan bölgeye dokun.',
     allow: { tap: t => t == tutT[0] },
     enter: () => {
       let b = -1, bv = -1;
@@ -10547,7 +10635,7 @@ const TS = [
     done: () => (!tData.pa || att[0] > (tData.att || 0)) && !busy },
   { t: 'Sis ve fetih hakkı', p: () => (won[0] > 0 ? 'Tebrikler, bölgeyi aldın! ' : 'Bu sefer olmadı; zar her zaman yanında olmayabilir. ') + 'Rakip bölgelerdeki <b>"?"</b> oradaki asker sayısını bilmediğin anlamına gelir; casuslar bunu açığa çıkarır. Her tur <b>3 fetih hakkın</b> var; istersen 5\'e çıkarabilirsin ama fazladan her fetih ve her başarısız saldırı halkının refahını düşürür.', next: 1 },
   tutBuild('Yapı paneli: Kışla', 'Kendi bölgene <b>parmağını basılı tutunca</b> yapı paneli açılır. Panel sekmelere ayrılır: Yapılar, Ordu, Deniz (kıyıda) ve Vergi. Parlayan başkentine basılı tut ve <b>Yapılar</b> sekmesinde <b>Kışla</b>\'ya dokun. Kışla her tur o bölgede asker üretir. Altının yetsin diye biraz ekledim.', 'b', 'y', BC, () => bar[cap[0]] >= 1),
-  tutBuild('Seviye sistemi', 'Yapıların 3 seviyesi vardır ve her seviye yeni bir güç açar. <b>Kışla:</b> sv1 +2, sv2 +4 asker/tur ve casus üretimi, sv3 +6 ve dolunca askerleri kendiliğinden sınıra yollar. <b>Maden:</b> her seviye +' + MI + ' altın; her yeni maden bir öncekinden pahalıdır. <b>Sandık:</b> 50 / 70 / 100 kapasite. Kule, iskele ve surun da seviyeleri var. Şimdi başkentine basılı tut ve <b>Kışlayı yükselt</b>.', 'ub', 'y', UPC, () => bar[cap[0]] >= 2),
+  tutBuild('Seviye sistemi', 'Yapıların 3 seviyesi vardır ve her seviye yeni bir güç açar. <b>Kışla:</b> sv1 +2, sv2 +4 asker/tur ve casus üretimi, sv3 +6 ve dolunca askerleri kendiliğinden sınıra yollar. <b>Maden:</b> her seviye +' + MI + ' altın; her yeni maden 5 altın daha pahalıdır (en fazla 80). <b>Sandık:</b> 50 / 70 / 100 kapasite. Kule, iskele ve surun da seviyeleri var. Şimdi başkentine basılı tut ve <b>Kışlayı yükselt</b>.', 'ub', 'y', UPC, () => bar[cap[0]] >= 2),
   tutBuild('Maden', 'Altın üç yerden gelir: bölgelerinden en fazla 15 altın temel gelir, madenler ve vergi. Madenler gelirini büyütmenin en güvenli yoludur. Başkentine basılı tut ve <b>Maden</b> kur.', 'm', 'y', MC(0), () => mn[cap[0]] >= 1),
   tutBuild('Altın sandığı', 'Altının bir sınırı vardır: <b>altın sandıklarının toplam kapasitesi</b>. Başkentinde 50\'lik bir sandık hazır gelir; sığmayan altın kaybolur. Sandığı yükseltebilir ya da başka bölgelere yenisini kurabilirsin. Dikkat: sandıklı bir bölge fethedilirse içindeki altının yarısı yağmalanır! Başkentine basılı tut ve <b>Sandığı yükselt</b>.', 'udp', 'y', DPU[1], () => dep[cap[0]] >= 2),
   { t: 'Vergi', p: 'Her bölgen <b>2 turda bir</b> vergi verir. <b>İç bölgeler</b> 2 altın verebilir; <b>sınır bölgeleri</b> 1 altın vermeli. Sınır bölgesinden 2 altın istersen halk kızar: refah düşer ve orada isyan çıkabilir. Başkentine basılı tut, <b>Vergi</b> sekmesini aç ve <b>Akıllı vergi</b>ye dokun: iç bölgeler 2, sınırlar 1 olur.',
