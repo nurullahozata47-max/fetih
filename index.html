@@ -1682,6 +1682,8 @@ let ctk = false;
 let cat = [];
 let catCd = [];
 let archV = [];
+// catXp: bölgedeki mancınıkların yıktığı sur sayısı (2 olunca rütbe alır, her tur atar).
+let catXp = [];
 let spyXp = 0;
 let spyMade = 0;
 const catFire = {};
@@ -1745,6 +1747,8 @@ let sco = false;
 let sp = false;
 let dr = false;
 let dnx = 0;
+// autoDr: oyuncu "Otomatik seç" dedi, kalan bölgeleri oyun onun yerine seçer.
+let autoDr = false;
 let inner;
 let fl = [];
 let bd = null;
@@ -4003,6 +4007,7 @@ function init(noDraft, seed) {
   cat = Array(N).fill(0);
   catCd = Array(N).fill(-9);
   archV = Array(N).fill(0);
+  catXp = Array(N).fill(0);
   spyXp = 0;
   spyMade = 0;
   ctk = false;
@@ -4320,6 +4325,7 @@ async function battle(a, t, sea, F) {
     tax[t] = 1;
     archV[t] = 0;
     cat[t] = 0;
+    catXp[t] = 0;
     if (lootD > 0) {
       gold[me] += lootD;
       clampGold(me);
@@ -4913,9 +4919,26 @@ function near2(a) {
 }
 // Okçu gücü: eğitilmiş okçular + kule + seviye 2 surun üstündeki okçular.
 const archN = u => arch[u] + (tw[u] ? 1 : 0) + (wall[u] >= 2 ? 2 : 0);
-// Savunmada okçu gücü: yeni okçular sadece saldırıya yardım eder; 3 saldırıda tecrübe kazanınca savunmaya da katılır.
+// Savunmada okçu gücü: yeni okçular sadece saldırıya yardım eder; 2 saldırıya katılınca tecrübeli olur ve savunmaya da katılır.
 // Kule ve sur okçuları her zaman savunur.
-const archDef = u => (archV[u] >= 3 ? arch[u] : 0) + (tw[u] ? 1 : 0) + (wall[u] >= 2 ? 2 : 0);
+const ARCHVET = 2;
+const archVet = u => arch[u] > 0 && archV[u] >= ARCHVET;
+// Mancınık rütbesi: 2 sur yıkan mancınıklar her tur taş atabilir.
+const CATVET = 2;
+const catGap = t => (catXp[t] >= CATVET ? 1 : 2);
+const catReady = t => rd - catCd[t] >= catGap(t);
+const archDef = u => (archVet(u) ? arch[u] : 0) + (tw[u] ? 1 : 0) + (wall[u] >= 2 ? 2 : 0);
+// Okçu tecrübesi: 2. saldırıdan sonra okçular tecrübeli olur (simgeleri altın yıldızlı olur).
+function archUp(u) {
+  archV[u]++;
+  if (archV[u] != ARCHVET)
+    return;
+  fl.push({ t: u, dx: 0, dy: -26, txt: '★ Tecrübeli okçular', col: '#ffd36b', t0: performance.now() + 900 });
+  if (own[u] == 0) {
+    hl += ` ${NM[u]} okçuları tecrübe kazandı: artık savunmada da savaşırlar.`;
+    setTimeout(() => banner(`★ ${NM[u]} okçuları tecrübeli oldu`, '#f2b134'), 900);
+  }
+}
 const canInc3 = (p, t) => {
   const q = own[t];
   return q != p && q != NEU && q >= 0 && q < P && (cap[q] != t || (p == 0 && !capVis(t))) && !inc[t] && !friend(p, q) && [...adj[t]].some(u => own[u] == p);
@@ -4951,6 +4974,8 @@ function spyTick() {
     }
     m.back = 1;
     spyXp++;
+    if (spyXp <= 5)
+      hl += spyXp == 5 ? ' ★ Casusların ustalaştı: yakalanma riski artık %50 daha az!' : ` ★ Casusların tecrübe kazandı (${spyXp}/5): yakalanma riski %${spyXp * 10} daha az.`;
     const rs = [m.t];
     const cand = [...adj[m.t]].filter(u => own[u] > 0 && own[u] < P && !allied(0, own[u])).sort((a, b) => [...adj[b]].filter(v => own[v] == 0).length - [...adj[a]].filter(v => own[v] == 0).length);
     if (cand.length)
@@ -4977,6 +5002,10 @@ function spyDepth(t) {
     if (own[u] == 0 && HD[u][t] < d)
       d = HD[u][t];
   return d;
+}
+function spyRank() {
+  const k = Math.min(5, spyXp);
+  return k >= 5 ? '★ Usta casuslar: yakalanma riski %50 daha az.' : k > 0 ? `★ Casus tecrübesi ${k}/5: yakalanma riski %${k * 10} daha az.` : 'Her başarılı görev casuslarının yakalanma riskini %10 azaltır (en fazla %50).';
 }
 // Casuslar başarılı oldukça ustalaşır: her başarılı görev yakalanma riskini %10 azaltır (en fazla %50).
 const spyRisk = t => Math.min(.8, .2 + .15 * spyDepth(t)) * (1 - Math.min(.5, .1 * spyXp));
@@ -5115,7 +5144,7 @@ async function cover(owner, ref, tgt) {
       k += h;
     }
     if (atk && arch[u] > 0)
-      archV[u]++;
+      archUp(u);
     pulse(tgt, '#ffffff', u, 2 + np, fire);
     tot += k;
     if (k > 0)
@@ -5139,7 +5168,7 @@ async function shoot(a, t) {
   let k = 0;
   const fire = tw[a] >= 2;
   if (arch[a] > 0)
-    archV[a]++;
+    archUp(a);
   for (let i = 0; i < archN(a); i++) {
     const d = Math.ceil(arm[t] * R(.2, .3) * (fire ? 1.5 : 1));
     const h = Math.max(0, Math.min(d, arm[t] - 1));
@@ -5458,6 +5487,11 @@ function neutralize(t, old) {
   arm[t] = 0;
   wall[t] = 0;
   arch[t] = 0;
+  archV[t] = 0;
+  if (cat) {
+    cat[t] = 0;
+    catXp[t] = 0;
+  }
   bar[t] = 0;
   mn[t] = 0;
   dk[t] = 0;
@@ -5677,7 +5711,7 @@ async function draftPick(p, t) {
 async function draftNext() {
   while (dnx < N) {
     const p = dnx % P;
-    if (p == 0 && !(TUT && cap[0] >= 0)) {
+    if (p == 0 && !(TUT && cap[0] >= 0) && !autoDr) {
       turn = 0;
       busy = false;
       ui();
@@ -5706,6 +5740,7 @@ function draftBegin() {
   zapply();
   dr = true;
   dnx = 0;
+  autoDr = false;
   turn = 0;
   phase = 'd';
   sel = null;
@@ -6563,14 +6598,33 @@ function lvPips(x, y, n) {
     c.stroke();
   }
 }
-function drawSpy(x, y, n, col) {
+// Rütbe yıldızı (okçu, casus, mancınık simgelerinde).
+function rankStar(ctx, x, y, r, fill) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5;
+    const rr = i % 2 ? r * .45 : r;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#3a2a08';
+  ctx.stroke();
+}
+// xp: başarılı casus görevleri (5'te usta casus: altın çerçeve).
+function drawSpy(x, y, n, col, xp) {
+  const mx = xp >= 5;
   c.beginPath();
   c.arc(x, y, 10, 0, 7);
   c.fillStyle = '#10222b';
   c.fill();
-  c.lineWidth = 2;
-  c.strokeStyle = col;
+  c.lineWidth = mx ? 2.6 : 2;
+  c.strokeStyle = mx ? '#ffd36b' : col;
   c.stroke();
+  if (xp > 0)
+    rankStar(c, x - 9, y - 9, 4.2, mx ? '#ffd36b' : '#d9e1e5');
   c.strokeStyle = '#fff';
   c.lineWidth = 1.8;
   c.beginPath();
@@ -6585,14 +6639,24 @@ function drawSpy(x, y, n, col) {
   c.fillText(n, x + 9, y - 9);
   c.font = 'bold 15px sans-serif';
 }
-function drawArch(x, y, n, col) {
+// vet: tecrübeli okçular (2 saldırıdan sonra): altın çift çerçeve ve yıldız, savunmada da savaşırlar.
+function drawArch(x, y, n, col, vet) {
+  if (vet) {
+    c.beginPath();
+    c.arc(x, y, 12.5, 0, 7);
+    c.lineWidth = 1.5;
+    c.strokeStyle = 'rgba(255,211,107,.75)';
+    c.stroke();
+  }
   c.beginPath();
   c.arc(x, y, 10, 0, 7);
-  c.fillStyle = '#10222b';
+  c.fillStyle = vet ? '#2a2410' : '#10222b';
   c.fill();
-  c.lineWidth = 2;
-  c.strokeStyle = col;
+  c.lineWidth = vet ? 2.6 : 2;
+  c.strokeStyle = vet ? '#ffd36b' : col;
   c.stroke();
+  if (vet)
+    rankStar(c, x - 9, y - 9, 4.5, '#ffd36b');
   c.strokeStyle = '#fff';
   c.lineWidth = 2;
   c.beginPath();
@@ -7798,6 +7862,18 @@ function catPos(t) {
   return [bx + 30 * sc, by + 19 * sc, sc];
 }
 // Mancınık atışı: her mancınık bir taş atar; isabet ederse sur bir seviye yıkılır (sv2'de okçular düşer).
+function catUp(a) {
+  catXp[a]++;
+  if (catXp[a] != CATVET)
+    return;
+  fl.push({ t: a, dx: 0, dy: -44, txt: '★ Mancınık rütbe aldı', col: '#ffd36b', t0: performance.now() + 600 });
+  if (own[a] == 0) {
+    hl += ` ${NM[a]} mancınıkları rütbe aldı: artık her tur taş atabilir.`;
+    setTimeout(() => banner(`★ ${NM[a]} mancınıkları rütbe aldı`, '#f2b134'), 1400);
+  }
+  else if (Vg.has(a))
+    hl += ` ${PN[own[a]]} mancınıkları rütbe aldı.`;
+}
 async function catapult(a, t) {
   const p = own[a];
   catCd[a] = rd;
@@ -7821,11 +7897,13 @@ async function catapult(a, t) {
         wall[t] = 1;
         nav.push({ k: 'fall', t, col: COL[own[t]], t0: performance.now(), dur: 1200 });
         wTxt.push('okçulu surun ön cephesi yıkıldı, okçular düştü');
+        catUp(a);
       }
       else if (wall[t] == 1) {
         makeRuin(t, a, 1, COL[p], p);
         wall[t] = 0;
         wTxt.push('surlar yıkıldı');
+        catUp(a);
       }
       const k = Math.max(0, Math.min(arm[t] - 1, 1 + Math.floor(Math.random() * 2)));
       arm[t] -= k;
@@ -7850,7 +7928,7 @@ function drawCatapult(t, s) {
   const [x0, y0, sc] = catPos(t);
   const F = catFire[t];
   const fa = F ? (performance.now() - F) / 900 : 9;
-  const ready = rd - catCd[t] >= 2;
+  const ready = catReady(t);
   // Hedefe göre yönü (en yakın düşman komşusu)
   let dir = 1;
   for (const u of adj[t])
@@ -7903,6 +7981,33 @@ function drawCatapult(t, s) {
     g.beginPath();
     g.arc(ex, ey, 2.6, 0, Math.PI);
     g.fill();
+    // Rütbeli mancınık: çerçevede sahibinin renginde dalgalanan sancak ve altın yıldız, tekerlek göbekleri altın.
+    if (catXp[t] >= CATVET) {
+      g.fillStyle = '#ffd36b';
+      [-8, 8].forEach(wx => {
+        g.beginPath();
+        g.arc(wx, 4, 1.6, 0, 7);
+        g.fill();
+      });
+      g.strokeStyle = '#3b2a1c';
+      g.lineWidth = 1.2;
+      g.beginPath();
+      g.moveTo(4.5, -12);
+      g.lineTo(4.5, -29);
+      g.stroke();
+      const wv = Math.sin(s * 4 + i + t) * 1.8;
+      g.fillStyle = COL[own[t]] || '#ccc';
+      g.strokeStyle = '#3b2a1c';
+      g.lineWidth = .8;
+      g.beginPath();
+      g.moveTo(4.5, -29);
+      g.quadraticCurveTo(11, -29 + wv, 18, -26.5 + wv);
+      g.lineTo(4.5, -20);
+      g.closePath();
+      g.fill();
+      g.stroke();
+      rankStar(g, 9.5, -25.5 + wv * .5, 3.4, '#ffd36b');
+    }
     if (ready && !(fa >= 0 && fa < 1.4)) {
       g.fillStyle = '#9a9c96';
       g.beginPath();
@@ -8583,7 +8688,7 @@ function movePick(a, t, cx, cy) {
         return;
       }
       arch[a] -= n;
-      // Tecrübe okçularla birlikte gider (gizli)
+      // Tecrübe okçularla birlikte gider
       archV[t] = Math.max(archV[t], archV[a]);
       if (!arch[a])
         archV[a] = 0;
@@ -8603,11 +8708,15 @@ function movePick(a, t, cx, cy) {
       }
       cat[a] -= n;
       const cd = catCd[a];
+      const cx0 = catXp[a];
+      if (!cat[a])
+        catXp[a] = 0;
       const d2 = dur + 500;
       nav.push({ k: 'carry', what: 'cat', x0: cen[a][0] * S, y0: cen[a][1] * S, x1: cen[t][0] * S, y1: cen[t][1] * S, n, col: COL[0], t0: now, dur: d2 });
       setTimeout(() => {
         cat[t] += n;
         catCd[t] = Math.max(catCd[t], cd);
+        catXp[t] = Math.max(catXp[t], cx0);
         fl.push({ t, dx: 0, txt: `+${n} mancınık`, col: '#fff', t0: performance.now() });
         ui();
       }, d2);
@@ -8624,7 +8733,7 @@ function spyPick(t, cx, cy) {
   const n = mySpies();
   const here = miss.some(m => m.t == t);
   pop.classList.remove('fixw');
-  pop.innerHTML = `<b>${PN[own[t]]} krallığı · ${NM[t]}</b><span>Hazır casusun: ${n}. Casus bu bölgeyi ve bir komşusunu 2 tur boyunca gösterir; içerilere gittikçe yakalanma riski artar.</span>` +
+  pop.innerHTML = `<b>${PN[own[t]]} krallığı · ${NM[t]}</b><span>Hazır casusun: ${n}. Casus bu bölgeyi ve bir komşusunu 2 tur boyunca gösterir; içerilere gittikçe yakalanma riski artar. ${spyRank()}</span>` +
     `<button data-k="sg" ${here || (TUT && !tutOK('k', 'sg', true)) ? 'disabled' : ''}>${here ? 'Burada zaten casusun var' : '🕵 Casus gönder'}</button>`;
   pop.hidden = false;
   const pw = pop.offsetWidth;
@@ -8718,14 +8827,16 @@ function openPop(cx, cy) {
       o.push(bar[t] < 2 ? ['c', 'Casus üret (Sv2 kışla gerekir)', false] : ['c', spyMade >= 5 ? 'Casus (bu tur 5 yetiştirildi)' : `Casus üret (${SPC} altın)`, spy[t] < 5 && spyMade < 5 && gold[0] >= SPC]);
     if (spy[t] > 0)
       o.push(['g', `Casus gönder (${spy[t]})`, true]);
+    if (spy[t] > 0)
+      inf.o += ' ' + spyRank();
     if (bar[t])
       o.push(['k', `Okçu üret (${AC})`, arch[t] < 5 && gold[0] >= AC]);
     if (bar[t])
       o.push(bar[t] < 3 ? ['ct', 'Mancınık (Sv3 kışla gerekir)', false] : ['ct', cat[t] >= CATMAX ? `Mancınık (${CATMAX}/${CATMAX})` : `Mancınık yap (${CTC} altın)`, cat[t] < CATMAX && gold[0] >= CTC]);
     if (cat[t] > 0) {
-      const rdy = rd - catCd[t] >= 2;
+      const rdy = catReady(t);
       o.push(['cf', rdy ? `Mancınıkla taş at (${cat[t]})` : 'Mancınıklar yeniden kuruluyor (gelecek tur)', rdy]);
-      inf.o += ` Mancınık: komşu düşman bölgesine 2 turda bir taş atar; surları yıkabilir, isabet etmezse taş boşa gider.`;
+      inf.o += catXp[t] >= CATVET ? ` ★ Rütbeli mancınık: komşu düşman bölgesine her tur taş atar; surları yıkabilir.` : ` Mancınık: komşu düşman bölgesine 2 turda bir taş atar; surları yıkabilir, isabet etmezse taş boşa gider. 2 sur yıkınca rütbe alır ve her tur atar (${catXp[t]}/${CATVET}).`;
     }
     if (cap[0] != t)
       o.push(['cm', mvd[0] ? 'Başkent taşıma hakkı kullanıldı' : `Başkenti buraya taşı (${CMC} altın)`, !mvd[0] && gold[0] >= CMC]);
@@ -8734,7 +8845,7 @@ function openPop(cx, cy) {
     if (archN(t) > 0)
       o.push(['f', shot[t] ? 'Okçular yoruldu' : `Okçu ateşi (${archN(t)})`, !shot[t]]);
     if (archN(t) > 0)
-      inf.o += ' Okçular 2 bölge uzağa ok atar ve yakındaki saldırılarına destek verir.';
+      inf.o += ' Okçular 2 bölge uzağa ok atar ve yakındaki saldırılarına destek verir.' + (arch[t] > 0 ? (archVet(t) ? ' ★ Tecrübeli okçular: savunmada da savaşırlar.' : ` Acemi okçular sadece saldırıda savaşır; 2 saldırıya katılınca tecrübeli olur ve savunmaya da katılır (${Math.min(archV[t], ARCHVET)}/${ARCHVET}).`) : '');
     // Vergi sekmesi: 1-5 arası seviye ve tüm bölgelere uygulama.
     const brd = isBorder(t);
     for (let v = 1; v <= 2; v++)
@@ -9581,6 +9692,14 @@ cv.addEventListener('click', async (e) => {
   ui();
 });
 $('end').onclick = () => {
+  if (dr && !ONLINE && !TUT) {
+    if (turn == 0 && !busy && !over) {
+      autoDr = true;
+      $('log').textContent = 'Kalan bölgelerini oyun senin yerine seçiyor.';
+      draftPick(0, botPick(0));
+    }
+    return;
+  }
   if (TUT && !tutOK('btn', 'end'))
     return;
   if (turn == 0 && phase == 'a' && !busy && !over) {
@@ -9948,7 +10067,7 @@ async function ai0(p) {
     }
   }
   for (const a of mine()) {
-    if (cat[a] > 0 && rd - catCd[a] >= 2 && !inc[a]) {
+    if (cat[a] > 0 && catReady(a) && !inc[a]) {
       const tg = [...adj[a]].filter(t => own[t] != p && own[t] != NEU && !friend(p, own[t]) && !prot(t)).sort((x, y) => (wall[y] - wall[x]) || (est(p, y) - est(p, x)))[0];
       if (tg != null && (wall[tg] > 0 || Math.random() < .4)) {
         await catapult(a, tg);
@@ -10132,9 +10251,9 @@ function ui(msg) {
     if (V.has(t) && dep[t] && depSeen(t))
       atSlot(c, t, 'd', () => lvPips(0, 9, dep[t]));
     if (V.has(t) && arch[t])
-      atSlot(c, t, 'a', () => drawArch(0, 0, arch[t], COL[own[t]]));
+      atSlot(c, t, 'a', () => drawArch(0, 0, arch[t], COL[own[t]], archVet(t)));
     if (V.has(t) && spy[t])
-      atSlot(c, t, 's', () => drawSpy(0, 0, spy[t], COL[own[t]]));
+      atSlot(c, t, 's', () => drawSpy(0, 0, spy[t], COL[own[t]], own[t] == 0 ? spyXp : 0));
   });
   for (let t = 0; t < N; t++)
     if (dk[t] && dock[t] && V.has(t))
@@ -10143,10 +10262,12 @@ function ui(msg) {
     for (let p = 0; p < P; p++)
       clampGold(p);
   setTxt('ttl', dr ? 'Fetih, bölge seçimi' : `Fetih, tur ${rd}` + (rd <= CAPT ? ` (başkentler ${CAPT + 1 - rd} tur daha dokunulmaz)` : ''));
-  setHTML('chips', PN.slice(0, P).map((n, p) => cnt(p) == 0 ? (p > 3 ? '' : `<span class="dead" style="--c:${COL[p]}">${n}</span>`) : `<span class="${p == turn && !over ? 'on' : ''}" style="--c:${COL[p]}">${n} ${cnt(p)}<em style="font-style:normal;font-size:.85em;margin-left:4px;color:${ref[p] < 20 ? '#d63a3a' : ref[p] < 50 ? '#e5566d' : ref[p] < 70 ? '#c98a12' : '#3a9a6c'}">${p == 0 ? '' : '%' + ref[p]}</em>${p == 0 ? ` (${gold[0]}/${capOf(0)} altın)` : ally[p] > 0 ? (tru[p] ? ` (haraç: ${ally[p]} tur)` : ` (ittifak: ${ally[p]} tur)`) : ''}${p > 0 && bp[p].some(v => v > 0) ? ` (+${bp[p].map((v, q) => v > 0 ? PN[q] : '').filter(Boolean).join(', ')})` : ''}</span>`).join('') + (cnt(NEU) ? `<span style="--c:#9aa3a8">Boş ${cnt(NEU)}</span>` : ''));
+  setHTML('chips', PN.slice(0, P).map((n, p) => cnt(p) == 0 && !dr ? (p > 3 ? '' : `<span class="dead" style="--c:${COL[p]}">${n}</span>`) : `<span class="${p == turn && !over ? 'on' : ''}" style="--c:${COL[p]}">${n} ${cnt(p)}<em style="font-style:normal;font-size:.85em;margin-left:4px;color:${ref[p] < 20 ? '#d63a3a' : ref[p] < 50 ? '#e5566d' : ref[p] < 70 ? '#c98a12' : '#3a9a6c'}">${p == 0 ? '' : '%' + ref[p]}</em>${p == 0 ? ` (${gold[0]}/${capOf(0)} altın)` : ally[p] > 0 ? (tru[p] ? ` (haraç: ${ally[p]} tur)` : ` (ittifak: ${ally[p]} tur)`) : ''}${p > 0 && bp[p].some(v => v > 0) ? ` (+${bp[p].map((v, q) => v > 0 ? PN[q] : '').filter(Boolean).join(', ')})` : ''}</span>`).join('') + (cnt(NEU) ? `<span style="--c:#9aa3a8">Boş ${cnt(NEU)}</span>` : ''));
   setTxt('st', msg || (ctk && sel != null && turn == 0 ? `Mancınıklar hazır (${NM[sel]}). Komşu bir düşman bölgesine dokun.` : ordSel != null && turn == 0 ? `${PN[ordSel]} için hedef seç: ortak bir düşmanın bölgesine dokun.` : dr ? (turn == 0 && !busy ? `Bölge seç (${N - dnx} kaldı)` + (cap[0] < 0 ? ': ilk seçimin başkent olur.' : '.') : `${PN[turn]} seçiyor…`) : bd && turn == 0 ? ({ b: 'Kışla kurmak için kendi bölgene dokun.', m: 'Maden kurmak için kendi bölgene dokun.', a: 'İttifak için o krallığın herhangi bir bölgesine dokun.', w: 'Sur için başkentine (★) dokun.' }[bd]) : turn != 0 ? `${PN[turn]} oynuyor…` : cn ? `Büyük gemiler hazır (${NM[sel]}). Kıyıdaki düşman bölgesine dokun.` : sco ? `Keşif gemisi hazır (${NM[sel]}). Kıyıdaki bir bölgeye dokun.` : sp ? `Casus hazır (${NM[sel]}). Herhangi bir düşman bölgesine dokun; içerilere gittikçe yakalanma riski artar.` : ak ? `Okçular hazır (${NM[sel]}). menzildeki düşmana dokun (2 bölge).` : phase == 'r' && !mv ? `Takviye: ${pool} birlik. Dokun: asker ekle. Basılı tut: inşa et.` : mv && bk ? (bk.src.size ? `Toplu taşıma: ${bk.src.size} bölgeden ${[...bk.src].reduce((a, u) => a + arm[u] - 1, 0)} asker seçildi. Şimdi hedef bölgeye basılı tut.` : 'Toplu taşıma: asker toplanacak bölgelere dokun, sonra hedefe basılı tut.') : mv ? (sel == null ? 'Taşımak için 2+ birlikli bölgeni seç. Basılı tut: toplu taşıma.' : `${NM[sel]} seçili. Hedef bölgene dokun, her dokunuş 1 birlik taşır.`) : sel == null ? `Saldırmak için 2+ birlikli bölgeni seç. (Fetih: ${won[0] + sup[0]}/${ext ? 5 : 3}, refah %${ref[0]})` : `${NM[sel]} seçili. Kendi bölgene dokun: asker taşı. Düşmana dokun: saldır.${shipCap(sel) > 0 ? ` Gemilerle ${Math.min(arm[sel] - 1, shipCap(sel))} asker taşıyabilirsin: denizin ötesindeki bir kıyıya dokun.` : ''} Koyu renkli düşmana dokun; bağlantılı bölgelerinden de saldırabilirsin.`));
   const ok = turn == 0 && phase == 'a' && !busy && !over;
-  $('end').disabled = !ok;
+  const adr = dr && !ONLINE && !TUT;
+  $('end').disabled = adr ? !(turn == 0 && !busy && !over && !autoDr) : !ok;
+  $('end').textContent = adr ? (autoDr ? 'Seçiliyor…' : 'Otomatik seç') : 'Turu bitir';
   $('mv').disabled = !(turn == 0 && !busy && !over && !dr);
   $('mv').className = mv ? 'on' : '';
   $('mv').textContent = mv ? 'Toplamayı bitir' : 'Toplu taşıma';
@@ -10855,7 +10976,7 @@ function LocalNet() {
 }
 // --- Durum anlık görüntüsü: SW ile kendi bakış açısından global numaralara çevrilir ---
 const PARR = ['gold', 'cap', 'att', 'won', 'pen', 'mvd', 'spl', 'ref', 'bt', 'tru', 'hp', 'hb', 'tcd', 'rev', 'sup', 'ally'];
-const GARR = { own: () => own, arm: () => arm, wall: () => wall, bar: () => bar, mn: () => mn, dep: () => dep, tax: () => tax, ik: () => ik, rwhy: () => rwhy, cat: () => cat, catCd: () => catCd, archV: () => archV, rcl: () => rcl, rcm: () => rcm, rst: () => rst, arch: () => arch, tw: () => tw, spy: () => spy, dk: () => dk, shS: () => shS, shL: () => shL, shUsed: () => shUsed, sfire: () => sfire, shot: () => shot, inc: () => inc, ib: () => ib, ruin: () => ruin, mine: () => mine };
+const GARR = { own: () => own, arm: () => arm, wall: () => wall, bar: () => bar, mn: () => mn, dep: () => dep, tax: () => tax, ik: () => ik, rwhy: () => rwhy, cat: () => cat, catCd: () => catCd, catXp: () => catXp, archV: () => archV, rcl: () => rcl, rcm: () => rcm, rst: () => rst, arch: () => arch, tw: () => tw, spy: () => spy, dk: () => dk, shS: () => shS, shL: () => shL, shUsed: () => shUsed, sfire: () => sfire, shot: () => shot, inc: () => inc, ib: () => ib, ruin: () => ruin, mine: () => mine };
 const PVARS = { gold: () => gold, cap: () => cap, att: () => att, won: () => won, pen: () => pen, mvd: () => mvd, spl: () => spl, ref: () => ref, bt: () => bt, tru: () => tru, hp: () => hp, hb: () => hb, tcd: () => tcd, rev: () => rev, sup: () => sup, ally: () => ally };
 function swapIdx(a) {
   if (!ONLINE || !myG)
