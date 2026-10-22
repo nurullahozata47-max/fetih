@@ -168,6 +168,12 @@ canvas {
   max-width: none;
 }
 /* Asker taşıma paneli */
+#pop .mv-lbl {
+  font-size: 12.5px;
+  font-weight: 700;
+  opacity: .8;
+  margin-top: 2px;
+}
 #pop .mv-row {
   display: flex;
   gap: 6px;
@@ -2825,6 +2831,51 @@ function drawDockShips(s) {
 }
 // Hareketli olayların animasyonları: fetih patlaması, çarpışma, gemi seferi, top atışı,
 // batma, başkent taşıma, bölünme, asker yürüyüşü, casus dönüşü...
+// Bölünme animasyonu: iki bölge grubunun (K: eski devlet, Q: kopan) ortak sınırını bulur.
+function riftFx(K, Q, c1, c2) {
+  const ks = new Set(K);
+  const qs = new Set(Q);
+  const pts = [];
+  for (let i = 0; i < W * H; i++) {
+    if (!qs.has(cell[i]))
+      continue;
+    const x = i % W;
+    const y = (i / W) | 0;
+    if ((x < W - 1 && ks.has(cell[i + 1])) || (y < H - 1 && ks.has(cell[i + W])) || (x > 0 && ks.has(cell[i - 1])) || (y > 0 && ks.has(cell[i - W])))
+      pts.push([x * S + S / 2, y * S + S / 2]);
+  }
+  const cm = L => {
+    let sx = 0;
+    let sy = 0;
+    L.forEach(t => {
+      sx += cen[t][0] * S;
+      sy += cen[t][1] * S;
+    });
+    return [sx / Math.max(1, L.length), sy / Math.max(1, L.length)];
+  };
+  const [kx, ky] = cm(K);
+  const [qx, qy] = cm(Q);
+  let nx = qx - kx;
+  let ny = qy - ky;
+  const nl = Math.hypot(nx, ny) || 1;
+  nx /= nl;
+  ny /= nl;
+  if (!pts.length)
+    pts.push([(kx + qx) / 2, (ky + qy) / 2]);
+  // Sınır boyunca sırala (bölünme yönüne dik eksen üzerinde)
+  pts.sort((a, b) => (a[0] * -ny + a[1] * nx) - (b[0] * -ny + b[1] * nx));
+  const step = Math.max(1, Math.ceil(pts.length / 150));
+  const P2 = pts.filter((_, i) => i % step == 0);
+  let cx = 0;
+  let cy = 0;
+  P2.forEach(([x, y]) => {
+    cx += x;
+    cy += y;
+  });
+  nav.push({ k: 'rift', pts: P2, nx, ny, cx: cx / P2.length, cy: cy / P2.length, c1, c2, t0: performance.now(), dur: 2600 });
+  if (navigator.vibrate)
+    navigator.vibrate([60, 40, 120]);
+}
 // Savaş sancağı: direk, sahibinin renginde dalgalanan bayrak ve üzerinde çapraz kılıçlar.
 function warBanner(x, y, col, s, k) {
   g.save();
@@ -3224,6 +3275,172 @@ function drawNav(now) {
       g.strokeText('★', x, y + 7);
       g.fillText('★', x, y + 7);
       g.globalAlpha = 1;
+      return;
+    }
+    if (e.k == 'carry') {
+      // Taşınan okçular (yaylı figürler) ya da tekerlekli mancınık yol boyunca ilerler
+      if (u < 0 || u > 1)
+        return;
+      const ez = u * u * (3 - 2 * u);
+      const n = e.what == 'cat' ? Math.min(2, e.n) : Math.min(6, e.n);
+      for (let i = 0; i < n; i++) {
+        const qi = Math.max(0, Math.min(1, ez - i * .06));
+        const x = e.x0 + (e.x1 - e.x0) * qi + (e.what == 'cat' ? 0 : Math.sin(i * 2.1) * 4);
+        const y = e.y0 + (e.y1 - e.y0) * qi + (e.what == 'cat' ? i * 5 : Math.cos(i * 1.7) * 3);
+        const dir = e.x1 >= e.x0 ? 1 : -1;
+        g.save();
+        g.translate(x, y);
+        if (e.what == 'cat') {
+          g.scale(.6 * dir, .6);
+          g.fillStyle = 'rgba(0,0,0,.25)';
+          g.beginPath();
+          g.ellipse(0, 5, 13, 3, 0, 0, 7);
+          g.fill();
+          g.fillStyle = '#7a5230';
+          g.fillRect(-11, -1, 22, 4);
+          g.fillStyle = '#5c3b20';
+          g.fillRect(-2, -10, 3, 10);
+          g.strokeStyle = '#6b4526';
+          g.lineWidth = 2.4;
+          g.beginPath();
+          g.moveTo(-8, -6);
+          g.lineTo(10, -13);
+          g.stroke();
+          const sp = u * 40;
+          [-7, 7].forEach(wx => {
+            g.fillStyle = '#3b2a1c';
+            g.beginPath();
+            g.arc(wx, 4, 3.6, 0, 7);
+            g.fill();
+            g.strokeStyle = '#a07a4e';
+            g.lineWidth = 1;
+            g.beginPath();
+            g.moveTo(wx + Math.cos(sp) * 3, 4 + Math.sin(sp) * 3);
+            g.lineTo(wx - Math.cos(sp) * 3, 4 - Math.sin(sp) * 3);
+            g.stroke();
+          });
+        }
+        else {
+          const bob = Math.abs(Math.sin(u * 30 + i)) * 1.5;
+          g.fillStyle = 'rgba(0,0,0,.25)';
+          g.beginPath();
+          g.ellipse(0, 3, 3, 1.2, 0, 0, 7);
+          g.fill();
+          g.fillStyle = '#fff';
+          g.beginPath();
+          g.arc(0, -bob, 2.8, 0, 7);
+          g.fill();
+          g.fillStyle = e.col;
+          g.beginPath();
+          g.arc(0, -bob, 1.9, 0, 7);
+          g.fill();
+          g.strokeStyle = '#7a5230';
+          g.lineWidth = 1;
+          g.beginPath();
+          g.arc(2.4 * dir, -bob, 3, -1.3, 1.3);
+          g.stroke();
+        }
+        g.restore();
+      }
+      return;
+    }
+    if (e.k == 'rift') {
+      // Devletin bölünmesi: iki parçanın sınırı boyunca kızgın bir yarık açılır, iki taraf kendi rengiyle parlar,
+      // şok dalgası yayılır, sonunda kıvılcımlar ve küller yükselip söner.
+      if (u < 0 || u > 1)
+        return;
+      const P0 = e.pts;
+      const n = P0.length;
+      const grow = Math.min(1, u / .42);
+      const m = Math.max(1, Math.round(n * grow));
+      const fade = u > .72 ? Math.max(0, (1 - u) / .28) : 1;
+      const jit = (k, a) => Math.sin(k * 12.9898 + a) * 2.6;
+      // Sınırdaki her nokta için yarık yönünde kısa, zikzaklı bir parça: yan yana birleşip kesintisiz bir yarık olur.
+      const tx0 = -e.ny;
+      const ty0 = e.nx;
+      const path = () => {
+        g.beginPath();
+        for (let k = 0; k < m; k++) {
+          const [x, y] = P0[k];
+          const o1 = jit(k, 1.7);
+          const o2 = jit(k + 1, 1.7);
+          g.moveTo(x - tx0 * 3.4 + e.nx * o1, y - ty0 * 3.4 + e.ny * o1);
+          g.lineTo(x + e.nx * (o1 + o2) * .5 * -.6, y + e.ny * (o1 + o2) * .5 * -.6);
+          g.lineTo(x + tx0 * 3.4 + e.nx * o2, y + ty0 * 3.4 + e.ny * o2);
+        }
+      };
+      g.save();
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      // İki tarafın renkli parıltısı
+      if (u > .3) {
+        const ga = Math.min(1, (u - .3) / .2) * fade * .55;
+        for (let k = 0; k < m; k += 2) {
+          const [x, y] = P0[k];
+          [[e.c1, -1], [e.c2, 1]].forEach(([cc, sg]) => {
+            const ox = x + e.nx * sg * (6 + (u - .3) * 14);
+            const oy = y + e.ny * sg * (6 + (u - .3) * 14);
+            g.globalAlpha = ga;
+            g.fillStyle = cc;
+            g.beginPath();
+            g.arc(ox, oy, 5.5, 0, 7);
+            g.fill();
+          });
+        }
+      }
+      g.globalCompositeOperation = 'lighter';
+      path();
+      g.globalAlpha = .35 * fade;
+      g.strokeStyle = '#ff6a1a';
+      g.lineWidth = 13;
+      g.stroke();
+      g.globalAlpha = .7 * fade;
+      g.strokeStyle = '#ffb03a';
+      g.lineWidth = 6;
+      g.stroke();
+      g.globalAlpha = fade;
+      g.strokeStyle = '#fff6d8';
+      g.lineWidth = 2.2;
+      g.stroke();
+      // Yarığın ucunda kıvılcımlar
+      if (grow < 1) {
+        const [tx, ty] = P0[m - 1];
+        for (let k = 0; k < 9; k++) {
+          const a = k * 2.4 + u * 20;
+          const d = ((u * 7 + k * .37) % 1) * 14;
+          g.globalAlpha = 1 - d / 14;
+          g.fillStyle = k % 2 ? '#ffe27a' : '#ff8a2a';
+          g.beginPath();
+          g.arc(tx + Math.cos(a) * d, ty + Math.sin(a) * d - d * .4, 1.6, 0, 7);
+          g.fill();
+        }
+      }
+      g.globalCompositeOperation = 'source-over';
+      // Şok dalgası
+      if (u > .42 && u < .9) {
+        const q = (u - .42) / .48;
+        [e.c1, e.c2].forEach((cc, i) => {
+          g.globalAlpha = (1 - q) * .8;
+          g.strokeStyle = cc;
+          g.lineWidth = 3 * (1 - q) + 1;
+          g.beginPath();
+          g.ellipse(e.cx, e.cy, 10 + q * (60 + i * 18), (10 + q * (60 + i * 18)) * .6, 0, 0, 7);
+          g.stroke();
+        });
+      }
+      // Yükselen küller
+      if (u > .55) {
+        const q = (u - .55) / .45;
+        for (let k = 0; k < n; k += 3) {
+          const [x, y] = P0[k];
+          g.globalAlpha = (1 - q) * .8;
+          g.fillStyle = k % 2 ? '#ffb03a' : '#5a5a5a';
+          g.beginPath();
+          g.arc(x + Math.sin(k + q * 6) * 4, y - q * (14 + (k % 5) * 4), 1.4, 0, 7);
+          g.fill();
+        }
+      }
+      g.restore();
       return;
     }
     if (e.k == 'split') {
@@ -4301,7 +4518,7 @@ function civilSplit(p) {
         tm = u;
       }
   fl.push({ t: tm, dx: 0, txt: 'İç savaş!', col: '#ff8a6b', t0: performance.now() + 200 });
-  nav.push({ k: 'split', t: tm, c1: COL[p], c2: COL[r], t0: performance.now(), dur: 1600 });
+  riftFx(K, Q, COL[p], COL[r]);
   const msg = p == 0 ? `Refah %20'nin altına düştü, halk ayaklandı! Ülken ikiye bölündü; kopan topraklarda ${PN[r]} devleti kuruldu.` : `${PN[p]} ülkesinde refah çöktü ve iç savaş çıktı! Ülke ikiye bölündü, kopan topraklarda ${PN[r]} devleti kuruldu.`;
   hl += ' ' + msg;
   setTimeout(() => banner(p == 0 ? 'Ülken ikiye bölündü!' : `${PN[p]} ikiye bölündü!`, COL[r]), 300);
@@ -4515,7 +4732,7 @@ async function capLost(old, me, t) {
   cap[old] = safest(old, K);
   cap[r] = safest(r, Q);
   fl.push({ t, dx: 0, txt: 'Bölündü!', col: '#ffd36b', t0: performance.now() + 200 });
-  nav.push({ k: 'split', t, c1: COL[old], c2: COL[r], t0: performance.now(), dur: 1600 });
+  riftFx(K, Q, COL[old], COL[r]);
   banner(`${PN[old]} ikiye bölündü!`, COL[r]);
   const msg = old == 0 ? `Başkentin düştü! Devletin ikiye bölündü: ${NM[cap[0]]} yeni başkentin. Kopan topraklarda ${PN[r]} devleti kuruldu.` : `${PN[old]} başkentini kaybetti ve ikiye bölündü! Kopan topraklarda ${PN[r]} devleti kuruldu. İki devletin de yeni başkenti gizli; birinin başkentini bir daha alırsan tümüyle düşer.`;
   $('log').textContent = msg;
@@ -5176,7 +5393,7 @@ function secede(p, list) {
       cap[r] = G[0];
     capChest(r);
     const tm = G[0];
-    nav.push({ k: 'split', t: tm, c1: COL[p], c2: COL[r], t0: performance.now(), dur: 1600 });
+    riftFx([...Array(N).keys()].filter(u => own[u] == p), G, COL[p], COL[r]);
     fl.push({ t: tm, dx: 0, txt: 'Bağımsızlık!', col: '#ffb38a', t0: performance.now() + 200 });
     const nm = G.map(t => NM[t]).join(', ');
     hl += p == 0 ? ` İsyan bastırılamadı: ${nm} bağımsızlığını ilan etti, ${PN[r]} devleti kuruldu!` : (G.some(t => Vg.has(t)) ? ` ${PN[p]} ülkesinde isyancılar ${PN[r]} devletini kurdu.` : '');
@@ -8165,14 +8382,25 @@ const POP_CAT = { b: 'y', ub: 'y', m: 'y', um: 'y', dp: 'y', udp: 'y', w: 'y', u
 let popTab = 'y';
 let popT = -1;
 let popPos = null;
-// ---- Asker taşıma paneli: seçili bölgeden hedefe 1, yarısı ya da hepsi ----
+// Taşınabilir bir şey var mı: 1'den fazla asker, okçu ya da mancınık.
+const movable = t => arm[t] > 1 || arch[t] > 0 || (cat && cat[t] > 0);
+// ---- Taşıma paneli: seçili bölgeden hedefe asker (1 / yarısı / hepsi), okçu ve mancınık ----
 function movePick(a, t, cx, cy) {
   const mx = arm[a] - 1;
   const half = Math.max(1, Math.floor(mx / 2));
-  const opts = [['m1', 1], ['mh', half], ['ma', mx]].filter((o, i, A) => A.findIndex(x => x[1] == o[1]) == i);
+  const uniq = L => L.filter((o, i, A) => A.findIndex(x => x[1] == o[1]) == i);
+  const btn = (k, n, lbl) => `<button data-k="${k}" data-n="${n}" class="${TUT && tutOK('k', k, true) ? 'tut-hl' : ''}" ${!TUT || tutOK('k', k, true) ? '' : 'disabled'}>${lbl}<em>${n}</em></button>`;
+  let h = '';
+  if (mx >= 1)
+    h += `<div class="mv-lbl">⚔ Asker</div><div class="mv-row">` + uniq([['m1', 1, ''], ['mh', half, 'Yarısı'], ['ma', mx, 'Hepsi']]).map(([k, n, l]) => btn(k, n, l)).join('') + '</div>';
+  const ra = Math.min(arch[a], 5 - arch[t]);
+  if (arch[a] > 0)
+    h += `<div class="mv-lbl">🏹 Okçu${ra < 1 ? ' (hedefte yer yok)' : ''}</div>` + (ra >= 1 ? `<div class="mv-row">` + uniq([['a1', 1, ''], ['aa', ra, 'Hepsi']]).map(([k, n, l]) => btn(k, n, l)).join('') + '</div>' : '');
+  const rc = Math.min(cat[a] || 0, CATMAX - (cat[t] || 0));
+  if (cat[a] > 0)
+    h += `<div class="mv-lbl">🪨 Mancınık${rc < 1 ? ' (hedefte yer yok)' : ''}</div>` + (rc >= 1 ? `<div class="mv-row">` + uniq([['c1', 1, ''], ['ca', rc, 'Hepsi']]).map(([k, n, l]) => btn(k, n, l)).join('') + '</div>' : '');
   pop.classList.remove('fixw');
-  pop.innerHTML = `<b>Asker taşı</b><span>${NM[a]} → ${NM[t]}` + (inc[t] > 0 && !supT.has(t) ? ' (isyanlı bölge: bir fetih hakkı harcar)' : '') + `</span><div class="mv-row">` +
-    opts.map(([k, n]) => `<button data-k="${k}" data-n="${n}" class="${TUT && tutOK('k', k, true) ? 'tut-hl' : ''}" ${!TUT || tutOK('k', k, true) ? '' : 'disabled'}>${k == 'ma' ? 'Hepsi' : k == 'mh' ? 'Yarısı' : ''}<em>${n}</em></button>`).join('') + '</div>';
+  pop.innerHTML = `<b>Taşı: ${NM[a]} → ${NM[t]}</b>` + (inc[t] > 0 && !supT.has(t) && mx >= 1 ? '<span>İsyanlı bölgeye asker göndermek bir fetih hakkı harcar.</span>' : '') + h;
   pop.hidden = false;
   const pw = pop.offsetWidth;
   const ph = pop.offsetHeight;
@@ -8182,30 +8410,118 @@ function movePick(a, t, cx, cy) {
     T = cy + 24;
   pop.style.top = Math.min(Math.max(T, 8), innerHeight - ph - 8) + 'px';
   popPos = null;
-  pop.onclick = e => {
-    const b = e.target.closest && e.target.closest('button[data-k]');
+  pop.onclick = ev => {
+    const b = ev.target.closest && ev.target.closest('button[data-k]');
     if (!b)
       return;
-    if (TUT && !tutOK('k', b.dataset.k))
+    const k = b.dataset.k;
+    if (TUT && !tutOK('k', k))
       return;
     pop.hidden = true;
-    const n = Math.min(+b.dataset.n, arm[a] - 1);
-    if (n < 1 || own[a] != 0 || own[t] != 0 || !supUse(t)) {
+    if (own[a] != 0 || own[t] != 0) {
       ui();
       return;
     }
-    arm[a] -= n;
-    mvCount++;
+    const kind = k[0];
     const now = performance.now();
     const dur = 700 + Math.min(500, HD[a][t] * 100);
-    nav.push({ k: 'march', x0: cen[a][0] * S, y0: cen[a][1] * S, x1: cen[t][0] * S, y1: cen[t][1] * S, n: Math.min(10, n), t0: now, dur });
-    setTimeout(() => {
-      arm[t] += n;
-      fl.push({ t, dx: 0, txt: `+${n}`, col: '#fff', t0: performance.now() });
+    if (kind == 'm') {
+      const n = Math.min(+b.dataset.n, arm[a] - 1);
+      if (n < 1 || !supUse(t)) {
+        ui();
+        return;
+      }
+      arm[a] -= n;
+      mvCount++;
+      nav.push({ k: 'march', x0: cen[a][0] * S, y0: cen[a][1] * S, x1: cen[t][0] * S, y1: cen[t][1] * S, n: Math.min(10, n), t0: now, dur });
+      setTimeout(() => {
+        arm[t] += n;
+        fl.push({ t, dx: 0, txt: `+${n}`, col: '#fff', t0: performance.now() });
+        ui();
+      }, dur);
+      $('log').textContent = `${n} asker ${NM[a]} → ${NM[t]} taşındı.`;
+    }
+    else if (kind == 'a') {
+      const n = Math.min(+b.dataset.n, arch[a], 5 - arch[t]);
+      if (n < 1) {
+        ui();
+        return;
+      }
+      arch[a] -= n;
+      // Tecrübe okçularla birlikte gider (gizli)
+      archV[t] = Math.max(archV[t], archV[a]);
+      if (!arch[a])
+        archV[a] = 0;
+      nav.push({ k: 'carry', what: 'arch', x0: cen[a][0] * S, y0: cen[a][1] * S, x1: cen[t][0] * S, y1: cen[t][1] * S, n, col: COL[0], t0: now, dur });
+      setTimeout(() => {
+        arch[t] += n;
+        fl.push({ t, dx: 0, txt: `+${n} okçu`, col: '#fff', t0: performance.now() });
+        ui();
+      }, dur);
+      $('log').textContent = `${n} okçu ${NM[a]} → ${NM[t]} taşındı.`;
+    }
+    else {
+      const n = Math.min(+b.dataset.n, cat[a], CATMAX - cat[t]);
+      if (n < 1) {
+        ui();
+        return;
+      }
+      cat[a] -= n;
+      const cd = catCd[a];
+      const d2 = dur + 500;
+      nav.push({ k: 'carry', what: 'cat', x0: cen[a][0] * S, y0: cen[a][1] * S, x1: cen[t][0] * S, y1: cen[t][1] * S, n, col: COL[0], t0: now, dur: d2 });
+      setTimeout(() => {
+        cat[t] += n;
+        catCd[t] = Math.max(catCd[t], cd);
+        fl.push({ t, dx: 0, txt: `+${n} mancınık`, col: '#fff', t0: performance.now() });
+        ui();
+      }, d2);
+      $('log').textContent = `${n} mancınık ${NM[a]} → ${NM[t]} yola çıktı.`;
+    }
+    sel = movable(a) ? a : null;
+    ui();
+  };
+}
+// ---- Casus gönderme paneli: düşman bölgesine dokununca ----
+const mySpies = () => spy.reduce((s0, v, i) => s0 + (own[i] == 0 ? v : 0), 0);
+const spyTarget = t => own[t] > 0 && own[t] < P && !allied(0, own[t]) && mySpies() > 0 && turn == 0 && !busy;
+function spyPick(t, cx, cy) {
+  const n = mySpies();
+  const here = miss.some(m => m.t == t);
+  pop.classList.remove('fixw');
+  pop.innerHTML = `<b>${PN[own[t]]} krallığı · ${NM[t]}</b><span>Hazır casusun: ${n}. Casus bu bölgeyi ve bir komşusunu 2 tur boyunca gösterir; içerilere gittikçe yakalanma riski artar.</span>` +
+    `<button data-k="sg" ${here || (TUT && !tutOK('k', 'sg', true)) ? 'disabled' : ''}>${here ? 'Burada zaten casusun var' : '🕵 Casus gönder'}</button>`;
+  pop.hidden = false;
+  const pw = pop.offsetWidth;
+  const ph = pop.offsetHeight;
+  pop.style.left = Math.min(Math.max(cx - pw / 2, 8), innerWidth - pw - 8) + 'px';
+  let T = cy - ph - 24;
+  if (T < 8)
+    T = cy + 24;
+  pop.style.top = Math.min(Math.max(T, 8), innerHeight - ph - 8) + 'px';
+  popPos = null;
+  pop.onclick = ev => {
+    const b = ev.target.closest && ev.target.closest('button[data-k=sg]');
+    if (!b)
+      return;
+    pop.hidden = true;
+    // En yakın casuslu bölgeden gönderilir
+    let a = -1;
+    let bd0 = 99;
+    for (let u = 0; u < N; u++)
+      if (own[u] == 0 && spy[u] > 0 && HD[u][t] < bd0) {
+        bd0 = HD[u][t];
+        a = u;
+      }
+    if (a < 0 || miss.some(m => m.t == t)) {
       ui();
-    }, dur);
-    $('log').textContent = `${n} asker ${NM[a]} → ${NM[t]} taşındı.`;
-    sel = arm[a] > 1 ? a : null;
+      return;
+    }
+    spy[a]--;
+    miss.push({ t, a });
+    fl.push({ t, dx: 0, txt: 'Casus', col: '#9bd1ff', t0: performance.now() });
+    pulse(t, '#9bd1ff');
+    $('log').textContent = `${NM[a]} bölgesinden ${NM[t]} bölgesine casus gönderdin. İçerilere gittikçe yakalanma riski artar. Yakalanmazsa o bölgenin ve bir komşusunun asker ve binaları 2 tur görünür, casus da gelecek tur geri döner.`;
     ui();
   };
 }
@@ -8999,6 +9315,10 @@ cv.addEventListener('click', async (e) => {
           phase = 'a';
       }
     }
+    else if (spyTarget(t)) {
+      spyPick(t, e.clientX, e.clientY);
+      return;
+    }
   }
   else if (mv && bk) {
     if (own[t] == 0 && arm[t] > 1) {
@@ -9021,8 +9341,12 @@ cv.addEventListener('click', async (e) => {
     }
   }
   else if (sel == null) {
-    if (own[t] == 0 && arm[t] > 1)
+    if (own[t] == 0 && movable(t))
       sel = t;
+    else if (spyTarget(t)) {
+      spyPick(t, e.clientX, e.clientY);
+      return;
+    }
   }
   else if (own[t] == 0 && shipCap(sel) > 0 && arm[sel] > 1 && coastC[t].length && !reach(sel).has(t)) {
     if (!supUse(t)) {
@@ -9052,13 +9376,17 @@ cv.addEventListener('click', async (e) => {
     busy = false;
     sel = null;
   }
-  else if (own[t] == 0 && t != sel && arm[sel] > 1 && reach(sel).has(t)) {
+  else if (own[t] == 0 && t != sel && movable(sel) && reach(sel).has(t)) {
     // Seçili bölgeden başka kendi bölgene: kaç asker taşınacağını soran küçük panel
     movePick(sel, t, e.clientX, e.clientY);
     return;
   }
   else if (own[t] == 0)
-    sel = arm[t] > 1 && t != sel ? t : null;
+    sel = movable(t) && t != sel ? t : null;
+  else if (arm[sel] < 2) {
+    $('log').textContent = `Saldırmak için ${NM[sel]} bölgesinde en az 2 asker olmalı.`;
+    sel = null;
+  }
   else if (canHit(sel, t) && prot(t)) {
     protHit(t);
     sel = null;
