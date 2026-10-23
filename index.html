@@ -13196,13 +13196,36 @@ const Mus = (() => {
   // Çalan parça. Adım süresi (sn) parçaya göre.
   const TRACKS = ['march', 'kusatma', 'hucum', 'karanlik'];
   const TRK_NM = { march: '⚔️ Marş', kusatma: '🏰 Kuşatma', hucum: '🐎 Hücum', karanlik: '🔥 Karanlık Ordu', diyar: '🌿 Diyar' };
+  // mode: 'auto' bütün parçalar sırayla (her biri ~2 dk, yumuşak geçiş) ya da tek bir parça.
   let trk = 'march';
+  let mode = 'auto';
+  let trkT0 = 0;
+  let swap = false;
+  const AUTO_SEC = 120;
   try {
     const v = localStorage.getItem('fetih_trk');
-    if (TRACKS.includes(v))
-      trk = v;
+    if (TRACKS.includes(v) || v == 'auto')
+      mode = v;
+    if (mode != 'auto')
+      trk = mode;
   }
   catch (e) { }
+  const tGain = () => (theme == 'game' ? .7 : 1.2) * (trk == 'march' ? 1 : .72);
+  // Sıradaki parçaya geç: ses kısılır, parça değişir, ses yeniden açılır.
+  function autoNext() {
+    if (swap || !ac)
+      return;
+    swap = true;
+    musG.gain.setTargetAtTime(0, ac.currentTime, .5);
+    setTimeout(() => {
+      trk = TRACKS[(TRACKS.indexOf(trk) + 1) % TRACKS.length];
+      step = 0;
+      nextT = ac.currentTime + .15;
+      trkT0 = ac.currentTime;
+      musG.gain.setTargetAtTime(tGain(), ac.currentTime + .1, .6);
+      swap = false;
+    }, 1800);
+  }
   const curSpb = () => trk == 'diyar' ? 60 / 100 / 4 : trk == 'kusatma' ? 60 / 132 / 4 : trk == 'hucum' ? 60 / 112 / 3 : trk == 'karanlik' ? 60 / 104 / 2 : 60 / TEMPO[theme == 'menu' ? 'menu' : 'game'] / 4;
   function scheduleStep(i, t) {
     if (trk == 'diyar')
@@ -13299,6 +13322,12 @@ const Mus = (() => {
     const tw = 0;
     war += (tw - war) * .08;
     warG.gain.setTargetAtTime(war * .6, now, .2);
+    if (!trkT0)
+      trkT0 = now;
+    if (mode == 'auto' && on && now - trkT0 > AUTO_SEC)
+      autoNext();
+    if (swap)
+      return;
     if (nextT < now)
       nextT = now + .05;
     const spb = curSpb();
@@ -13361,7 +13390,7 @@ const Mus = (() => {
     catch (e) { }
     const tb = document.getElementById('mnTrk');
     if (tb)
-      tb.textContent = TRK_NM[trk];
+      tb.textContent = mode == 'auto' ? '🔁 Hepsi sırayla' : TRK_NM[trk];
     document.querySelectorAll('.mus-tg').forEach(b => {
       b.textContent = on ? '🔊' : '🔇';
       b.setAttribute('aria-label', on ? 'Müziği kapat' : 'Müziği aç');
@@ -13399,14 +13428,17 @@ const Mus = (() => {
       apply();
     },
     setTrack(k) {
-      trk = k;
+      mode = k;
+      trk = k == 'auto' ? 'march' : k;
       if (musG && ac)
-        musG.gain.setTargetAtTime((theme == 'game' ? .7 : 1.2) * (trk == 'march' ? 1 : .72), ac.currentTime, .3);
+        musG.gain.setTargetAtTime(tGain(), ac.currentTime, .3);
       step = 0;
-      if (ac)
+      if (ac) {
         nextT = ac.currentTime + .1;
+        trkT0 = ac.currentTime;
+      }
       try {
-        localStorage.setItem('fetih_trk', trk);
+        localStorage.setItem('fetih_trk', mode);
       }
       catch (e) { }
       if (!on) {
@@ -13418,8 +13450,16 @@ const Mus = (() => {
     get track() {
       return trk;
     },
+    // Test için: sıradaki parçaya hemen geç ve durumu oku.
+    _skip() {
+      autoNext();
+    },
+    get playing() {
+      return { mode, trk };
+    },
     nextTrack() {
-      this.setTrack(TRACKS[(TRACKS.indexOf(trk) + 1) % TRACKS.length]);
+      const L = ['auto', ...TRACKS];
+      this.setTrack(L[(L.indexOf(mode) + 1) % L.length]);
     },
     setVol(v) {
       vol = Math.max(0, Math.min(1, v));
@@ -13432,6 +13472,8 @@ const Mus = (() => {
     theme(k) {
       if (musG && ac)
         musG.gain.setTargetAtTime((k == 'game' ? .7 : 1.2) * (trk == 'march' ? 1 : .72), ac.currentTime, .8);
+      if (swap)
+        return void (theme = k);
       if (k == theme || (k != 'off' && theme != 'off' && (k == 'menu' || k == 'game')))
         return void (theme = k);
       theme = k;
