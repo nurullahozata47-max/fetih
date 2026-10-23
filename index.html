@@ -13027,17 +13027,192 @@ const Mus = (() => {
       }
     }
   }
-  // Çalan parça: 'march' (Fetih Marşı) ya da 'diyar'.
+  // ---- Savaş parçaları (özgün): Kuşatma, Hücum, Karanlık Ordu ----
+  const mk = (sc, root) => (d, oct) => {
+    const o = Math.floor(d / sc.length);
+    const k = ((d % sc.length) + sc.length) % sc.length;
+    return root + 12 * (oct + o) + sc[k];
+  };
+  const MIN = mk([0, 2, 3, 5, 7, 8, 10], 50);
+  const DOR = mk([0, 2, 3, 5, 7, 9, 10], 50);
+  const PHR = mk([0, 1, 3, 5, 7, 8, 10], 50);
+  // Kesik yaylı (staccato): kısa testere, kapanan süzgeç.
+  function stac(out, m, t, v, dur) {
+    const g = ac.createGain();
+    const f = ac.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(Math.min(4000, hz(m) * 9), t);
+    f.frequency.exponentialRampToValueAtTime(hz(m) * 2, t + dur);
+    [-6, 6].forEach(dt => {
+      const o = ac.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = hz(m);
+      o.detune.value = dt;
+      o.connect(f);
+      o.start(t);
+      o.stop(t + dur + .3);
+    });
+    f.connect(g);
+    g.connect(out);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(v, t + .008);
+    g.gain.setTargetAtTime(0, t + dur * .6, dur * .3);
+  }
+  // Örs / demir vuruşu: uyumsuz kısmi tonlar, hızlı sönüm.
+  function anvil(out, t, v) {
+    [1, 2.76, 5.4, 8.93].forEach((r, k) => {
+      const o = ac.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = 520 * r;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(v / (k + 1), t);
+      g.gain.exponentialRampToValueAtTime(.0005, t + .9 / (k * .5 + 1));
+      o.connect(g);
+      g.connect(out);
+      o.start(t);
+      o.stop(t + 1);
+    });
+    cym(out, t, v * .5, .08);
+  }
+  // Trampet benzeri kısa gürültü vuruşu.
+  function snare(out, t, v) {
+    const n = noise();
+    const f = ac.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.value = 1800;
+    f.Q.value = .8;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(v, t);
+    g.gain.exponentialRampToValueAtTime(.001, t + .14);
+    n.connect(f);
+    f.connect(g);
+    g.connect(out);
+    n.start(t);
+    n.stop(t + .16);
+    drum(out, t, v * .4, 220, 160, .08);
+  }
+  // Notaları ölçü içi konumlarıyla çalan yardımcı: mel = [[derece, süre], ...] adım cinsinden.
+  function playMel(mel, s, bar, per, fn) {
+    let p = 0;
+    const tot = mel.reduce((a, x) => a + x[1], 0);
+    const pos = (bar * per + s) % tot;
+    for (const [d, l] of mel) {
+      if (p == pos && d != null)
+        fn(d, l);
+      p += l;
+    }
+  }
+  // 1) KUŞATMA — 4/4, 132 vuruş. Durmayan kesik yaylı ostinato, taiko davulları, bakır üflemeliler ve koro.
+  const KU_CH = [0, 0, 5, 5, 6, 6, 4, 4];
+  const KU_MEL = [[4, 16], [3, 8], [2, 8], [0, 16], [-1, 8], [0, 8], [2, 8], [3, 8], [4, 16], [3, 8], [1, 8], [0, 16]];
+  function stepKusatma(i, t, spb) {
+    const bar = Math.floor(i / 16);
+    const s = i % 16;
+    const lb = bar % 16;
+    const ch = KU_CH[lb % 8];
+    const M = musG;
+    if (s % 2 == 0) {
+      const pat = [0, 0, 7, 0, 0, 5, 0, 3];
+      stac(M, MIN(ch, -2) + pat[s / 2], t, s == 0 ? .1 : .07, spb * 1.6);
+    }
+    if (s == 0 || s == 6 || s == 10)
+      drum(M, t, s == 0 ? .6 : .42, 70, 40, .6);
+    if (s == 4 || s == 12)
+      drum(M, t, .25, 140, 95, .25);
+    if (lb % 4 == 3 && s >= 12)
+      snare(M, t, .05 + (s - 12) * .03);
+    if (lb >= 4 && s == 0 && lb % 2 == 0) {
+      horn(M, MIN(ch, -1), t, .07, spb * 6);
+      horn(M, MIN(ch + 4, -1), t, .05, spb * 6);
+    }
+    if (lb >= 8) {
+      if (s == 0)
+        [0, 2].forEach(k => chant(M, MIN(ch + k, -1), t, .035, spb * 15));
+      playMel(KU_MEL, s, lb - 8, 16, (d, l) => horn(M, MIN(d, 0), t, .075, spb * l * .95));
+      if (s == 0 && lb % 4 == 0)
+        cym(M, t, .14, 1.6);
+    }
+  }
+  // 2) HÜCUM — 6/8 dörtnala ritim, kahramanca boru çağrısı, titreyen yaylılar (Dor dizisi).
+  const HU_CH = [0, 0, 6, 6, 3, 3, 0, 4];
+  const HU_CALL = [[4, 3], [4, 1], [4, 2], [7, 6], [6, 3], [4, 3], [3, 6]];
+  const HU_MEL = [[0, 6], [4, 6], [7, 9], [6, 3], [4, 6], [5, 3], [4, 3], [2, 12], [3, 6], [4, 6], [5, 9], [4, 3], [2, 6], [1, 3], [2, 3], [0, 12]];
+  function stepHucum(i, t, spb) {
+    const bar = Math.floor(i / 6);
+    const s = i % 6;
+    const lb = bar % 16;
+    const ch = HU_CH[lb % 8];
+    const M = musG;
+    // Dörtnala: DUM-da-da DUM-da-da
+    if (s == 0 || s == 3)
+      drum(M, t, s == 0 ? .5 : .38, 80, 48, .45);
+    else
+      drum(M, t, .12, 170, 120, .12);
+    if (s == 5 && lb % 2 == 1)
+      snare(M, t, .08);
+    // Titreyen yaylılar: her sekizlikte iki hızlı vuruş
+    [0, .5].forEach(h => stac(M, DOR(ch + (s < 3 ? 0 : 2), -1), t + h * spb, .035, spb * .45));
+    if (s == 0)
+      pad(M, DOR(ch, -2), t, .05, spb * 6, 600);
+    if (lb >= 4 && lb < 8)
+      playMel(HU_CALL, s, lb - 4, 6, (d, l) => horn(M, DOR(d, 0), t, .08, spb * l * .9));
+    if (lb >= 8) {
+      playMel(HU_MEL, s, (Math.floor(bar / 16) % 2) * 8 + lb - 8, 6, (d, l) => {
+        horn(M, DOR(d, 0), t, .08, spb * l * .95);
+        horn(M, DOR(d - 2, 0), t, .035, spb * l * .95);
+      });
+      if (s == 0 && lb % 4 == 0)
+        cym(M, t, .16, 1.8);
+    }
+  }
+  // 3) KARANLIK ORDU — 5/4 (3+3+2+2), örs vuruşları, derin erkek korosu, Frig dizisi.
+  const KO_CH = [0, 0, 1, 0, 0, 0, -2, -1];
+  function stepKaranlik(i, t, spb) {
+    const bar = Math.floor(i / 10);
+    const s = i % 10;
+    const lb = bar % 16;
+    const ch = KO_CH[lb % 8];
+    const M = musG;
+    if (s == 0 || s == 3 || s == 6 || s == 8)
+      drum(M, t, s == 0 ? .65 : .45, 60, 34, .8);
+    if (lb >= 2 && (s == 5 || s == 9))
+      anvil(M, t, .06);
+    // Alçak yaylılar: kromatik sürünen ostinato
+    const os = [0, 0, 1, 0, 0, 1, 0, -1, 0, 1];
+    stac(M, PHR(ch, -2) + os[s], t, s == 0 ? .09 : .055, spb * .8);
+    if (s == 0 && lb % 2 == 0) {
+      chant(M, PHR(ch, -2), t, .05, spb * 19);
+      chant(M, PHR(ch, -2) + 7, t, .03, spb * 19);
+    }
+    if (lb >= 8 && s == 0) {
+      horn(M, PHR(ch, -1), t, .07, spb * 9);
+      horn(M, PHR(ch, -1) + 1, t + spb * 5, .05, spb * 4);
+    }
+    if (lb >= 12 && (s == 0 || s == 3 || s == 6))
+      chant(M, PHR(ch + [4, 3, 1][s / 3], -1), t, .04, spb * 3);
+    if (s == 0 && lb % 8 == 0)
+      cym(M, t, .12, 2.2);
+  }
+  // Çalan parça. Adım süresi (sn) parçaya göre.
+  const TRACKS = ['march', 'kusatma', 'hucum', 'karanlik'];
+  const TRK_NM = { march: '⚔️ Marş', kusatma: '🏰 Kuşatma', hucum: '🐎 Hücum', karanlik: '🔥 Karanlık Ordu', diyar: '🌿 Diyar' };
   let trk = 'march';
   try {
-    if (localStorage.getItem('fetih_trk') == 'diyar')
-      trk = 'diyar';
+    const v = localStorage.getItem('fetih_trk');
+    if (TRACKS.includes(v))
+      trk = v;
   }
   catch (e) { }
-  const curSpb = () => trk == 'diyar' ? 60 / 100 / 4 : 60 / TEMPO[theme == 'menu' ? 'menu' : 'game'] / 4;
+  const curSpb = () => trk == 'diyar' ? 60 / 100 / 4 : trk == 'kusatma' ? 60 / 132 / 4 : trk == 'hucum' ? 60 / 112 / 3 : trk == 'karanlik' ? 60 / 104 / 2 : 60 / TEMPO[theme == 'menu' ? 'menu' : 'game'] / 4;
   function scheduleStep(i, t) {
     if (trk == 'diyar')
       return stepDiyar(i, t, curSpb());
+    if (trk == 'kusatma')
+      return stepKusatma(i, t, curSpb());
+    if (trk == 'hucum')
+      return stepHucum(i, t, curSpb());
+    if (trk == 'karanlik')
+      return stepKaranlik(i, t, curSpb());
     const spb = 60 / TEMPO[theme == 'menu' ? 'menu' : 'game'] / 4;
     const bar = Math.floor(i / 16);
     const s = i % 16;
@@ -13186,7 +13361,7 @@ const Mus = (() => {
     catch (e) { }
     const tb = document.getElementById('mnTrk');
     if (tb)
-      tb.textContent = trk == 'diyar' ? '🌿 Diyar' : '⚔️ Marş';
+      tb.textContent = TRK_NM[trk];
     document.querySelectorAll('.mus-tg').forEach(b => {
       b.textContent = on ? '🔊' : '🔇';
       b.setAttribute('aria-label', on ? 'Müziği kapat' : 'Müziği aç');
@@ -13225,6 +13400,8 @@ const Mus = (() => {
     },
     setTrack(k) {
       trk = k;
+      if (musG && ac)
+        musG.gain.setTargetAtTime((theme == 'game' ? .7 : 1.2) * (trk == 'march' ? 1 : .72), ac.currentTime, .3);
       step = 0;
       if (ac)
         nextT = ac.currentTime + .1;
@@ -13241,6 +13418,9 @@ const Mus = (() => {
     get track() {
       return trk;
     },
+    nextTrack() {
+      this.setTrack(TRACKS[(TRACKS.indexOf(trk) + 1) % TRACKS.length]);
+    },
     setVol(v) {
       vol = Math.max(0, Math.min(1, v));
       if (vol > 0 && !on) {
@@ -13251,7 +13431,7 @@ const Mus = (() => {
     },
     theme(k) {
       if (musG && ac)
-        musG.gain.setTargetAtTime(k == 'game' ? .7 : 1.2, ac.currentTime, .8);
+        musG.gain.setTargetAtTime((k == 'game' ? .7 : 1.2) * (trk == 'march' ? 1 : .72), ac.currentTime, .8);
       if (k == theme || (k != 'off' && theme != 'off' && (k == 'menu' || k == 'game')))
         return void (theme = k);
       theme = k;
@@ -13298,7 +13478,7 @@ const Mus = (() => {
 })();
 $('musb').onclick = () => Mus.toggle();
 document.getElementById('mnMus').onclick = () => Mus.toggle();
-document.getElementById('mnTrk').onclick = () => Mus.setTrack(Mus.track == 'diyar' ? 'march' : 'diyar');
+document.getElementById('mnTrk').onclick = () => Mus.nextTrack();
 document.getElementById('mnVol').oninput = e => Mus.setVol(e.target.value / 100);
 Mus.apply();
 // Oyunu başlat: arka planda bir harita üret ve ana menüyü göster.
