@@ -719,6 +719,52 @@ button:focus-visible {
   border-color: #ffd36b;
   color: #12252e;
 }
+.mn-maps {
+  margin-top: 12px;
+  text-align: left;
+  animation: rowIn .5s ease-out 1.45s both;
+}
+.mn-maps h3 {
+  margin: 0 0 8px 2px;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: .65;
+}
+.mn-maps > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.mn-map {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .06);
+  color: #f4efe2;
+  border: 2px solid transparent;
+  text-align: left;
+  font-weight: 700;
+}
+.mn-map b {
+  font-size: 22px;
+}
+.mn-map small {
+  display: block;
+  font-weight: 400;
+  font-size: 11px;
+  opacity: .7;
+}
+#menu .mn-map.on {
+  border-color: #6fb7ff;
+  background: rgba(111, 183, 255, .14);
+  color: #fff;
+  box-shadow: 0 0 18px -4px #6fb7ff;
+}
+.mn-map.dim {
+  opacity: .35;
+}
 #mnGo {
   position: relative;
   overflow: hidden;
@@ -1531,6 +1577,7 @@ input, textarea {
       </div>
       <button id="mnTut"><span class="mn-check">✓</span><svg viewBox="0 0 44 44" aria-hidden="true"><path d="M6 9c6-2 11-1 16 3v24c-5-4-10-5-16-3z" fill="#f4efe2"/><path d="M38 9c-6-2-11-1-16 3v24c5-4 10-5 16-3z" fill="#ffd36b"/><path d="M22 12v24" stroke="#12252e" stroke-width="1.6"/><path d="M10 15c3-.6 6-.2 8.5 1.2M10 20c3-.6 6-.2 8.5 1.2M10 25c3-.6 6-.2 8.5 1.2" stroke="#9aa3a8" stroke-width="1.3" fill="none"/><circle cx="33" cy="33" r="7" fill="#3fb98a" stroke="#12252e" stroke-width="1.6"/><path d="M33 30v6M30 33h6" stroke="#fff" stroke-width="2"/></svg><span>Öğretici</span><small>Oyunu adım adım öğren. Kolay zorlukta oynanır.</small></button>
     </div>
+    <div class="mn-maps"><h3>Harita</h3><div><button class="mn-map" data-m="r"><b>🎲</b><span>Rastgele<small>Her oyun yeni kıtalar</small></span></button><button class="mn-map" data-m="am"><b>🌎</b><span>Amerika<small>Gerçek kıta haritası</small></span></button></div></div>
     <button id="mnGo">Oyuna başla</button>
     <button id="mnCont" hidden>Oyuna devam et</button>
     <button id="mnOn">🌐 Online oyna</button>
@@ -1571,15 +1618,18 @@ input, textarea {
 // W,H: harita boyutu (hücre); S: hücre başına piksel; N: bölge sayısı;
 // PM: en fazla devlet sayısı (bölünmelerle artar); P: şu anki devlet sayısı.
 // Oyuncu her zaman 0 numaralı devlettir; 1-3 başlangıç botları; NEU = boş (gri) topraklar.
-const W = 330;
-const H = 184;
+// Harita boyutu (hücre): rastgele kıtalarda 330x184; gerçek dünya haritalarında haritaya göre değişir.
+let W = 330;
+let H = 184;
 const S = 4;
 const N = 72;
 const PM = 8;
 let P = 4;
 const COL = ['#f2b134', '#e5566d', '#8b7be8', '#3fb98a', '#e47fc4', '#9b6b45', '#3d5fbf', '#2fb0c4', '#9aa3a8'];
 const PN = ['Sen', 'Kızıl', 'Mor', 'Yeşil', 'Pembe', 'Kahve', 'Lacivert', 'Turkuaz'];
-const NM = ['Akova', 'Berra', 'Cemre', 'Dalyan', 'Elmas', 'Fırat', 'Gölova', 'Hisar', 'İlica', 'Kıyı', 'Lale', 'Meşe', 'Nehir', 'Ova', 'Pınar', 'Rüzgâr', 'Sarp', 'Tuna', 'Umut', 'Yamaç', 'Zirve', 'Çınar', 'Derya', 'Ege', 'Kaya', 'Orman', 'Sedir', 'Vadi', 'Alaz', 'Bora', 'Ceylan', 'Damla', 'Eylül', 'Fidan', 'Gökçe', 'Hazar', 'Irmak', 'Kuzey', 'Lodos', 'Mavi', 'Nilüfer', 'Okyanus', 'Poyraz', 'Rüya', 'Selin', 'Toros', 'Uçar', 'Vuslat', 'Yıldız', 'Zeybek', 'Aren', 'Bulut', 'Çağlar', 'Doruk', 'Erguvan', 'Fırtına', 'Ayaz', 'Baykal', 'Cihan', 'Deniz', 'Engin', 'Gediz', 'Hakan', 'Ilgaz', 'Kerem', 'Meltem', 'Nazlı', 'Oğuz', 'Pelin', 'Tarkan', 'Seçil', 'Yaren'];
+// Bölge adları: rastgele haritada hazır liste; gerçek haritalarda o yerin adları.
+const NM0 = ['Akova', 'Berra', 'Cemre', 'Dalyan', 'Elmas', 'Fırat', 'Gölova', 'Hisar', 'İlica', 'Kıyı', 'Lale', 'Meşe', 'Nehir', 'Ova', 'Pınar', 'Rüzgâr', 'Sarp', 'Tuna', 'Umut', 'Yamaç', 'Zirve', 'Çınar', 'Derya', 'Ege', 'Kaya', 'Orman', 'Sedir', 'Vadi', 'Alaz', 'Bora', 'Ceylan', 'Damla', 'Eylül', 'Fidan', 'Gökçe', 'Hazar', 'Irmak', 'Kuzey', 'Lodos', 'Mavi', 'Nilüfer', 'Okyanus', 'Poyraz', 'Rüya', 'Selin', 'Toros', 'Uçar', 'Vuslat', 'Yıldız', 'Zeybek', 'Aren', 'Bulut', 'Çağlar', 'Doruk', 'Erguvan', 'Fırtına', 'Ayaz', 'Baykal', 'Cihan', 'Deniz', 'Engin', 'Gediz', 'Hakan', 'Ilgaz', 'Kerem', 'Meltem', 'Nazlı', 'Oğuz', 'Pelin', 'Tarkan', 'Seçil', 'Yaren'];
+let NM = NM0.slice();
 // Ana harita tuvali (c = çizim bağlamı)
 const cv = document.getElementById('m');
 const c = cv.getContext('2d');
@@ -1613,7 +1663,7 @@ let mv = false;
 // DC2/DC3 iskele yükseltme, MNC mayın, CMC başkent taşıma, CAPS küçük gemi kapasitesi,
 // INC isyan çıkarma, ALC ittifak, EXC ittifaktan çıkma, SUP müttefike takviye, TWC okçu kulesi,
 // SPC casus, UPC seviye yükseltme, SSC/SLC küçük/büyük gemi, LOOT deniz aşırı yağma, SEAR top menzili.
-const ov = new Int8Array(W * H).fill(-1);
+let ov = new Int8Array(W * H).fill(-1);
 const BC = 40;
 const WC = l => (l > 0 ? 100 : 70);
 // Seviye 2 surlu bölgeye en az WALLMIN askerle saldırılabilir.
@@ -1628,7 +1678,7 @@ const AC = 20;
 const TR = 20;
 const TT = 2;
 const DC = 30;
-const NI = 8;
+let NI = 8;
 const NEU = 8;
 const CMC = 100;
 const DC2 = 40;
@@ -2334,6 +2384,16 @@ function gen3() {
   if (cnt0.some(m => m < 70))
     return false;
   const ctn = Array.from({ length: N }, (_, t) => t < NM_ ? (t < HF ? 0 : 1) : (t - NM_ < per ? 0 : 1));
+  return mapFinish(cl, ctn, null);
+}
+// Bölge haritası (cl: her hücrenin bölgesi) hazır olunca komşuluklar, kıyılar, boğazlar, merkezler,
+// iskele yerleri ve deniz zemini hesaplanır. am: gerçek dünya haritası (boğazlar her kara parçası arasında).
+function mapFinish(cl, ctn, am) {
+  const hyp = (a, b) => Math.sqrt(a * a + b * b);
+  const T = W * H;
+  const NM_ = N - NI;
+  const HF = NM_ / 2;
+  const per = NI / 2;
   const ad = Array.from({ length: N }, () => new Set());
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
@@ -2361,33 +2421,50 @@ function gen3() {
     if (cl[i] >= 0 && nb(i).some(j => cl[j] < 0))
       coast[cl[i]].push(i);
   const stl = [];
-  for (let t = NM_; t < N; t++)
-    for (let u = 0; u < N; u++) {
-      if (u == t || ctn[u] != ctn[t] || (u >= NM_ && u < t))
+  if (am) {
+    // Ayrı kara parçalarındaki bölgeler arasında kısa deniz geçişleri (en fazla 9 hücre) boğaz olur.
+    const lc = new Int16Array(T).fill(-1);
+    let nc = 0;
+    for (let i = 0; i < T; i++) {
+      if (cl[i] < 0 || lc[i] >= 0)
         continue;
-      let hit = false;
-      outer: for (const a of coast[t]) {
-        const ax = a % W;
-        const ay = (a / W) | 0;
-        for (const b of coast[u]) {
-          const dx = b % W - ax;
-          const dy = ((b / W) | 0) - ay;
-          if (dx * dx + dy * dy <= 81) {
-            hit = true;
-            break outer;
+      const q = [i];
+      lc[i] = nc;
+      for (let k = 0; k < q.length; k++)
+        nb(q[k]).forEach(j => {
+          if (cl[j] >= 0 && lc[j] < 0) {
+            lc[j] = nc;
+            q.push(j);
+          }
+        });
+      nc++;
+    }
+    const comp = coast.map(l => (l.length ? lc[l[0]] : -1));
+    for (let t = 0; t < N; t++)
+      for (let u = t + 1; u < N; u++) {
+        if (comp[t] == comp[u] || ad[t].has(u))
+          continue;
+        let hit = false;
+        outer2: for (const a of coast[t]) {
+          const ax = a % W;
+          const ay = (a / W) | 0;
+          for (const b of coast[u]) {
+            const dx = b % W - ax;
+            const dy = ((b / W) | 0) - ay;
+            if (dx * dx + dy * dy <= 81) {
+              hit = true;
+              break outer2;
+            }
           }
         }
+        if (hit) {
+          ad[t].add(u);
+          ad[u].add(t);
+          stl.push([t, u]);
+        }
       }
-      if (hit) {
-        ad[t].add(u);
-        ad[u].add(t);
-        stl.push([t, u]);
-      }
-    }
-  for (let k = 0; k < 2; k++) {
-    const st = k * HF;
-    const sn2 = new Set([st]);
-    const qn = [st];
+    const sn2 = new Set([0]);
+    const qn = [0];
     while (qn.length) {
       const a = qn.pop();
       ad[a].forEach(b => {
@@ -2397,8 +2474,49 @@ function gen3() {
         }
       });
     }
-    if (sn2.size != HF + per)
+    if (sn2.size != N)
       return false;
+  }
+  else {
+    for (let t = NM_; t < N; t++)
+      for (let u = 0; u < N; u++) {
+        if (u == t || ctn[u] != ctn[t] || (u >= NM_ && u < t))
+          continue;
+        let hit = false;
+        outer: for (const a of coast[t]) {
+          const ax = a % W;
+          const ay = (a / W) | 0;
+          for (const b of coast[u]) {
+            const dx = b % W - ax;
+            const dy = ((b / W) | 0) - ay;
+            if (dx * dx + dy * dy <= 81) {
+              hit = true;
+              break outer;
+            }
+          }
+        }
+        if (hit) {
+          ad[t].add(u);
+          ad[u].add(t);
+          stl.push([t, u]);
+        }
+      }
+    for (let k = 0; k < 2; k++) {
+      const st = k * HF;
+      const sn2 = new Set([st]);
+      const qn = [st];
+      while (qn.length) {
+        const a = qn.pop();
+        ad[a].forEach(b => {
+          if (!sn2.has(b)) {
+            sn2.add(b);
+            qn.push(b);
+          }
+        });
+      }
+      if (sn2.size != HF + per)
+        return false;
+    }
   }
   const dE = new Int16Array(T).fill(-1);
   const qd = [];
@@ -2572,8 +2690,8 @@ function gen3() {
   cs2.forEach((l, t) => {
     const g3 = l.filter(v => v[4] >= 3);
     const pk = g3.length ? g3 : l;
-    const w = ctn[t] == 0 ? 1 : -1;
-    const f = pk.filter(v => v[2] == w);
+    const w = ctn[t] == 0 ? 1 : ctn[t] == 1 ? -1 : 0;
+    const f = w ? pk.filter(v => v[2] == w) : [];
     if (f.length)
       dkl[t] = f[Math.floor(Math.random() * f.length)];
   });
@@ -2601,6 +2719,287 @@ function gen3() {
     return o;
   });
   return true;
+}
+// Amerika kıtası: Natural Earth kara verisinden (Lambert eşit alan izdüşümü, merkez 85°B 15°K) çıkarılmış kara maskesi.
+// rle: denizle başlayan, sırayla deniz/kara uzunlukları (36 tabanında). an: gerçek yer adları ve harita üzerindeki konumları.
+const AMAP = { w: 232, h: 320, rle: 't9,2,67,5,1,4,65,c,63,e,62,g,5z,i,5r,2,5,m,5k,x,5h,11,3u,1,1j,13,3s,9,1a,17,3p,c,17,19,3i,3,3,d,16,1a,3g,5,1,f,15,1b,3e,m,15,1c,3c,n,15,1e,3b,n,15,1e,36,2,2,n,15,1f,32,u,j,1,f,2,5,8,2,15,2x,1,2,w,h,4,b,h,3,14,2w,11,f,6,a,h,4,13,2w,11,e,8,a,f,d,v,2x,11,c,a,9,g,e,t,2x,14,8,b,4,2,6,d,f,s,2y,19,2,d,1,4,x,r,2y,1b,1,h,6,f,e,p,2y,1c,2,g,6,g,e,o,2y,1t,7,g,f,o,2y,1t,6,j,d,n,2z,1s,5,l,c,n,2m,6,5,1u,5,o,a,m,2m,26,2,r,a,l,2m,26,1,t,a,j,2q,9,7,25,2,a,b,h,2s,1,2,2,b,23,3,c,9,h,3d,1y,3,e,8,h,3d,1x,3,g,7,g,3e,1w,2,i,7,g,3e,1w,2,h,8,f,3f,1u,6,e,9,e,3f,1t,7,d,b,e,3e,1t,5,e,d,d,3e,1t,4,f,e,c,3e,1u,2,h,f,b,3d,1v,2,g,g,a,3d,1w,7,b,h,8,3d,1l,3,3,d,a,m,2,3d,1l,5,1,9,e,43,1j,f,e,44,1i,g,b,5,1,40,1i,h,c,3,3,3z,1h,h,d,3,3,41,1f,i,c,3,4,41,1d,j,d,2,5,40,1e,i,m,3x,1g,g,o,3w,1g,h,n,3w,1g,i,n,3v,1j,g,n,3u,1l,e,r,3q,1m,d,s,3p,1o,b,u,3m,1u,5,w,3k,1w,2,z,3k,1v,1,10,3k,1v,2,z,3k,1v,2,11,3j,1v,2,10,3k,1v,1,10,3k,1u,2,u,1,5,1,2,3g,2r,1,9,3f,2q,2,9,3f,2o,4,a,3e,2p,3,b,3c,2p,4,c,3b,2n,6,5,2,5,3a,2o,7,4,4,2,3b,2o,5,1,3l,2s,1,3,3k,2x,3i,2x,3i,2y,3i,2x,3j,2v,3l,2u,3l,2o,1,4,3m,2o,3,2,3o,2l,3u,2l,3v,2l,3v,2m,3v,2l,3v,2k,3w,2i,3y,2h,3z,2g,40,2f,41,2f,42,2d,43,2d,43,2d,44,2b,46,2a,47,29,48,29,48,27,49,26,4a,26,4a,25,4b,23,4d,22,4f,20,4g,1z,4h,1x,4k,1w,4k,1v,4m,1u,4l,1v,4k,1l,1,b,4k,1g,6,2,1,7,4l,13,7,4,b,6,4m,10,p,6,4m,5,1,r,q,7,4n,4,1,r,q,8,4m,4,1,q,s,7,4l,5,2,q,s,5,4m,5,3,p,s,6,4m,5,3,n,u,5,4o,4,3,m,v,4,4o,4,3,l,x,2,4q,3,4,k,5q,1,6,j,5x,j,u,4,4z,j,r,a,4w,j,q,e,4u,i,p,4,2,b,4r,j,f,7,3,3,3,d,4p,k,d,9,3,1,8,b,4n,k,c,9,g,a,4m,k,a,a,h,a,1,7,4e,j,a,9,j,8,1,a,4d,j,9,9,k,2,2,1,4,a,4d,j,4,d,r,d,4d,y,r,d,4g,w,s,8,4m,u,x,1,4p,s,5q,q,5s,o,5u,v,5o,1,5,n,5u,n,5u,m,5v,l,5w,k,60,g,62,e,n,2,5g,a,n,3,4,1,h,1,4u,9,k,6,3,4,9,4,1,3,4u,8,i,k,3,9,4v,7,h,w,4w,8,f,y,4v,8,f,z,4v,9,4,5,4,11,4u,i,1,15,4v,a,2,1a,4u,a,3,1a,4u,9,3,1j,4o,6,2,1m,4n,1,1,2,4,1n,4u,1n,4t,1o,4s,1o,4s,1p,4r,1p,4r,1q,4q,1r,4p,1r,4o,1s,4n,1v,4k,20,4g,24,4a,27,48,29,1,2,3,3,3y,2k,3w,2l,3u,2o,3s,2s,3n,2u,3m,2v,3m,2u,3n,2t,3n,2t,3m,2u,3l,2v,3k,2w,3l,2v,3l,2u,3m,2u,3n,2s,3p,2r,3q,2p,3s,2n,3u,2l,3v,2l,3w,2j,3x,2j,3x,2i,3z,2g,40,2f,42,2e,43,2d,43,2d,44,2c,45,2b,45,2b,45,2a,47,29,48,28,49,27,4a,25,4d,22,4g,20,4i,1y,4j,1w,4l,1v,4l,1u,4n,1s,4o,1s,4o,1s,4o,1r,4p,1p,4q,1p,4r,1n,4t,1j,4w,1j,4y,1f,50,1f,51,1d,53,1d,53,1c,54,1c,54,1c,53,1d,53,1c,54,1c,53,1c,54,1b,55,1a,56,19,56,19,57,18,58,17,59,16,5a,15,5b,14,5b,14,5c,13,5d,12,5d,12,5e,10,5f,w,5j,y,5i,y,5h,z,5g,z,5i,x,5i,x,5k,t,5n,p,5q,o,5r,p,5r,o,5s,n,5t,k,5v,m,5u,l,5w,i,5x,j,5w,j,5x,i,5y,h,5y,g,5z,i,5z,i,5y,i,5x,i,5x,i,5y,h,60,f,60,f,61,e,63,c,63,d,64,c,64,c,65,b,66,b,66,c,66,a,67,9,6a,2,2l1', an: [["Alaska", 43.3, 30.3], ["Yukon", 52.7, 39.7], ["Kuzeybatı", 69.7, 44.3], ["Nunavut", 93.3, 48.7], ["Kivalliq", 91.7, 59.0], ["Baffin", 118.1, 40.2], ["Ellesmere", 106.6, 19.5], ["Victoria", 83.9, 32.8], ["Banks", 77.7, 27.6], ["Keewatin", 84.2, 54.0], ["Britanya Kolumbiyası", 50.6, 61.5], ["Alberta", 65.3, 63.5], ["Saskatchewan", 75.1, 67.7], ["Manitoba", 87.8, 67.1], ["Ontario", 104.1, 78.5], ["Quebec", 123.7, 77.6], ["Nunavik", 119.4, 60.8], ["Labrador", 135.8, 67.2], ["Yeni İskoçya", 139.6, 85.5], ["Washington", 50.5, 77.0], ["Oregon", 46.6, 84.3], ["Kaliforniya", 42.7, 100.0], ["Nevada", 48.3, 96.5], ["Idaho", 55.9, 86.5], ["Montana", 65.7, 81.6], ["Wyoming", 66.5, 90.7], ["Utah", 57.9, 97.3], ["Arizona", 54.8, 109.4], ["Colorado", 67.9, 100.0], ["Yeni Meksika", 65.1, 109.8], ["Kuzey Dakota", 79.8, 82.5], ["Güney Dakota", 79.4, 89.1], ["Nebraska", 79.2, 95.7], ["Kansas", 80.0, 102.4], ["Oklahoma", 81.0, 109.2], ["Teksas", 77.0, 118.9], ["Minnesota", 88.8, 86.6], ["Iowa", 89.6, 95.4], ["Missouri", 90.7, 103.1], ["Arkansas", 90.3, 111.3], ["Louisiana", 90.5, 119.7], ["Wisconsin", 96.2, 90.2], ["Michigan", 104.1, 91.4], ["Illinois", 96.7, 100.0], ["Indiana", 102.0, 100.1], ["Ohio", 108.0, 99.5], ["Kentucky", 104.1, 105.6], ["Tennessee", 102.3, 109.4], ["Mississippi", 95.1, 116.1], ["Alabama", 100.7, 116.0], ["Georgia", 107.2, 116.4], ["Florida", 110.7, 125.5], ["Karolina", 113.4, 111.0], ["Virginia", 115.4, 105.4], ["Pensilvanya", 117.0, 97.6], ["New York", 120.2, 93.1], ["Yeni İngiltere", 126.7, 91.5], ["Maine", 130.1, 87.2], ["Baja Kaliforniya", 48.2, 117.6], ["Sonora", 54.5, 119.7], ["Chihuahua", 62.8, 123.1], ["Coahuila", 70.2, 126.7], ["Tamaulipas", 76.1, 133.9], ["Sinaloa", 58.6, 130.7], ["Durango", 64.0, 132.4], ["Zacatecas", 68.1, 136.2], ["Jalisco", 65.2, 141.7], ["Meksiko", 74.4, 144.9], ["Veracruz", 79.8, 145.0], ["Oaxaca", 79.5, 150.6], ["Guerrero", 72.2, 148.8], ["Chiapas", 88.0, 152.1], ["Yukatan", 95.7, 144.5], ["Guatemala", 92.7, 154.5], ["Honduras", 100.9, 156.2], ["Nikaragua", 104.1, 160.5], ["Kosta Rika", 106.3, 167.0], ["Panama", 115.2, 170.0], ["Küba", 116.6, 140.6], ["Hispanyola", 133.7, 145.8], ["Newfoundland", 148.2, 77.1], ["Kuzey Grönland", 123.2, 13.2], ["Doğu Grönland", 144.7, 24.1], ["Batı Grönland", 131.6, 32.9], ["Güney Grönland", 146.5, 43.9], ["Grönland", 132.0, 21.0], ["Kolombiya", 129.9, 178.8], ["Venezuela", 146.3, 171.0], ["Guyana", 161.9, 175.3], ["Surinam", 169.7, 177.9], ["Ekvador", 118.8, 192.5], ["Peru", 124.5, 203.5], ["Lima", 124.4, 215.6], ["Cusco", 133.3, 219.7], ["Bolivya", 149.7, 224.6], ["Atakama", 137.7, 241.2], ["Santiago", 133.4, 261.2], ["Patagonya", 132.9, 286.4], ["Ateş Toprağı", 130.6, 300.8], ["Santa Cruz", 129.9, 293.1], ["Salta", 147.2, 243.1], ["Kordoba", 147.6, 256.9], ["Pampa", 145.7, 268.3], ["Buenos Aires", 156.1, 265.1], ["Paraguay", 162.5, 238.2], ["Uruguay", 163.2, 259.7], ["Amazonas", 151.5, 196.7], ["Pará", 177.9, 194.4], ["Maranhão", 193.0, 194.9], ["Pernambuco", 207.7, 200.0], ["Bahia", 199.9, 211.7], ["Goiás", 182.3, 221.4], ["Mato Grosso", 168.8, 215.7], ["Minas Gerais", 192.2, 226.3], ["Rio de Janeiro", 194.0, 235.3], ["São Paulo", 182.7, 236.1], ["Paraná", 175.6, 242.0], ["Rio Grande", 169.7, 252.1], ["Rondônia", 153.5, 212.2], ["Roraima", 157.9, 182.6], ["Amapá", 178.6, 181.5], ["Tocantins", 185.8, 207.4], ["Piauí", 197.6, 200.2], ["Akre", 138.0, 208.5], ["Pantanal", 166.7, 229.2], ["Patagonya Kıyısı", 139.6, 280.5], ["Mendoza", 137.6, 263.2], ["Chubut", 135.5, 282.5]] };
+// Gerçek dünya haritası: kara maskesinden bölgeler. Büyük kara parçaları bölge sayısıyla orantılı bölünür;
+// küçük adalar (Küba gibi) tek bölgelik ada olur. Bölgelere en yakın gerçek yer adı verilir.
+function genWorld(M) {
+  const hyp = (a, b) => Math.sqrt(a * a + b * b);
+  const T = W * H;
+  const sd = Math.random() * 500;
+  const land = new Uint8Array(T);
+  let pos = 0;
+  M.rle.split(',').forEach((r, k) => {
+    const n = parseInt(r, 36);
+    if (k % 2)
+      land.fill(1, pos, pos + n);
+    pos += n;
+  });
+  // Kara parçaları
+  const comp = new Int16Array(T).fill(-1);
+  const cs = [];
+  for (let i = 0; i < T; i++) {
+    if (!land[i] || comp[i] >= 0)
+      continue;
+    const q = [i];
+    comp[i] = cs.length;
+    for (let k = 0; k < q.length; k++)
+      nb(q[k]).forEach(j => {
+        if (land[j] && comp[j] < 0) {
+          comp[j] = cs.length;
+          q.push(j);
+        }
+      });
+    cs.push(q);
+  }
+  const isl = cs.map((q, c) => c).filter(c => cs[c].length < 200).sort((a, b) => cs[b].length - cs[a].length).slice(0, 8);
+  cs.forEach((q, c) => {
+    if (q.length < 200 && !isl.includes(c))
+      q.forEach(i => (land[i] = 0, comp[i] = -1));
+  });
+  NI = isl.length;
+  const NM_ = N - NI;
+  const big = cs.map((q, c) => c).filter(c => cs[c].length >= 200);
+  const tot = big.reduce((a, c) => a + cs[c].length, 0);
+  const kk = big.map(c => Math.max(1, Math.floor(NM_ * cs[c].length / tot)));
+  while (kk.reduce((a, b) => a + b, 0) < NM_) {
+    let bi = 0;
+    let bv = -1e9;
+    big.forEach((c, j) => {
+      const v = NM_ * cs[c].length / tot - kk[j];
+      if (v > bv) {
+        bv = v;
+        bi = j;
+      }
+    });
+    kk[bi]++;
+  }
+  // Yer adlarının haritadaki hücreleri (kıyıdaki adlar en yakın kara hücresine kayar).
+  const anC = M.an.map(([nm, x, y]) => {
+    let b = 1e9;
+    let bi = -1;
+    const x0 = Math.round(x);
+    const y0 = Math.round(y);
+    for (let dy = -6; dy <= 6; dy++)
+      for (let dx = -6; dx <= 6; dx++) {
+        const xx = x0 + dx;
+        const yy = y0 + dy;
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H || !land[yy * W + xx])
+          continue;
+        const d = dx * dx + dy * dy;
+        if (d < b) {
+          b = d;
+          bi = yy * W + xx;
+        }
+      }
+    return bi;
+  });
+  const ce = new Int16Array(T).fill(-1);
+  const fw1 = fbmGrid(10, sd + 7);
+  const fw2 = fbmGrid(10, sd + 13);
+  let base = 0;
+  big.forEach((c, j) => {
+    const L = cs[c];
+    const k = kk[j];
+    // Tohumlar: bu kara parçasındaki yer adlarından birbirine en uzak olanlar, eksikse rastgele noktalar.
+    const cand = anC.filter(i => i >= 0 && comp[i] == c);
+    const sx = [];
+    const sy = [];
+    const pick = pool => {
+      let b = -1;
+      let bi = pool[0];
+      for (const i of pool) {
+        const x = i % W;
+        const y = (i / W) | 0;
+        let d = 1e9;
+        for (let s = 0; s < sx.length; s++)
+          d = Math.min(d, (sx[s] - x) ** 2 + (sy[s] - y) ** 2);
+        d += Math.random() * 4;
+        if (d > b) {
+          b = d;
+          bi = i;
+        }
+      }
+      sx.push(bi % W);
+      sy.push((bi / W) | 0);
+    };
+    while (sx.length < k && sx.length < cand.length)
+      pick(cand);
+    while (sx.length < k)
+      pick(L.filter((_, n) => n % 7 == 0));
+    // Lloyd: bölgeleri eşit büyüklüğe yaklaştırır.
+    const n = L.length;
+    for (let it = 0; it < 4; it++) {
+      const ax = new Float64Array(k);
+      const ay = new Float64Array(k);
+      const an = new Int32Array(k);
+      for (let m = 0; m < n; m++) {
+        const x = L[m] % W;
+        const y = (L[m] / W) | 0;
+        let b = 1e9;
+        let bs = 0;
+        for (let s = 0; s < k; s++) {
+          const d = (sx[s] - x) ** 2 + (sy[s] - y) ** 2;
+          if (d < b) {
+            b = d;
+            bs = s;
+          }
+        }
+        ax[bs] += x;
+        ay[bs] += y;
+        an[bs]++;
+      }
+      for (let s = 0; s < k; s++)
+        if (an[s]) {
+          const mx = ax[s] / an[s];
+          const my = ay[s] / an[s];
+          let b = 1e9;
+          let bi = 0;
+          for (let m = 0; m < n; m++) {
+            const d = (L[m] % W - mx) ** 2 + (((L[m] / W) | 0) - my) ** 2;
+            if (d < b) {
+              b = d;
+              bi = m;
+            }
+          }
+          sx[s] = L[bi] % W;
+          sy[s] = (L[bi] / W) | 0;
+        }
+    }
+    for (const i of L) {
+      const x = i % W;
+      const y = (i / W) | 0;
+      const wx = x + (fw1(x, y) - .5) * 12;
+      const wy = y + (fw2(x, y) - .5) * 12;
+      let b = 1e9;
+      let bs = 0;
+      for (let s = 0; s < k; s++) {
+        const d = (sx[s] - wx) ** 2 + (sy[s] - wy) ** 2;
+        if (d < b) {
+          b = d;
+          bs = s;
+        }
+      }
+      ce[i] = base + bs;
+    }
+    base += k;
+  });
+  // Sınırları yumuşat (aynı kara parçası içinde çoğunluk kuralı).
+  for (let it = 0; it < 2; it++) {
+    const nc = ce.slice();
+    for (let y = 1; y < H - 1; y++)
+      for (let x = 1; x < W - 1; x++) {
+        const i = y * W + x;
+        if (ce[i] < 0)
+          continue;
+        const cnt = new Map();
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const v = ce[i + dy * W + dx];
+            if (v >= 0)
+              cnt.set(v, (cnt.get(v) || 0) + 1);
+          }
+        let bk = ce[i];
+        let bv = cnt.get(bk) || 0;
+        cnt.forEach((v, kx) => {
+          if (v > bv) {
+            bv = v;
+            bk = kx;
+          }
+        });
+        nc[i] = bk;
+      }
+    for (let i = 0; i < T; i++)
+      ce[i] = nc[i];
+  }
+  // Her bölge tek parça olsun: kopuk küçük parçalar komşu bölgeye katılır.
+  for (let rep = 0; rep < 3; rep++)
+    for (let t = 0; t < NM_; t++) {
+      const cells = [];
+      for (let i = 0; i < T; i++)
+        if (ce[i] == t)
+          cells.push(i);
+      const seen = new Set();
+      const parts = [];
+      for (const s0 of cells) {
+        if (seen.has(s0))
+          continue;
+        const q = [s0];
+        seen.add(s0);
+        for (let k = 0; k < q.length; k++)
+          nb(q[k]).forEach(j => {
+            if (ce[j] == t && !seen.has(j)) {
+              seen.add(j);
+              q.push(j);
+            }
+          });
+        parts.push(q);
+      }
+      parts.sort((a, b) => b.length - a.length);
+      for (let k = 1; k < parts.length; k++) {
+        let nid = -1;
+        for (const i of parts[k]) {
+          for (const j of nb(i))
+            if (ce[j] >= 0 && ce[j] != t && ce[j] < NM_) {
+              nid = ce[j];
+              break;
+            }
+          if (nid >= 0)
+            break;
+        }
+        if (nid >= 0)
+          parts[k].forEach(i => (ce[i] = nid));
+      }
+    }
+  isl.forEach((c, j) => cs[c].forEach(i => (ce[i] = NM_ + j)));
+  const sz = Array(N).fill(0);
+  for (let i = 0; i < T; i++)
+    if (ce[i] >= 0)
+      sz[ce[i]]++;
+  if (sz.some(v => v < 45))
+    return false;
+  // Adlar: her bölgeye merkezine en yakın (henüz kullanılmamış) gerçek yer adı.
+  const mx = Array(N).fill(0);
+  const my = Array(N).fill(0);
+  for (let i = 0; i < T; i++)
+    if (ce[i] >= 0) {
+      mx[ce[i]] += i % W;
+      my[ce[i]] += (i / W) | 0;
+    }
+  const pr = [];
+  for (let t = 0; t < N; t++)
+    M.an.forEach(([nm, x, y], a) => pr.push([(x - mx[t] / sz[t]) ** 2 + (y - my[t] / sz[t]) ** 2 + (ce[anC[a]] == t ? 0 : 400), t, a]));
+  pr.sort((a, b) => a[0] - b[0]);
+  const nmA = Array(N).fill(null);
+  const used = new Set();
+  for (const [, t, a] of pr) {
+    if (nmA[t] != null || used.has(a))
+      continue;
+    nmA[t] = M.an[a][0];
+    used.add(a);
+  }
+  NM = nmA.map((v, t) => v || NM0[t]);
+  return mapFinish(ce, Array(N).fill(2), true);
+}
+// Harita boyutunu değiştirir: tuvaller ve hücre dizileri yeni boyuta göre yeniden kurulur.
+function setDims(w, h) {
+  if (w == W && h == H)
+    return;
+  W = w;
+  H = h;
+  cv.width = W * S;
+  cv.height = H * S;
+  ov = new Int8Array(W * H).fill(-1);
+  if (wg) {
+    wvc.width = W * S / 2;
+    wvc.height = H * S / 2;
+  }
+  if (g) {
+    fxc.width = W * S;
+    fxc.height = H * S;
+  }
 }
 // Bölgeleri sahip renkleriyle boyar; seçili, hedef ve sisli bölgelere katman ekler.
 function fastFill(V, tg) {
@@ -3951,16 +4350,22 @@ function focusOn(t, k) {
 // 6. OYUN AKIŞI
 // ======================================================================
 // Yeni oyun: harita üret, her şeyi sıfırla, bölge seçimini başlat.
+// MAPK: oyuncunun seçtiği harita ('r' rastgele kıtalar, 'am' Amerika). Menü arka planı, öğretici ve online oyun hep rastgele haritadır.
+let MAPK = 'r';
 function init(noDraft, seed) {
   demo = !!noDraft && seed == null;
   demoN = 0;
   let tr = 0;
+  const wm = !noDraft && seed == null && !TUT && MAPK == 'am' ? AMAP : null;
+  setDims(wm ? wm.w : 330, wm ? wm.h : 184);
+  NI = 8;
+  NM = NM0.slice();
   const mr = Math.random;
   if (seed != null)
     Math.random = seededRng(seed);
   try {
     do {
-    } while (!gen3() && ++tr < 400);
+    } while (!(wm ? genWorld(wm) : gen3()) && ++tr < 400);
   }
   finally {
     Math.random = mr;
@@ -4307,7 +4712,7 @@ async function battle(a, t, sea, F) {
   if (w) {
     const old = own[t];
     const me = own[a];
-    const hw = wall[t] > 0 && visSet().has(t);
+    const hw = wall[t] > 0 && (visSet().has(t) || [...adj[t]].some(u => own[u] == 0));
     const wd = hw ? 750 : 0;
     if (hw) {
       makeRuin(t, a, wall[t], COL[me], me);
@@ -4875,7 +5280,7 @@ function moveCap(p, t) {
 }
 // Başkent ikinci kez düşünce bütün topraklar fethedene geçer.
 async function fall(old, me, t) {
-  $('log').textContent = `${PN[old]} başkentini kaybetti! Ordusu zayıftı (50 askerden az), tüm toprakları ${PN[me]} tarafına geçti.`;
+  $('log').textContent = old == 0 ? `Başkentin düştü! Ordun zayıftı (50 askerden az), tüm toprakların ${PN[me]} tarafına geçti.` : `${PN[old]} başkentini kaybetti! Ordusu zayıftı (50 askerden az), tüm toprakları ${PN[me]} tarafına geçti.`;
   if (old != 0 && (me == 0 || Vg.has(t)))
     setTimeout(() => banner(`${PN[old]} tümüyle işgal edildi!`, COL[me]), 200);
   const ord = [];
@@ -6312,6 +6717,8 @@ function wallStart(t) {
   uiSoon();
 }
 // Bölge sınırı boyunca taş sur.
+// Surlar dışarıdan görünür: görünen bölgelerin ve senin sınır komşularının surları sis altında da çizilir.
+const wallSeen = t => (Vg && Vg.has(t)) || [...adj[t]].some(u => own[u] == 0);
 function drawCityWall(t) {
   const L = wall[t];
   const f = Math.min(1, (performance.now() - wt0[t]) / 700);
@@ -6504,7 +6911,7 @@ function drawRuinFx(now) {
     return;
   for (let t = 0; t < N; t++) {
     const r = ruin[t];
-    if (!r || wall[t] > 0 || !Vg.has(t))
+    if (!r || wall[t] > 0 || !wallSeen(t))
       continue;
     const el = now - r.t0;
     if (el > 2800 || el < 0)
@@ -8494,7 +8901,7 @@ function anim(ts) {
     }
     if (tw[t] && Vg.has(t))
       drawTowerAnim(t, s);
-    if (wall[t] >= 2 && Vg.has(t) && own[t] < P)
+    if (wall[t] >= 2 && wallSeen(t) && own[t] < P)
       wallArchers(t, s);
     if (taxView && own[t] == 0)
       taxBadge(t);
@@ -10268,9 +10675,9 @@ function ui(msg) {
   const tg = (sel != null && turn == 0) ? (cn ? [...Array(N).keys()].filter(t => own[t] != 0 && own[t] != NEU && !allied(0, own[t]) && fireOK(sel, t) && !protK(t)) : sco ? [...Array(N).keys()].filter(t => own[t] != 0 && seaOK2(sel, t)) : sp ? [...Array(N).keys()].filter(t => own[t] > 0 && own[t] < P && !allied(0, own[t]) && !miss.some(m => m.t == t)) : ak ? [...near2(sel)].filter(t => own[t] != 0 && !ally[own[t]] && !protK(t)) : ctk ? [...adj[sel]].filter(t => own[t] != 0 && own[t] != NEU && !ally[own[t]] && !protK(t)) : mv ? [...reach(sel)].filter(t => t != sel) : [...new Set([...reach2(sel)].flatMap(u => [...adj[u]]).concat(seaTargets(sel)))].filter(t => own[t] != 0 && !ally[own[t]] && !protK(t))) : [];
   fastFill(V, tg);
   for (let t = 0; t < N; t++)
-    if (wall[t] > 0 && V.has(t))
+    if (wall[t] > 0 && wallSeen(t))
       drawCityWall(t);
-    else if (ruin[t] && V.has(t))
+    else if (ruin[t] && wallSeen(t))
       drawRuin(t);
   drawBorders();
   c.font = 'bold 15px sans-serif';
@@ -10394,6 +10801,10 @@ function menuRefresh() {
     b.classList.toggle('dim', tutSel && d != 0);
   });
   document.getElementById('mnTut').classList.toggle('on', tutSel);
+  document.querySelectorAll('.mn-map').forEach(b => {
+    b.classList.toggle('on', b.dataset.m == MAPK);
+    b.classList.toggle('dim', tutSel && b.dataset.m != 'r');
+  });
   document.getElementById('mnGo').textContent = tutSel ? 'Öğreticiyi başlat' : 'Oyuna başla';
 }
 function showMenu(canContinue) {
@@ -10433,6 +10844,15 @@ function hideMenu(then) {
 document.querySelectorAll('.mn-dif').forEach(b => b.onclick = () => {
   DIF = +b.dataset.d;
   tutSel = false;
+  menuRefresh();
+});
+document.querySelectorAll('.mn-map').forEach(b => b.onclick = () => {
+  MAPK = b.dataset.m;
+  tutSel = false;
+  try {
+    localStorage.setItem('fetih_map', MAPK);
+  }
+  catch (e) { }
   menuRefresh();
 });
 document.getElementById('mnTut').onclick = () => {
@@ -11730,6 +12150,9 @@ try {
   const v = localStorage.getItem('fetih_dif');
   if (v != null)
     DIF = Math.max(0, Math.min(2, +v || 0));
+  const mk = localStorage.getItem('fetih_map');
+  if (mk == 'am' || mk == 'r')
+    MAPK = mk;
 }
 catch (e) { }
 init(true);
