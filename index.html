@@ -741,6 +741,12 @@ button:focus-visible {
   background: rgba(255, 255, 255, .08);
   font-size: 16px;
 }
+#menu .mn-mus .mn-trk {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 10px;
+  color: #f4efe2;
+}
 .mn-mus input {
   flex: 1;
   accent-color: #ffd36b;
@@ -754,6 +760,30 @@ button:focus-visible {
 .mn-pg #mnStart {
   margin-top: 14px;
   animation: rowIn .4s ease-out .25s both, goPulse 2.2s ease-in-out 1s infinite;
+}
+#menu .mn-tmr {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .06);
+  border: 2px solid transparent;
+  color: #f4efe2;
+  font-size: 14px;
+  text-align: left;
+}
+#menu .mn-tmr.on {
+  border-color: rgba(242, 177, 52, .7);
+  background: rgba(242, 177, 52, .12);
+}
+.mn-tmr small {
+  margin-left: auto;
+  font-size: 11.5px;
+  opacity: .7;
 }
 .mn-pg[hidden] {
   display: none;
@@ -1753,7 +1783,7 @@ input, textarea {
       <button id="mnCont" hidden>Oyuna devam et</button>
       <button id="mnOn">🌐 Online oyna</button>
       <button id="mnInst" hidden>📲 Telefona uygulama olarak yükle</button>
-      <div class="mn-mus"><button id="mnMus" class="mus-tg" aria-label="Müzik">🔊</button><span>Müzik</span><input id="mnVol" type="range" min="0" max="100" value="70" aria-label="Müzik sesi"></div>
+      <div class="mn-mus"><button id="mnMus" class="mus-tg" aria-label="Müzik">🔊</button><span>Müzik</span><button id="mnTrk" class="mn-trk">⚔️ Marş</button><input id="mnVol" type="range" min="0" max="100" value="70" aria-label="Müzik sesi"></div>
     </div>
     <div class="mn-pg" data-pg="map" hidden>
       <div class="mn-hd"><button class="mn-back" data-to="home" aria-label="Geri">‹</button><h3>Harita seç</h3></div>
@@ -1770,6 +1800,7 @@ input, textarea {
       </div>
       <button id="mnTut"><span class="mn-check">✓</span><svg viewBox="0 0 44 44" aria-hidden="true"><path d="M6 9c6-2 11-1 16 3v24c-5-4-10-5-16-3z" fill="#f4efe2"/><path d="M38 9c-6-2-11-1-16 3v24c5-4 10-5 16-3z" fill="#ffd36b"/><path d="M22 12v24" stroke="#12252e" stroke-width="1.6"/><path d="M10 15c3-.6 6-.2 8.5 1.2M10 20c3-.6 6-.2 8.5 1.2M10 25c3-.6 6-.2 8.5 1.2" stroke="#9aa3a8" stroke-width="1.3" fill="none"/><circle cx="33" cy="33" r="7" fill="#3fb98a" stroke="#12252e" stroke-width="1.6"/><path d="M33 30v6M30 33h6" stroke="#fff" stroke-width="2"/></svg><span>Öğretici</span><small>Oyunu adım adım öğren. Kolay zorlukta oynanır.</small></button>
     </div>
+      <button id="mnTmr" class="mn-tmr"></button>
       <button id="mnStart" class="mn-cta">Oyuna başla</button>
     </div>
   </div>
@@ -4693,6 +4724,7 @@ function start(p) {
   bd = null;
   spySel = null;
   if (p == 0) {
+    soloStart();
     ext = 0;
     supT.clear();
     spyMade = 0;
@@ -11222,7 +11254,22 @@ document.querySelectorAll('.mn-dif').forEach(b => b.onclick = () => {
   menuRefresh();
 });
 // Menü sayfaları: ana sayfa → harita seçimi → zorluk.
+function tmrBtn() {
+  const b = document.getElementById('mnTmr');
+  b.innerHTML = soloOn ? `⏱ Süreli tur: <b>${SOLO_SEC} saniye</b><small>Dokun: süresiz oyna</small>` : '⏱ Süreli tur: <b>kapalı</b><small>Dokun: her tur 30 saniye</small>';
+  b.classList.toggle('on', soloOn);
+}
+document.getElementById('mnTmr').onclick = () => {
+  soloOn = !soloOn;
+  try {
+    localStorage.setItem('fetih_tmr', soloOn ? '1' : '0');
+  }
+  catch (e) { }
+  tmrBtn();
+};
 function menuPage(k) {
+  if (k == 'dif')
+    tmrBtn();
   menuEl.querySelectorAll('.mn-pg').forEach(e => e.hidden = e.dataset.pg != k);
 }
 menuEl.querySelectorAll('.mn-back').forEach(b => b.onclick = () => menuPage(b.dataset.to));
@@ -12102,8 +12149,67 @@ const amHost = () => {
   }
   return false;
 };
+// Tek oyunculu tur sayacı: senin turun 30 saniye sürer (animasyonlar ve açık pencereler sayacı durdurur).
+// Süre bitince kalan takviyeler sınır bölgelerine dağıtılır ve tur kendiliğinden biter.
+const SOLO_SEC = 30;
+let soloOn = true;
+try {
+  soloOn = localStorage.getItem('fetih_tmr') != '0';
+}
+catch (e) { }
+let soloLeft = 0;
+let soloLast = 0;
+function soloStart() {
+  soloLeft = SOLO_SEC * 1000;
+  soloLast = performance.now();
+}
+setInterval(() => {
+  if (ONLINE)
+    return;
+  const el = document.getElementById('tmr');
+  const now = performance.now();
+  const dt = now - soloLast;
+  soloLast = now;
+  const act = soloOn && !TUT && !over && !dr && cen && turn == 0 && soloLeft > 0 && menuEl.hidden && !document.getElementById('alc') && !document.getElementById('eov');
+  if (!act) {
+    el.hidden = !(soloOn && !TUT && !over && !dr && cen && menuEl.hidden && turn != 0 && !document.getElementById('eov'));
+    if (!el.hidden) {
+      el.textContent = `${PN[turn] || ''} oynuyor`;
+      el.style.setProperty('--tc', COL[turn] || '#9aa3a8');
+      el.classList.remove('low');
+    }
+    return;
+  }
+  if (!busy && !document.hidden)
+    soloLeft -= dt;
+  const left = Math.max(0, Math.ceil(soloLeft / 1000));
+  el.hidden = false;
+  el.textContent = `⏱ ${left} sn`;
+  el.style.setProperty('--tc', left <= 10 ? '#e5566d' : COL[0]);
+  el.classList.toggle('low', left <= 10);
+  if (soloLeft <= 0 && !busy) {
+    soloLeft = 0;
+    const pl = pool;
+    if (pool > 0)
+      autoPool(0);
+    sel = null;
+    mv = false;
+    bk = null;
+    bd = null;
+    ordSel = null;
+    spySel = null;
+    pop.hidden = true;
+    busy = true;
+    banner('⏱ Süre doldu!', '#e5566d');
+    $('log').textContent = 'Süre doldu, turun bitti.' + (pl ? ` Kalan ${pl} takviye sınır bölgelerine dağıtıldı.` : '');
+    ui();
+    setTimeout(() => next(), 700);
+  }
+}, 250);
 setInterval(() => {
   const el = document.getElementById('tmr');
+  if (!ONLINE)
+    return;
   if (!ONLINE || over || !cen) {
     el.hidden = true;
     return;
@@ -12835,7 +12941,103 @@ const Mus = (() => {
     mel = [a, b, a, c];
   }
   const TEMPO = { menu: 66, game: 66 };
+  // ---- "Diyar": yeşil tepeler ve masal diyarı havasında, özgün bir pastoral ezgi (3/4, Re majör) ----
+  // Düdük (tin whistle) melodisi, arp eşliği, yaylı dem ve hafif çerçeve davul. Ezgi tamamen özgündür.
+  const DI_MAJ = [0, 2, 4, 5, 7, 9, 11];
+  const dm = (d, oct) => {
+    const o = Math.floor(d / 7);
+    const k = ((d % 7) + 7) % 7;
+    return 62 + 12 * (oct + o) + DI_MAJ[k];
+  };
+  // [derece, süre (sekizlik)] — her ölçü 6 sekizlik.
+  const DI_A1 = [[4, 2], [5, 1], [4, 1], [2, 2], [1, 3], [2, 1], [4, 2], [5, 2], [7, 2], [6, 1], [5, 1], [4, 6]];
+  const DI_A2 = [[4, 2], [5, 1], [4, 1], [2, 2], [1, 2], [0, 2], [1, 2], [2, 3], [1, 1], [-1, 2], [0, 6]];
+  const DI_B1 = [[7, 3], [6, 1], [5, 2], [4, 2], [5, 2], [6, 2], [7, 2], [8, 2], [9, 2], [8, 6]];
+  const DI_B2 = [[7, 3], [6, 1], [5, 2], [4, 2], [2, 2], [1, 2], [2, 2], [4, 2], [1, 2], [0, 6]];
+  const DI_CH = { A1: [0, 5, 3, 4], A2: [0, 5, 4, 0], B1: [5, 3, 0, 4], B2: [5, 3, 4, 0], I: [0, 3, 0, 4] };
+  // 24 ölçülük döngü: 4 ölçü giriş (arp), A1 A2 B1 B2 (16 ölçü), 4 ölçü kapanış.
+  const DI_FORM = [['I', null], ['A1', DI_A1], ['A2', DI_A2], ['B1', DI_B1], ['B2', DI_B2], ['I', null]];
+  function whistle(out, m, t, v, dur) {
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = hz(m);
+    const lfo = ac.createOscillator();
+    lfo.frequency.value = 5.6;
+    const lg = ac.createGain();
+    lg.gain.setValueAtTime(0, t);
+    lg.gain.linearRampToValueAtTime(hz(m) * .009, t + Math.min(.45, dur * .8));
+    lfo.connect(lg);
+    lg.connect(o.frequency);
+    const o2 = ac.createOscillator();
+    o2.type = 'triangle';
+    o2.frequency.value = hz(m) * 2;
+    const g2 = ac.createGain();
+    g2.gain.value = .1;
+    o2.connect(g2);
+    const n = noise();
+    const nb = ac.createBiquadFilter();
+    nb.type = 'bandpass';
+    nb.frequency.value = hz(m) * 3;
+    nb.Q.value = 4;
+    const ng = ac.createGain();
+    ng.gain.value = .08;
+    n.connect(nb);
+    nb.connect(ng);
+    const g = ac.createGain();
+    o.connect(g);
+    g2.connect(g);
+    ng.connect(g);
+    g.connect(out);
+    env(g, t, .04, v, .25, .8, .12, dur);
+    [o, lfo, o2, n].forEach(x => {
+      x.start(t);
+      x.stop(t + dur + .8);
+    });
+  }
+  function stepDiyar(i, t, spb) {
+    const bar = Math.floor(i / 12);
+    const s = i % 12;
+    const lb = bar % 24;
+    const sec = Math.min(5, Math.floor(lb / 4));
+    const [nm, mel] = DI_FORM[sec];
+    const ch = DI_CH[nm][lb % 4];
+    const M = musG;
+    if (s == 0) {
+      pad(M, dm(ch, -2), t, .035, spb * 12, 700);
+      pad(M, dm(ch + 2, -1), t, .02, spb * 12, 1100);
+      pad(M, dm(ch + 4, -1), t, .018, spb * 12, 1100);
+      drum(M, t, .14, 110, 70, .35);
+    }
+    if (s == 8)
+      drum(M, t, .06, 160, 110, .2);
+    // Arp: her sekizlikte akor sesleri yukarı-aşağı.
+    if (s % 2 == 0) {
+      const ar = [0, 4, 7, 9, 7, 4];
+      pluck(M, dm(ch + [0, 2, 4, 7, 4, 2][s / 2], 0) - 12, t, s == 0 ? .06 : .04, spb * 3);
+    }
+    if (mel) {
+      // Melodinin bu ölçüdeki notaları
+      const bi = lb % 4;
+      let p = 0;
+      for (const [d, l] of mel) {
+        const st = p * 2;
+        if (Math.floor(st / 12) == bi && st % 12 == s)
+          whistle(M, dm(d, 1), t, .11, spb * l * 2 * .95);
+        p += l;
+      }
+    }
+  }
+  // Çalan parça: 'march' (Fetih Marşı) ya da 'diyar'.
+  let trk = 'march';
+  try {
+    if (localStorage.getItem('fetih_trk') == 'diyar')
+      trk = 'diyar';
+  }
+  catch (e) { }
+  const curSpb = () => trk == 'diyar' ? 60 / 100 / 4 : 60 / TEMPO[theme == 'menu' ? 'menu' : 'game'] / 4;
   function scheduleStep(i, t) {
+    if (trk == 'diyar')
+      return stepDiyar(i, t, curSpb());
     const spb = 60 / TEMPO[theme == 'menu' ? 'menu' : 'game'] / 4;
     const bar = Math.floor(i / 16);
     const s = i % 16;
@@ -12924,7 +13126,7 @@ const Mus = (() => {
     warG.gain.setTargetAtTime(war * .6, now, .2);
     if (nextT < now)
       nextT = now + .05;
-    const spb = 60 / TEMPO[theme == 'menu' ? 'menu' : 'game'] / 4;
+    const spb = curSpb();
     while (nextT < now + .25) {
       if (on && theme != 'off')
         scheduleStep(step, nextT);
@@ -12982,6 +13184,9 @@ const Mus = (() => {
       localStorage.setItem('fetih_vol', String(vol));
     }
     catch (e) { }
+    const tb = document.getElementById('mnTrk');
+    if (tb)
+      tb.textContent = trk == 'diyar' ? '🌿 Diyar' : '⚔️ Marş';
     document.querySelectorAll('.mus-tg').forEach(b => {
       b.textContent = on ? '🔊' : '🔇';
       b.setAttribute('aria-label', on ? 'Müziği kapat' : 'Müziği aç');
@@ -13018,6 +13223,24 @@ const Mus = (() => {
         ensure();
       apply();
     },
+    setTrack(k) {
+      trk = k;
+      step = 0;
+      if (ac)
+        nextT = ac.currentTime + .1;
+      try {
+        localStorage.setItem('fetih_trk', trk);
+      }
+      catch (e) { }
+      if (!on) {
+        on = true;
+        ensure();
+      }
+      apply();
+    },
+    get track() {
+      return trk;
+    },
     setVol(v) {
       vol = Math.max(0, Math.min(1, v));
       if (vol > 0 && !on) {
@@ -13046,7 +13269,10 @@ const Mus = (() => {
     jingle,
     apply,
     // Test için: bir temayı sessizce dosyaya işler (oyunda kullanılmaz).
-    async render(th, fl, secs, warOn, jg) {
+    async render(th, fl, secs, warOn, jg, tk) {
+      const tk0 = trk;
+      if (tk)
+        trk = tk;
       const sv = [ac, master, musG, warG, sfxG, rev, theme, flavor, war, on];
       const oc = new OfflineAudioContext(2, 44100 * secs, 44100);
       build(oc);
@@ -13057,7 +13283,7 @@ const Mus = (() => {
       war = warOn ? 1 : 0;
       warG.gain.value = warOn ? .6 : 0;
       seed = 11;
-      const spb = 60 / TEMPO[th == 'menu' ? 'menu' : 'game'] / 4;
+      const spb = curSpb();
       if (jg)
         jingle(jg);
       else
@@ -13065,12 +13291,14 @@ const Mus = (() => {
           scheduleStep(i, t);
       const buf = await oc.startRendering();
       [ac, master, musG, warG, sfxG, rev, theme, flavor, war, on] = sv;
+      trk = tk0;
       return buf;
     }
   };
 })();
 $('musb').onclick = () => Mus.toggle();
 document.getElementById('mnMus').onclick = () => Mus.toggle();
+document.getElementById('mnTrk').onclick = () => Mus.setTrack(Mus.track == 'diyar' ? 'march' : 'diyar');
 document.getElementById('mnVol').oninput = e => Mus.setVol(e.target.value / 100);
 Mus.apply();
 // Oyunu başlat: arka planda bir harita üret ve ana menüyü göster.
