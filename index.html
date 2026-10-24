@@ -2067,6 +2067,14 @@ const isBorder = t => [...adj[t]].some(u => own[u] != own[t]);
 // taxEvery: oyuncu vergiyi her tur (1) ya da 2 turda bir (2) toplar. Sınırdan 2 altın istemek
 // her toplamada o bölgede isyan ihtimali doğurur: her tur toplanıyorsa %15, 2 turda birse %5.
 let taxEvery = 2;
+// taxAuto: otomatik vergi (varsayılan açık). Her tur başında iç bölgeler 2, sınır bölgeleri 1 altına ayarlanır.
+let taxAuto = true;
+let taxTip = false;
+function taxSmart() {
+  for (let u = 0; u < N; u++)
+    if (own[u] == 0)
+      tax[u] = isBorder(u) ? 1 : 2;
+}
 function taxCollect(p) {
   let n = 0;
   let n1 = 0;
@@ -2956,7 +2964,7 @@ function mapFinish(cl, ctn, am) {
 }
 // Amerika kıtası: Natural Earth kara verisinden (Lambert eşit alan izdüşümü, merkez 85°B 15°K) çıkarılmış kara maskesi.
 // rle: denizle başlayan, sırayla deniz/kara uzunlukları (36 tabanında). an: gerçek yer adları ve harita üzerindeki konumları.
-const AMAP = { w: 232, h: 320, rle: 't9,2,67,5,1,4,65,c,63,e,62,g,5z,i,5r,2,5,m,5k,x,5h,11,3u,1,1j,13,3s,9,1a,17,3p,c,17,19,3i,3,3,d,16,1a,3g,5,1,f,15,1b,3e,m,15,1c,3c,n,15,1e,3b,n,15,1e,36,2,2,n,15,1f,32,u,j,1,f,2,5,8,2,15,2x,1,2,w,h,4,b,h,3,14,2w,11,f,6,a,h,4,13,2w,11,e,8,a,f,d,v,2x,11,c,a,9,g,e,t,2x,14,8,b,4,2,6,d,f,s,2y,19,2,d,1,4,x,r,2y,1b,1,h,6,f,e,p,2y,1c,2,g,6,g,e,o,2y,1t,7,g,f,o,2y,1t,6,j,d,n,2z,1s,5,l,c,n,2m,6,5,1u,5,o,a,m,2m,26,2,r,a,l,2m,26,1,t,a,j,2q,9,7,25,2,a,b,h,2s,1,2,2,b,23,3,c,9,h,3d,1y,3,e,8,h,3d,1x,3,g,7,g,3e,1w,2,i,7,g,3e,1w,2,h,8,f,3f,1u,6,e,9,e,3f,1t,7,d,b,e,3e,1t,5,e,d,d,3e,1t,4,f,e,c,3e,1u,2,h,f,b,3d,1v,2,g,g,a,3d,1w,7,b,h,8,3d,1l,3,3,d,a,m,2,3d,1l,5,1,9,e,43,1j,f,e,44,1i,g,b,5,1,40,1i,h,c,3,3,3z,1h,h,d,3,3,41,1f,i,c,3,4,41,1d,j,d,2,5,40,1e,i,m,3x,1g,g,o,3w,1g,h,n,3w,1g,i,n,3v,1j,g,n,3u,1l,e,r,3q,1m,d,s,3p,1o,b,u,3m,1u,5,w,3k,1w,2,z,3k,1v,1,10,3k,1v,2,z,3k,1v,2,11,3j,1v,2,10,3k,1v,1,10,3k,1u,2,u,1,5,1,2,3g,2r,1,9,3f,2q,2,9,3f,2o,4,a,3e,2p,3,b,3c,2p,4,c,3b,2n,6,5,2,5,3a,2o,7,4,4,2,3b,2o,5,1,3l,2s,1,3,3k,2x,3i,2x,3i,2y,3i,2x,3j,2v,3l,2u,3l,2o,1,4,3m,2o,3,2,3o,2l,3u,2l,3v,2l,3v,2m,3v,2l,3v,2k,3w,2i,3y,2h,3z,2g,40,2f,41,2f,42,2d,43,2d,43,2d,44,2b,46,2a,47,29,48,29,48,27,49,26,4a,26,4a,25,4b,23,4d,22,4f,20,4g,1z,4h,1x,4k,1w,4k,1v,4m,1u,4l,1v,4k,1l,1,b,4k,1g,6,2,1,7,4l,13,7,4,b,6,4m,10,p,6,4m,5,1,r,q,7,4n,4,1,r,q,8,4m,4,1,q,s,7,4l,5,2,q,s,5,4m,5,3,p,s,6,4m,5,3,n,u,5,4o,4,3,m,v,4,4o,4,3,l,x,2,4q,3,4,k,5q,1,6,j,5x,j,u,4,4z,j,r,a,4w,j,q,e,4u,i,p,4,2,b,4r,j,f,7,3,3,3,d,4p,k,d,9,3,1,8,b,4n,k,c,9,g,a,4m,k,a,a,h,a,1,7,4e,j,a,9,j,8,1,a,4d,j,9,9,k,2,2,1,4,a,4d,j,4,d,r,d,4d,y,r,d,4g,w,s,8,4m,u,x,1,4p,s,5q,q,5s,o,5u,v,5o,1,5,n,5u,n,5u,m,5v,l,5w,k,60,g,62,e,n,2,5g,a,n,3,4,1,h,1,4u,9,k,6,3,4,9,4,1,3,4u,8,i,k,3,9,4v,7,h,w,4w,8,f,y,4v,8,f,z,4v,9,4,5,4,11,4u,i,1,15,4v,a,2,1a,4u,a,3,1a,4u,9,3,1j,4o,6,2,1m,4n,1,1,2,4,1n,4u,1n,4t,1o,4s,1o,4s,1p,4r,1p,4r,1q,4q,1r,4p,1r,4o,1s,4n,1v,4k,20,4g,24,4a,27,48,29,1,2,3,3,3y,2k,3w,2l,3u,2o,3s,2s,3n,2u,3m,2v,3m,2u,3n,2t,3n,2t,3m,2u,3l,2v,3k,2w,3l,2v,3l,2u,3m,2u,3n,2s,3p,2r,3q,2p,3s,2n,3u,2l,3v,2l,3w,2j,3x,2j,3x,2i,3z,2g,40,2f,42,2e,43,2d,43,2d,44,2c,45,2b,45,2b,45,2a,47,29,48,28,49,27,4a,25,4d,22,4g,20,4i,1y,4j,1w,4l,1v,4l,1u,4n,1s,4o,1s,4o,1s,4o,1r,4p,1p,4q,1p,4r,1n,4t,1j,4w,1j,4y,1f,50,1f,51,1d,53,1d,53,1c,54,1c,54,1c,53,1d,53,1c,54,1c,53,1c,54,1b,55,1a,56,19,56,19,57,18,58,17,59,16,5a,15,5b,14,5b,14,5c,13,5d,12,5d,12,5e,10,5f,w,5j,y,5i,y,5h,z,5g,z,5i,x,5i,x,5k,t,5n,p,5q,o,5r,p,5r,o,5s,n,5t,k,5v,m,5u,l,5w,i,5x,j,5w,j,5x,i,5y,h,5y,g,5z,i,5z,i,5y,i,5x,i,5x,i,5y,h,60,f,60,f,61,e,63,c,63,d,64,c,64,c,65,b,66,b,66,c,66,a,67,9,6a,2,2l1', an: [["Alaska", 43.3, 30.3], ["Yukon", 52.7, 39.7], ["Kuzeybatı", 69.7, 44.3], ["Nunavut", 93.3, 48.7], ["Kivalliq", 91.7, 59.0], ["Baffin", 118.1, 40.2], ["Ellesmere", 106.6, 19.5], ["Victoria", 83.9, 32.8], ["Banks", 77.7, 27.6], ["Keewatin", 84.2, 54.0], ["Britanya Kolumbiyası", 50.6, 61.5], ["Alberta", 65.3, 63.5], ["Saskatchewan", 75.1, 67.7], ["Manitoba", 87.8, 67.1], ["Ontario", 104.1, 78.5], ["Quebec", 123.7, 77.6], ["Nunavik", 119.4, 60.8], ["Labrador", 135.8, 67.2], ["Yeni İskoçya", 139.6, 85.5], ["Washington", 50.5, 77.0], ["Oregon", 46.6, 84.3], ["Kaliforniya", 42.7, 100.0], ["Nevada", 48.3, 96.5], ["Idaho", 55.9, 86.5], ["Montana", 65.7, 81.6], ["Wyoming", 66.5, 90.7], ["Utah", 57.9, 97.3], ["Arizona", 54.8, 109.4], ["Colorado", 67.9, 100.0], ["Yeni Meksika", 65.1, 109.8], ["Kuzey Dakota", 79.8, 82.5], ["Güney Dakota", 79.4, 89.1], ["Nebraska", 79.2, 95.7], ["Kansas", 80.0, 102.4], ["Oklahoma", 81.0, 109.2], ["Teksas", 77.0, 118.9], ["Minnesota", 88.8, 86.6], ["Iowa", 89.6, 95.4], ["Missouri", 90.7, 103.1], ["Arkansas", 90.3, 111.3], ["Louisiana", 90.5, 119.7], ["Wisconsin", 96.2, 90.2], ["Michigan", 104.1, 91.4], ["Illinois", 96.7, 100.0], ["Indiana", 102.0, 100.1], ["Ohio", 108.0, 99.5], ["Kentucky", 104.1, 105.6], ["Tennessee", 102.3, 109.4], ["Mississippi", 95.1, 116.1], ["Alabama", 100.7, 116.0], ["Georgia", 107.2, 116.4], ["Florida", 110.7, 125.5], ["Karolina", 113.4, 111.0], ["Virginia", 115.4, 105.4], ["Pensilvanya", 117.0, 97.6], ["New York", 120.2, 93.1], ["Yeni İngiltere", 126.7, 91.5], ["Maine", 130.1, 87.2], ["Baja Kaliforniya", 48.2, 117.6], ["Sonora", 54.5, 119.7], ["Chihuahua", 62.8, 123.1], ["Coahuila", 70.2, 126.7], ["Tamaulipas", 76.1, 133.9], ["Sinaloa", 58.6, 130.7], ["Durango", 64.0, 132.4], ["Zacatecas", 68.1, 136.2], ["Jalisco", 65.2, 141.7], ["Meksiko", 74.4, 144.9], ["Veracruz", 79.8, 145.0], ["Oaxaca", 79.5, 150.6], ["Guerrero", 72.2, 148.8], ["Chiapas", 88.0, 152.1], ["Yukatan", 95.7, 144.5], ["Guatemala", 92.7, 154.5], ["Honduras", 100.9, 156.2], ["Nikaragua", 104.1, 160.5], ["Kosta Rika", 106.3, 167.0], ["Panama", 115.2, 170.0], ["Küba", 116.6, 140.6], ["Hispanyola", 133.7, 145.8], ["Newfoundland", 148.2, 77.1], ["Kuzey Grönland", 123.2, 13.2], ["Doğu Grönland", 144.7, 24.1], ["Batı Grönland", 131.6, 32.9], ["Güney Grönland", 146.5, 43.9], ["Grönland", 132.0, 21.0], ["Kolombiya", 129.9, 178.8], ["Venezuela", 146.3, 171.0], ["Guyana", 161.9, 175.3], ["Surinam", 169.7, 177.9], ["Ekvador", 118.8, 192.5], ["Peru", 124.5, 203.5], ["Lima", 124.4, 215.6], ["Cusco", 133.3, 219.7], ["Bolivya", 149.7, 224.6], ["Atakama", 137.7, 241.2], ["Santiago", 133.4, 261.2], ["Patagonya", 132.9, 286.4], ["Ateş Toprağı", 130.6, 300.8], ["Santa Cruz", 129.9, 293.1], ["Salta", 147.2, 243.1], ["Kordoba", 147.6, 256.9], ["Pampa", 145.7, 268.3], ["Buenos Aires", 156.1, 265.1], ["Paraguay", 162.5, 238.2], ["Uruguay", 163.2, 259.7], ["Amazonas", 151.5, 196.7], ["Pará", 177.9, 194.4], ["Maranhão", 193.0, 194.9], ["Pernambuco", 207.7, 200.0], ["Bahia", 199.9, 211.7], ["Goiás", 182.3, 221.4], ["Mato Grosso", 168.8, 215.7], ["Minas Gerais", 192.2, 226.3], ["Rio de Janeiro", 194.0, 235.3], ["São Paulo", 182.7, 236.1], ["Paraná", 175.6, 242.0], ["Rio Grande", 169.7, 252.1], ["Rondônia", 153.5, 212.2], ["Roraima", 157.9, 182.6], ["Amapá", 178.6, 181.5], ["Tocantins", 185.8, 207.4], ["Piauí", 197.6, 200.2], ["Akre", 138.0, 208.5], ["Pantanal", 166.7, 229.2], ["Patagonya Kıyısı", 139.6, 280.5], ["Mendoza", 137.6, 263.2], ["Chubut", 135.5, 282.5]] };
+const AMAP = { w: 232, h: 320, rle: 't9,2,67,5,1,4,65,c,63,e,62,g,5z,i,5r,2,5,m,5k,x,5h,11,3u,1,1j,13,3s,9,1a,17,3p,c,17,19,3i,3,3,d,16,1a,3g,5,1,f,15,1b,3e,m,15,1c,3c,n,15,1e,3b,n,15,1e,36,2,2,n,15,1f,32,u,j,1,f,2,5,8,2,15,2x,1,2,w,h,4,b,h,3,14,2w,11,f,6,a,h,4,13,2w,11,e,8,a,f,d,v,2x,11,c,a,9,g,e,t,2x,14,8,b,4,2,6,d,f,s,2y,19,2,d,1,4,x,r,2y,1b,1,h,6,f,e,p,2y,1c,2,g,6,g,e,o,2y,1t,7,g,f,o,2y,1t,6,j,d,n,2z,1s,5,l,c,n,2m,6,5,1u,5,o,a,m,2m,26,2,r,a,l,2m,26,1,t,a,j,2q,9,7,25,2,a,b,h,2s,1,2,2,b,x,6,10,3,c,9,h,3d,t,6,z,3,e,8,h,3d,r,6,10,3,g,7,g,3e,r,3,12,2,i,7,g,3e,1w,2,h,8,f,3f,1u,6,e,9,e,3f,1t,7,d,b,e,3e,1t,5,e,d,d,3e,1t,4,f,e,c,3e,s,1,11,2,h,f,b,3d,s,2,3,2,w,2,g,g,a,3d,p,1,1,7,y,7,b,h,8,3d,p,7,p,3,3,d,a,m,2,3d,t,1,r,5,1,a,d,43,1j,f,1,7,6,44,1i,g,7,4a,1i,h,c,5,1,3z,1h,h,d,3,3,41,1f,i,c,3,4,41,1d,j,d,2,5,40,1e,i,m,3x,1g,g,o,3w,1g,h,n,3w,1g,i,n,3v,1j,g,n,3u,1l,e,r,3q,1m,d,s,3p,1o,b,u,3m,1u,5,w,3k,1w,2,z,3k,18,1,m,1,10,3k,16,3,m,2,z,3k,16,3,m,2,11,3j,15,3,n,2,10,3k,15,2,o,1,10,3k,15,2,n,2,u,1,5,1,2,3g,17,2,1i,1,9,3f,17,2,1h,2,9,3f,17,1,1g,4,a,3e,2p,3,b,3c,2p,4,c,3b,2n,6,5,2,5,3a,1m,1,11,7,4,4,2,3b,1l,4,z,5,1,3l,1k,7,11,1,3,3k,1j,a,14,3i,1i,c,13,3i,1k,3,3,6,12,3i,1u,5,y,3j,1q,c,t,3l,1q,4,2,6,s,3l,1q,5,2,7,k,1,4,3m,1r,3,4,4,7,2,d,3,2,3o,1q,3,4,4,4,5,b,3u,1r,3,6,2,3,5,b,3v,1r,3,6,1,5,1,e,3v,1r,3,8,4,g,3v,1q,3,5,6,h,3v,1r,1,6,3,j,3w,2i,3y,2h,3z,2g,40,2f,41,2f,42,2d,43,2d,43,2d,44,2b,46,2a,47,29,48,29,48,27,49,26,4a,26,4a,25,4b,23,4d,22,4f,20,4g,1z,4h,1x,4k,1w,4k,1v,4m,1u,4l,1v,4k,1l,1,b,4k,1g,6,2,1,7,4l,13,7,4,b,6,4m,10,p,6,4m,5,1,r,q,7,4n,4,1,r,q,8,4m,4,1,q,s,7,4l,5,2,q,s,5,4m,5,3,p,s,6,4m,5,3,n,u,5,4o,4,3,m,v,4,4o,4,3,l,x,2,4q,3,4,k,5q,1,6,j,5x,j,u,4,4z,j,r,a,4w,j,q,e,4u,i,p,4,2,b,4r,j,f,7,3,3,3,d,4p,k,d,9,3,1,8,b,4n,k,c,9,g,a,4m,k,a,a,h,a,1,7,4e,j,a,9,j,8,1,a,4d,j,9,9,k,2,2,1,4,a,4d,j,4,d,r,d,4d,y,r,d,4g,w,s,8,4m,u,x,1,4p,s,5q,q,5s,o,5u,v,5o,1,5,n,5u,n,5u,m,5v,l,5w,k,60,g,62,e,n,2,5g,a,n,3,4,1,h,1,4u,9,k,6,3,4,9,4,1,3,4u,8,i,k,3,9,4v,7,h,w,4w,8,f,y,4v,8,f,z,4v,9,4,5,4,11,4u,i,1,15,4v,a,2,1a,4u,a,3,1a,4u,9,3,1j,4o,6,2,1m,4n,1,1,2,4,1n,4u,1n,4t,1o,4s,1o,4s,1p,4r,1p,4r,1q,4q,1r,4p,1r,4o,1s,4n,1v,4k,20,4g,24,4a,27,48,29,1,2,3,3,3y,2k,3w,2l,3u,2o,3s,2s,3n,2u,3m,2v,3m,2u,3n,2t,3n,2t,3m,2u,3l,2v,3k,2w,3l,2v,3l,2u,3m,2u,3n,2s,3p,2r,3q,2p,3s,2n,3u,2l,3v,2l,3w,2j,3x,2j,3x,2i,3z,2g,40,2f,42,2e,43,2d,43,2d,44,2c,45,2b,45,2b,45,2a,47,29,48,28,49,27,4a,25,4d,22,4g,20,4i,1y,4j,1w,4l,1v,4l,1u,4n,1s,4o,1s,4o,1s,4o,1r,4p,1p,4q,1p,4r,1n,4t,1j,4w,1j,4y,1f,50,1f,51,1d,53,1d,53,1c,54,1c,54,1c,53,1d,53,1c,54,1c,53,1c,54,1b,55,1a,56,19,56,19,57,18,58,17,59,16,5a,15,5b,14,5b,14,5c,13,5d,12,5d,12,5e,10,5f,w,5j,y,5i,y,5h,z,5g,z,5i,x,5i,x,5k,t,5n,p,5q,o,5r,p,5r,o,5s,n,5t,k,5v,m,5u,l,5w,i,5x,j,5w,j,5x,i,5y,h,5y,g,5z,i,5z,i,5y,i,5x,i,5x,i,5y,h,60,f,60,f,61,e,63,c,63,d,64,c,64,c,65,b,66,b,66,c,66,a,67,9,6a,2,2l1', an: [["Alaska", 43.3, 30.3], ["Yukon", 52.7, 39.7], ["Kuzeybatı", 69.7, 44.3], ["Nunavut", 93.3, 48.7], ["Kivalliq", 91.7, 59.0], ["Baffin", 118.1, 40.2], ["Ellesmere", 106.6, 19.5], ["Victoria", 83.9, 32.8], ["Banks", 77.7, 27.6], ["Keewatin", 84.2, 54.0], ["Britanya Kolumbiyası", 50.6, 61.5], ["Alberta", 65.3, 63.5], ["Saskatchewan", 75.1, 67.7], ["Manitoba", 87.8, 67.1], ["Ontario", 104.1, 78.5], ["Quebec", 123.7, 77.6], ["Nunavik", 119.4, 60.8], ["Labrador", 135.8, 67.2], ["Yeni İskoçya", 139.6, 85.5], ["Washington", 50.5, 77.0], ["Oregon", 46.6, 84.3], ["Kaliforniya", 42.7, 100.0], ["Nevada", 48.3, 96.5], ["Idaho", 55.9, 86.5], ["Montana", 65.7, 81.6], ["Wyoming", 66.5, 90.7], ["Utah", 57.9, 97.3], ["Arizona", 54.8, 109.4], ["Colorado", 67.9, 100.0], ["Yeni Meksika", 65.1, 109.8], ["Kuzey Dakota", 79.8, 82.5], ["Güney Dakota", 79.4, 89.1], ["Nebraska", 79.2, 95.7], ["Kansas", 80.0, 102.4], ["Oklahoma", 81.0, 109.2], ["Teksas", 77.0, 118.9], ["Minnesota", 88.8, 86.6], ["Iowa", 89.6, 95.4], ["Missouri", 90.7, 103.1], ["Arkansas", 90.3, 111.3], ["Louisiana", 90.5, 119.7], ["Wisconsin", 96.2, 90.2], ["Michigan", 104.1, 91.4], ["Illinois", 96.7, 100.0], ["Indiana", 102.0, 100.1], ["Ohio", 108.0, 99.5], ["Kentucky", 104.1, 105.6], ["Tennessee", 102.3, 109.4], ["Mississippi", 95.1, 116.1], ["Alabama", 100.7, 116.0], ["Georgia", 107.2, 116.4], ["Florida", 110.7, 125.5], ["Karolina", 113.4, 111.0], ["Virginia", 115.4, 105.4], ["Pensilvanya", 117.0, 97.6], ["New York", 120.2, 93.1], ["Yeni İngiltere", 126.7, 91.5], ["Maine", 130.1, 87.2], ["Baja Kaliforniya", 48.2, 117.6], ["Sonora", 54.5, 119.7], ["Chihuahua", 62.8, 123.1], ["Coahuila", 70.2, 126.7], ["Tamaulipas", 76.1, 133.9], ["Sinaloa", 58.6, 130.7], ["Durango", 64.0, 132.4], ["Zacatecas", 68.1, 136.2], ["Jalisco", 65.2, 141.7], ["Meksiko", 74.4, 144.9], ["Veracruz", 79.8, 145.0], ["Oaxaca", 79.5, 150.6], ["Guerrero", 72.2, 148.8], ["Chiapas", 88.0, 152.1], ["Yukatan", 95.7, 144.5], ["Guatemala", 92.7, 154.5], ["Honduras", 100.9, 156.2], ["Nikaragua", 104.1, 160.5], ["Kosta Rika", 106.3, 167.0], ["Panama", 115.2, 170.0], ["Küba", 116.6, 140.6], ["Hispanyola", 133.7, 145.8], ["Newfoundland", 148.2, 77.1], ["Kuzey Grönland", 123.2, 13.2], ["Doğu Grönland", 144.7, 24.1], ["Batı Grönland", 131.6, 32.9], ["Güney Grönland", 146.5, 43.9], ["Grönland", 132.0, 21.0], ["Kolombiya", 129.9, 178.8], ["Venezuela", 146.3, 171.0], ["Guyana", 161.9, 175.3], ["Surinam", 169.7, 177.9], ["Ekvador", 118.8, 192.5], ["Peru", 124.5, 203.5], ["Lima", 124.4, 215.6], ["Cusco", 133.3, 219.7], ["Bolivya", 149.7, 224.6], ["Atakama", 137.7, 241.2], ["Santiago", 133.4, 261.2], ["Patagonya", 132.9, 286.4], ["Ateş Toprağı", 130.6, 300.8], ["Santa Cruz", 129.9, 293.1], ["Salta", 147.2, 243.1], ["Kordoba", 147.6, 256.9], ["Pampa", 145.7, 268.3], ["Buenos Aires", 156.1, 265.1], ["Paraguay", 162.5, 238.2], ["Uruguay", 163.2, 259.7], ["Amazonas", 151.5, 196.7], ["Pará", 177.9, 194.4], ["Maranhão", 193.0, 194.9], ["Pernambuco", 207.7, 200.0], ["Bahia", 199.9, 211.7], ["Goiás", 182.3, 221.4], ["Mato Grosso", 168.8, 215.7], ["Minas Gerais", 192.2, 226.3], ["Rio de Janeiro", 194.0, 235.3], ["São Paulo", 182.7, 236.1], ["Paraná", 175.6, 242.0], ["Rio Grande", 169.7, 252.1], ["Rondônia", 153.5, 212.2], ["Roraima", 157.9, 182.6], ["Amapá", 178.6, 181.5], ["Tocantins", 185.8, 207.4], ["Piauí", 197.6, 200.2], ["Akre", 138.0, 208.5], ["Pantanal", 166.7, 229.2], ["Patagonya Kıyısı", 139.6, 280.5], ["Mendoza", 137.6, 263.2], ["Chubut", 135.5, 282.5]] };
 // Tarihî haritalar: kara Natural Earth'ten, imparatorluk sınırları historical-basemaps (A. Ourednik) verisinden.
 // rle: her parça 'durum+uzunluk' (0 deniz, 1 imparatorluk toprağı, 2 dış kara), uzunluk 36 tabanında.
 const OMAP = { w: 319, h: 274, v3: 1, rle: '0w,27z,0w,27z,0y,27x,0z,27w,010,27v,011,27u,012,27t,012,27t,013,27s,013,27s,013,22m,12,22,11,24,11,24w,013,22j,1e,24v,013,22i,1g,24u,013,22h,1l,24q,014,22f,1p,21m,15,22w,015,22e,1r,21f,1c,22u,015,22d,1t,21d,1e,22t,015,22d,1u,26,12,213,1h,21n,03,211,014,22e,1y,21,14,22,11,2y,1j,21g,02,23,04,211,014,22e,11a,2u,1k,21e,0a,211,014,22e,11c,2r,1m,21b,0d,210,05,23,0v,22f,11f,2n,1o,219,0e,219,0u,22e,11x,25,1q,218,0e,219,0u,22d,121,21,1s,215,0g,21c,0q,22d,12w,213,0h,21g,0m,22c,12y,212,0h,21h,0k,22c,130,210,0j,21h,0j,22c,12r,01,18,2z,0l,21i,0g,22c,12p,04,18,2z,0f,21r,0d,22b,12n,05,1a,2y,0f,21u,0a,22b,12n,05,1c,2w,0f,21y,06,22c,12l,05,1e,2t,0i,21z,05,22b,12j,07,1f,2u,0h,247,12,25,12i,0a,1e,2t,0j,245,14,23,11x,03,11,01,1g,0c,1d,2t,0k,23z,02,22,124,05,1g,0d,1d,2t,0f,240,06,22,124,05,1e,0e,1e,2t,0f,240,05,22,124,0e,16,0e,1e,2s,0j,23x,05,23,11,01,121,0e,17,0c,1e,2t,0k,23w,05,23,122,0d,1a,0b,19,21,13,2u,0k,22q,02,2l,03,2f,07,21,02,11z,0e,1b,04,12,04,19,210,0k,22n,05,2j,05,2e,0b,11y,0d,1i,02,19,214,0j,22k,0a,2e,08,2d,0b,11y,0f,1g,02,18,216,0j,22j,0b,28,0f,2b,0b,11y,0h,19,09,15,217,0l,22h,0c,26,0g,2b,0c,11x,0i,17,0b,13,217,11,0q,22c,0e,22,0i,2c,0b,11w,0j,15,0g,216,13,0p,22c,0y,2d,09,11u,0l,15,0i,214,14,0p,22b,0z,2e,09,11t,0m,13,0m,212,13,0p,25,02,224,010,2e,0a,11r,01c,211,13,0p,23,04,224,010,2f,0a,11p,01e,210,14,0o,22,06,220,012,2g,0c,11n,01g,2q,11,28,14,0o,21,07,21w,016,2f,0d,11m,01h,2m,18,25,14,0n,22,08,21o,01d,2e,0d,11m,01j,2i,1b,24,15,0n,21,0a,21l,01f,2e,0f,11j,01k,2g,1d,24,15,0x,21k,01g,2e,0g,11i,01o,2b,1g,23,15,0v,21j,01j,2d,0g,11g,01r,2a,1i,22,16,0s,21j,01l,2c,0g,11f,01t,28,1l,01,16,0k,21p,01m,2d,0i,11b,01u,28,1t,0k,21m,01p,2d,0i,11a,01v,26,1v,0i,21m,01r,2d,0i,119,01v,26,1w,0h,21m,01s,2d,0i,117,01x,24,1y,0h,21l,01s,2i,0e,116,01x,21,112,0g,21,03,21g,01v,2g,0e,117,01v,118,0g,21g,01v,2f,0g,116,0y,12,0v,115,0k,21g,01y,2b,0i,115,0o,1b,0u,115,0j,21j,01x,2d,0f,116,0m,1h,0o,117,0l,21f,01z,2e,0e,116,0k,1k,0m,118,0n,21a,023,2f,0c,117,0i,1p,0b,12,03,11a,0o,219,024,2f,0a,119,0f,1w,04,11h,0o,218,028,2d,09,11b,0c,12j,0n,217,029,2e,08,11b,03,12r,0o,212,04,21,029,2a,01,24,07,1p,01,11,02,1c,08,12s,0p,2h,09,2a,02f,29,03,24,06,1o,02,11,06,17,09,12r,0q,2h,0c,26,02j,25,06,23,05,1m,04,11,06,16,08,12t,0q,2h,0g,21,02k,25,07,22,05,1g,01,16,07,21,05,11,05,11,04,12t,0q,2h,031,24,08,22,06,1f,03,13,22,0d,133,0r,2g,032,24,0g,1e,03,11,21,12,08,22,03,135,0q,2g,032,25,0e,1f,04,21,07,22,05,136,0r,2f,032,26,0f,1e,0b,22,04,137,0r,2f,032,26,0e,1f,0g,139,0r,2f,031,26,0g,1e,0f,139,0r,2i,0r,12,026,25,0h,1e,0e,11,23,136,0m,2p,02,21,0h,1b,02,13,01u,24,0l,1b,01,11,0d,21,11,22,13d,0e,2u,0b,13,02,1o,01n,24,0l,1d,0e,23,01,13d,0c,2w,07,1y,07,11,0v,26,0b,24,0l,1b,01,13,0e,21,02,13f,07,210,11,02,112,02,16,02,11,0r,28,03,29,0o,1b,21,12,0g,13g,215,11i,0a,12,0e,2f,01,23,0p,1c,21,13,0d,13h,215,11l,03,18,0d,2d,0w,13,01,1a,09,21,02,11,21,13g,216,11v,0f,2b,0w,14,03,18,08,21,13k,216,11v,03,11,0c,29,0w,17,02,15,01,12,07,21,02,13i,216,11v,01,13,0d,28,0v,1f,02,11,0c,13g,215,11z,0f,27,0w,1a,03,12,03,21,0c,13e,215,11y,0i,26,0w,19,09,21,07,21,13h,215,11x,0k,24,0y,16,01,12,09,21,04,21,04,13f,215,11w,0m,23,0y,16,01,11,06,21,0e,13e,214,11x,01m,17,0o,13d,214,11x,01n,17,0b,22,09,13e,214,11y,01m,11,01,15,0c,21,07,21,05,115,02,123,214,11z,01o,11,02,11,0e,21,06,21,03,1f,03,1g,04,13,02,124,214,11z,01o,11,02,11,0n,14,03,19,07,1d,08,125,214,11z,02o,17,08,1b,09,124,215,11z,02i,21,05,17,09,19,0a,124,216,11x,02h,23,07,12,0d,14,0f,123,216,11x,02h,22,015,124,217,11u,02j,21,016,125,217,11s,03r,125,218,11p,020,14,01q,124,219,11n,021,14,02,12,016,16,0a,124,21b,11l,021,1c,02,11,0z,16,0a,124,21d,11k,025,1a,0w,19,0a,125,21d,11j,03,11,023,12,012,17,0c,125,21f,11j,01,11,037,16,0e,124,21h,11j,03a,11,0f,1d,29,11j,21k,11h,03o,1d,2b,11i,21o,1v,25,1d,03o,1d,2d,11h,21q,1q,28,1e,03m,1c,2f,11g,21u,1k,2c,1d,03k,1d,2g,11f,21y,1f,2f,1d,03i,1c,2i,11e,221,1a,2i,1i,03c,1c,2j,11d,225,14,2m,1i,039,1d,2k,11d,22w,1i,037,1d,2l,11c,22x,1i,036,1d,2m,11b,22z,1i,034,1c,2o,11a,231,1i,0z,15,01x,1d,2p,119,232,1i,0u,1b,01v,1d,2r,118,233,1g,0s,1f,01t,1d,2s,117,235,1e,0r,1g,01s,1e,2t,116,236,1d,0q,1h,01s,1e,2u,115,236,1e,0o,1m,01o,1d,2w,114,237,1d,0o,1n,01n,1d,2x,1y,02,13,02,235,1f,0m,1s,01h,1e,2y,1x,08,235,1g,0k,1t,01g,1e,2z,1v,0a,233,1l,0g,1t,0x,11,0h,1f,210,1q,01,11,0d,232,1n,0f,111,0k,19,0c,1g,211,1r,0e,231,1p,0d,114,0g,19,0c,1h,213,1p,0e,231,1r,0a,118,0b,114,214,1m,0h,230,1s,08,1e,21,1y,06,115,216,1m,0g,22z,1t,07,17,2b,1x,02,117,219,1j,0h,22x,1f,22,1e,04,18,2f,123,21i,1b,0g,22x,1f,26,1l,2j,120,21i,1c,0g,22w,1e,2a,1h,2n,11x,21h,1d,0h,22v,1e,2c,1e,2r,11v,21h,1d,0h,22u,1e,2d,1d,2u,11s,21i,1d,0n,22n,1e,2e,1b,2w,11r,21n,18,0n,22n,1e,2f,19,2y,110,01,1q,21n,18,0p,22j,1e,2h,14,212,110,02,1p,21o,18,0r,22g,1e,21n,111,01,1b,01,1e,21n,18,0s,22f,1e,21o,110,02,1a,01,1e,21o,19,0q,22f,1e,21o,111,02,19,01,1f,21o,19,0p,22f,1e,21p,110,02,19,01,1f,21o,1b,0n,22f,1e,21p,110,03,18,01,1g,21o,1c,0l,22e,1e,21q,111,02,18,01,1g,21p,1c,0k,22e,1e,21r,111,02,16,02,1h,21o,1c,0k,22e,1e,21r,111,03,15,01,1i,21p,1c,0j,22e,1e,21r,112,03,14,01,11,02,1f,21q,1b,0j,22e,1e,21s,112,02,14,05,1f,21q,1a,0j,22e,1d,21t,113,03,11,07,1f,21r,18,0j,22e,1d,21u,112,0b,1f,21t,17,0i,22d,1e,21u,113,0b,1f,21s,18,0h,22d,1e,21u,113,0c,1e,21t,18,0g,22d,1e,21v,113,0c,1e,21s,18,0g,227,1j,21w,113,0c,1e,21t,18,0f,21w,1u,21w,114,0c,1e,21s,1a,0d,21p,111,21x,113,0d,1d,21s,1b,0c,21o,112,21x,113,0e,1d,21s,1b,09,21p,113,21y,113,0d,1d,21s,1c,23,03,21r,112,21z,113,0e,1d,21s,1a,21y,112,21z,114,0e,1c,21t,19,21y,112,220,114,0c,1e,21t,18,21y,112,220,114,0e,1c,21u,16,21z,112,220,115,0d,1d,21w,12,221,110,222,115,0e,1b,240,1y,223,115,0e,1d,270,114,0f,1g,26w,115,0e,1j,26t,116,0d,1l,26s,115,0e,1l,26r,116,0d,1m,26r,116,0e,1k,26r,117,0g,1h,26r,118,0g,1h,26r,117,0h,1g,26r,116,0i,1g,26r,116,0j,1g,26r,115,0k,1f,26r,116,0j,1f,26s,115,0k,1f,26r,116,0j,1f,26r,117,0j,1f,26r,118,0h,1h,26p,119,0g,1i,26p,119,0f,1j,26p,11a,0d,1j,26q,119,0d,1k,26r,117,0e,1j,26r,116,22,0d,1j,26r,115,23,0d,1j,26q,114,26,0c,1k,26p,112,29,0c,1j,26o,111,2b,0d,1j,26m,1z,2c,11,0f,1i,26m,1u,2g,13,0f,1i,26k,1q,2k,14,0g,1i,26j,1m,2n,15,0j,1f,26j,1o,2k,16,0k,1f,26i,1p,2i,17,0m,1d,26i,1r,2g,17,0m,1e,26h,1t,2d,18,0n,1e,26g,1u,2c,18,0o,1d,26g,1v,2a,1a,0n,1e,26f,1w,28,1b,0o,1e,26e,1w,29,1a,0o,1e,26e,1x,28,1b,0o,1e,26d,1x,28,1b,0p,1d,26d,1y,28,1c,0n,1d,26e,1x,28,1d,0n,1c,26e,1y,28,1e,0m,1c,26e,1x,28,1g,0l,1b,26e,1y,27,1g,21,0l,1a,26f,1x,28,1e,23,0m,19,26e,1x,29,1c,24,0m,19,26f,1w,2b,18,27,0m,18,26f,1w,2f,12,29,0n,18,26f,1u,2s,0n,17,26f,1u,2s,0n,18,21a,01,254,1t,2s,0o,17,218,03,254,1s,2u,0n,18,215,05,255,1r,2u,0n,18,214,06,255,1q,2v,0n,19,211,08,256,1p,2v,0n,19,2y,0b,257,1o,2w,0l,1b,2w,0c,258,1m,2x,0m,1a,2v,0d,259,1l,2y,0l,1b,2t,0e,25a,1k,2z,0k,1b,2t,0e,25c,1h,210,01,22,0i,1b,2r,0f,25c,1h,213,0i,1b,2b,12,2c,0h,25c,1h,214,0i,1b,27,17,26,0l,25c,1h,217,0f,1c,24,1a,24,0m,25c,1i,21a,0b,1r,22,0n,25c,1i,21b,0b,1q,21,0o,25c,1i,21c,0a,1o,0r,25c,1i,21c,0a,1m,0t,25c,1i,21e,09,1h,0x,25b,1k,21f,07,1f,0z,25b,1k,21g,06,1f,0z,25b,1k,21h,05,1d,011,25b,1k,21i,05,1b,010,25d,1k,21j,05,17,013,25d,1l,21j,01,21,02,16,013,25e,1k,21m,019,25g,1k,21n,015,25j,1k,21o,013,25k,1j,21p,011,25m,1j,21p,0w,25r,1i,21o,0w,25u,1h,21n,0s,25z,1h,21p,0p,260,1g,21s,0m,261,1g,21t,0j,263,1g,21t,0d,269,1f,21w,09,26c,1e,21x,07,26e,1c,220,02,26i,1a,212l,01,28u,01,28u,01,28t,02,28t,02,28s,03,28s,03', an: [["İstanbul", 175.8, 71.2], ["Edirne", 163.5, 66.6], ["Selanik", 145.4, 73.1], ["Sofya", 148.2, 59.5], ["Belgrad", 135.9, 45.0], ["Budin", 130.8, 26.8], ["Temeşvar", 139.6, 39.0], ["Bosna", 125.5, 49.9], ["Mora", 141.2, 93.3], ["Yanya", 134.5, 78.4], ["Üsküp", 138.7, 63.5], ["Niğbolu", 156.1, 53.3], ["Silistre", 167.5, 50.9], ["Eflak", 159.1, 47.5], ["Boğdan", 166.3, 32.0], ["Kırım", 198.7, 44.2], ["Kefe", 205.2, 43.7], ["Özi", 186.7, 34.3], ["Bursa", 175.8, 76.4], ["İzmir", 166.2, 88.2], ["Aydın", 169.8, 92.1], ["Antalya", 185.0, 97.8], ["Konya", 194.1, 91.0], ["Ankara", 195.5, 77.8], ["Kastamonu", 199.3, 67.7], ["Sivas", 216.1, 77.6], ["Trabzon", 228.5, 67.7], ["Erzurum", 237.4, 73.8], ["Van", 249.3, 81.3], ["Diyarbakır", 233.7, 87.6], ["Maraş", 216.9, 91.4], ["Adana", 209.0, 96.0], ["Halep", 219.4, 100.4], ["Rakka", 229.0, 101.4], ["Musul", 250.1, 95.9], ["Şehrizor", 262.9, 99.1], ["Bağdat", 260.0, 114.3], ["Basra", 281.6, 129.2], ["Lahsa", 297.8, 160.3], ["Şam", 216.1, 118.5], ["Trablusşam", 212.9, 112.8], ["Kudüs", 210.9, 130.0], ["Gazze", 207.1, 132.3], ["Kıbrıs", 199.7, 109.1], ["Kahire", 189.0, 143.0], ["İskenderiye", 181.5, 135.3], ["Said", 197.4, 168.8], ["Asvan", 200.2, 181.1], ["Sevakin", 228.9, 211.9], ["Cidde", 239.4, 195.2], ["Mekke", 243.1, 195.5], ["Medine", 240.1, 175.4], ["Sana", 274.1, 230.9], ["Aden", 280.9, 246.9], ["Zebid", 269.2, 239.5], ["Trablusgarp", 89.8, 118.3], ["Bingazi", 127.0, 127.8], ["Fizan", 91.6, 157.7], ["Tunus", 78.2, 90.3], ["Cezayir", 41.6, 82.7], ["Kostantine", 59.3, 89.1], ["Tilimsan", 16.8, 88.1], ["Eğri", 137.3, 24.8], ["Kanije", 121.1, 32.3], ["Akkerman", 181.3, 37.1], ["Azak", 221.8, 28.2], ["Kars", 245.6, 67.9], ["Batum", 237.2, 62.5], ["Rodos", 171.9, 101.3], ["Midilli", 163.2, 83.6], ["Malatya", 223.6, 85.4], ["Kayseri", 209.1, 84.8], ["Hama", 217.4, 107.8], ["Urfa", 227.0, 93.0], ["Mardin", 236.8, 91.2], ["Kerkük", 257.7, 100.0], ["Hille", 260.9, 119.5], ["Gadames", 66.7, 133.2], ["Sirte", 107.1, 131.8], ["Biskra", 52.3, 98.4], ["Siva Vahası", 156.5, 148.3], ["Nubya", 192.3, 198.4], ["Dongola", 186.4, 213.5], ["Tebük", 220.4, 151.7], ["Asir", 261.7, 214.2], ["Taiz", 274.0, 242.7], ["Erdel", 151.0, 32.8], ["Varad", 143.5, 30.5], ["Bucak", 177.6, 36.5], ["Manisa", 167.7, 86.9], ["Kütahya", 181.0, 81.6], ["Amasya", 209.6, 71.9], ["Sinop", 205.7, 63.3], ["Elbasan", 131.8, 68.9], ["Şkodra", 129.5, 62.2], ["Dobruca", 173.2, 48.3], ["Hersek", 122.2, 53.5], ["Mohaç", 128.4, 36.4], ["Vidin", 146.7, 50.9], ["Akka", 209.8, 122.9], ["Dimyat", 192.1, 133.7], ["Fayyum", 186.8, 147.6], ["Hicaz", 231.2, 163.2], ["Kuveyt", 283.5, 136.2], ["Zeyla", 272.1, 258.0]] };
@@ -4179,6 +4187,9 @@ function drawNav(now) {
       const rise = Math.min(1, u / .28);
       const ph = 46 * (1 - Math.pow(1 - rise, 3));
       g.save();
+      g.translate(bx, by);
+      g.scale(1.4, 1.4);
+      g.translate(-bx, -by);
       g.globalAlpha = fade;
       g.fillStyle = 'rgba(0,0,0,.3)';
       g.beginPath();
@@ -4248,6 +4259,9 @@ function drawNav(now) {
       const R0 = 36;
       const fade = u > .7 ? Math.max(0, (1 - u) / .3) : 1;
       g.save();
+      g.translate(bx, by);
+      g.scale(1.35, 1.35);
+      g.translate(-bx, -by);
       g.lineCap = 'round';
       const strike = (x0, y0, x1, y1, p) => {
         if (p <= 0)
@@ -4323,8 +4337,8 @@ function drawNav(now) {
         const dead = dd > 0 && pj >= dd;
         const pp = dead ? dd : pj;
         const d = e.lo - 8 + span * pp;
-        const px = bx + e.dx * d + nx * (o * 14 + e.lat[j]);
-        const py = by + e.dy * d + ny * (o * 14 + e.lat[j]);
+        const px = bx + e.dx * d + nx * (o * 17 + e.lat[j]);
+        const py = by + e.dy * d + ny * (o * 17 + e.lat[j]);
         g.globalAlpha = fade;
         if (dead) {
           // Düşen asker: yere yığılır, kısa bir kırmızı kıvılcım, sonra solar.
@@ -4334,7 +4348,7 @@ function drawNav(now) {
           g.save();
           g.translate(px, py - 4);
           g.rotate(dir * q * 1.45);
-          g.scale(.86, .86);
+          g.scale(1.12, 1.12);
           soldierFig(0, 0, dir, e.col, .9, false, 0);
           g.restore();
           if (el - tD < 400) {
@@ -4359,14 +4373,14 @@ function drawNav(now) {
         }
         g.save();
         g.translate(px, py - 5 + bob);
-        g.scale(.86, .86);
+        g.scale(1.12, 1.12);
         soldierFig(0, 0, dir, e.col, sw, false, arrived ? 0 : s * 12 + j * 1.3);
         g.restore();
         if (arrived) {
           // Kılıç ucunda parıltı
           const a = -2.2 + sw * 2.6;
-          const tx = px + dir * (2.6 + Math.cos(a) * 10) * .86;
-          const ty = py - 5 + bob + (-2.5 + Math.sin(a) * 10) * .86;
+          const tx = px + dir * (2.6 + Math.cos(a) * 10) * 1.12;
+          const ty = py - 5 + bob + (-2.5 + Math.sin(a) * 10) * 1.12;
           const tw2 = .6 + .4 * Math.sin(el / 70 + j);
           g.fillStyle = `rgba(255,246,214,${(.9 * tw2).toFixed(2)})`;
           g.beginPath();
@@ -4809,7 +4823,8 @@ const zfill = () => {
 const zmax = () => Math.max(3.5 * S / 4, zfill() * 1.4);
 const zclamp = k => Math.min(zmax(), Math.max(zmin(), k));
 // Oyun başında kullanılan rahat okuma yakınlığı.
-const zread = () => Math.max(zfill(), .7 * W * S / (mw.clientWidth || innerWidth));
+// Oyun başındaki rahat okuma yakınlığı: haritanın bir pikseli ekranda yaklaşık bir piksel (yapılar net seçilsin).
+const zread = () => Math.min(zmax(), Math.max(zfill(), 1.05 * W * S / (mw.clientWidth || innerWidth)));
 function focusOn(t, k) {
   const G = zins();
   zk = zclamp(k || zk);
@@ -4890,6 +4905,8 @@ function init(noDraft, seed) {
   archV = Array(N).fill(0);
   catXp = Array(N).fill(0);
   taxEvery = 2;
+  taxAuto = true;
+  taxTip = false;
   allyAsked = false;
   spySel = null;
   aspy = {};
@@ -4949,6 +4966,10 @@ function start(p) {
   spySel = null;
   if (p == 0) {
     soloStart();
+    if (taxAuto && !ONLINE)
+      taxSmart();
+    if (!taxTip && !TUT && !ONLINE && (taxTip = true))
+      hl += ' 💡 Vergiler otomatik: iç bölgelerin 2, sınır bölgelerin 1 altın veriyor. Değiştirmek istersen bir bölgene basılı tut → 💰 Vergi.';
     ext = 0;
     supT.clear();
     spyMade = 0;
@@ -7285,6 +7306,7 @@ function layout(t) {
   };
   const tryAt = (sc, force) => {
     const used = BADGE.map(([a, b, c2, d]) => [X + a, Y + b, X + c2, Y + d]);
+    const icons = used.slice();
     const res = { key };
     let pen = 0;
     for (const k of FORD) {
@@ -7297,12 +7319,16 @@ function layout(t) {
       let bs = 1e9;
       for (const [x, y, d2] of C) {
         const rs = F.map(([a, b, c2, d]) => [x + a * sc, y + b * sc, x + c2 * sc, y + d * sc]);
-        const ov = rs.some(r => used.some(R => hit(r, R)));
+        // Asıl simge (ilk dikdörtgen) başka simgelerin ve asker dairesinin üstüne binmez, bölgenin içinde kalır;
+        // yanındaki hareketli sahne (ikinci dikdörtgen) biraz taşabilir ve başka sahnelerle kesişebilir.
+        const ov = used.some(R => hit(rs[0], R)) || rs.slice(1).some(r => icons.some(R => hit(r, R)));
         if (!force && ov)
           continue;
-        const of = Math.max(...rs.map(r => outF(...r)));
+        const ofI = outF(...rs[0]);
+        const ofS = rs.length > 1 ? Math.max(...rs.slice(1).map(r => outF(...r))) : 0;
+        const of = Math.max(ofI, ofS * .3);
         if (!force) {
-          if (of <= .06) {
+          if (ofI <= .05 && ofS <= .35) {
             best = [x, y, rs];
             break;
           }
@@ -7321,17 +7347,18 @@ function layout(t) {
       }
       res[k] = [best[0], best[1], sc];
       used.push(...best[2]);
+      icons.push(best[2][0]);
       pen += bs < 1e9 ? bs : 0;
     }
     return res;
   };
   const s0 = lsc(t);
   let R = null;
-  for (const f of [1, .9, .8, .72, .64, .57])
+  for (const f of [1, .9, .8, .72, .66])
     if ((R = tryAt(s0 * f, false)))
       break;
   if (!R)
-    R = tryAt(s0 * .57, true);
+    R = tryAt(s0 * .66, true);
   return (layC[t] = R);
 }
 // Sığan en büyük ölçek %33 büyütülür (çok küçük kalmasın diye), tam boyu geçmez.
@@ -7354,7 +7381,9 @@ function bCount(t) {
     n++;
   return n;
 }
-const lsc = t => [1, 1, .9, .8, .72, .65, .6, .56][Math.min(7, bCount(t))];
+// BSC: yapıların genel büyüklüğü (bölgeler büyüdüğü için yapılar da büyütüldü, uzaktan da seçilsinler).
+const BSC = 1.4;
+const lsc = t => BSC * [1, 1, .9, .8, .72, .65, .6, .56][Math.min(7, bCount(t))];
 function slotXY(t, k) {
   const L = cell && cen && cen[t] ? layout(t)[k] : null;
   if (L)
@@ -9770,7 +9799,7 @@ function cellAt(cx, cy) {
 }
 // Yapı panelinin sekmeleri: her düğme bir kategoriye aittir.
 const POP_TABS = [['y', '🏰', 'Yapılar'], ['o', '⚔️', 'Ordu'], ['d', '⚓', 'Deniz'], ['v', '💰', 'Vergi']];
-const POP_CAT = { txf: 'v', b: 'y', ub: 'y', m: 'y', um: 'y', dp: 'y', udp: 'y', w: 'y', u: 'y', uw: 'y', cm: 'y', c: 'o', g: 'o', k: 'o', f: 'o', d: 'd', ud: 'd', ss: 'd', sl: 'd', sf: 'd', mn: 'd', sc: 'd', ct: 'o', cf: 'o', tx1: 'v', tx2: 'v', txa: 'v', txs: 'v' };
+const POP_CAT = { txf: 'v', txm: 'v', b: 'y', ub: 'y', m: 'y', um: 'y', dp: 'y', udp: 'y', w: 'y', u: 'y', uw: 'y', cm: 'y', c: 'o', g: 'o', k: 'o', f: 'o', d: 'd', ud: 'd', ss: 'd', sl: 'd', sf: 'd', mn: 'd', sc: 'd', ct: 'o', cf: 'o', tx1: 'v', tx2: 'v', txa: 'v', txs: 'v' };
 let popTab = 'y';
 let popT = -1;
 let popPos = null;
@@ -10004,11 +10033,13 @@ function openPop(cx, cy) {
     const brd = isBorder(t);
     for (let v = 1; v <= 2; v++)
       o.push(['tx' + v, String(v), true]);
-    o.push(['txs', 'Akıllı vergi: iç bölgeler 2, sınırlar 1', true]);
+    o.push(['txs', taxAuto ? '🤖 Otomatik vergi açık ✓ (iç 2, sınır 1)' : '🤖 Otomatik vergiyi aç (iç 2, sınır 1)', true]);
+    if (taxAuto)
+      o.push(['txm', '✋ Vergiyi kendim ayarlayacağım', true]);
     o.push(['txf', taxEvery == 1 ? '⏱ Vergi her tur toplanıyor (2 turda bire çevir)' : '⏱ Vergi 2 turda bir toplanıyor (her tura çevir)', true]);
     o.push(['txa', `Tüm bölgelerime ${tax[t]} altın uygula`, true]);
     const nTax = taxEvery == 1 ? 'Her tur' : rd % 2 == 0 ? 'Bu tur toplandı; sonraki 2 tur sonra' : 'Gelecek tur';
-    inf.v = `${brd ? '<b>Sınır bölgesi.</b>' : '<b>İç bölge.</b>'} ${taxEvery == 1 ? 'Her tur' : '2 turda bir'} <b>${tax[t]} altın</b> verir. Toplam: ${taxOf(0)} altın. ${nTax} toplanacak.<br>` +
+    inf.v = (taxAuto ? '<b>🤖 Otomatik vergi açık:</b> her tur başında iç bölgeler 2, sınır bölgeleri 1 altına ayarlanır; bir şey yapmana gerek yok.<br>' : '<b>✋ Vergiyi sen ayarlıyorsun.</b> Kolayı için Otomatik vergiyi açabilirsin.<br>') + `${brd ? '<b>Sınır bölgesi.</b>' : '<b>İç bölge.</b>'} ${taxEvery == 1 ? 'Her tur' : '2 turda bir'} <b>${tax[t]} altın</b> verir. Toplam: ${taxOf(0)} altın. ${nTax} toplanacak.<br>` +
       (brd ? `Sınır bölgeleri 1 altın verir; 2 istersen her toplamada o bölgede isyan çıkma ihtimali olur (${taxEvery == 1 ? 'her tur toplanırken %15' : '2 turda bir toplanırken %5'}).` : 'İç bölgeler 2 altını sorunsuz verir. 1 altında halk memnun olur.') +
       (brd && tax[t] >= 2 ? `<em class="tx-warn">⚠ Sınır bölgesinden 2 altın: her toplamada %${taxEvery == 1 ? 15 : 5} isyan ihtimali!</em>` : '');
     if (inc[t] > 0) {
@@ -10081,7 +10112,7 @@ function openPop(cx, cy) {
         const tk = !TUT || tutOK('tab', c, true);
         return `<button data-tab="${c}" class="${c == popTab ? 'on' : ''} ${TUT && tk && c != popTab ? 'tut-hl' : ''}" ${tk ? '' : 'disabled'}><i>${ic}</i>${nm}${n ? `<em>${n}</em>` : ''}</button>`;
       }).join('')}</div>` : '') +
-      (ti ? `<span>${ti}</span>` : '') + (popTab == 'v' ? `<div class="tx-row">${list.filter(e => e[0] == 'tx1' || e[0] == 'tx2').map(([k, l]) => `<button data-k="${k}" class="${+l == tax[t] ? 'on' : ''} ${+l >= 2 && isBorder(t) ? 'hot' : ''}" ${!TUT || tutOK('k', k, true) ? '' : 'disabled'}>${l} altın</button>`).join('')}</div>` + list.filter(e => e[0] == 'txa' || e[0] == 'txs' || e[0] == 'txf').map(btn).join('') : list.map(btn).join(''));
+      (ti ? `<span>${ti}</span>` : '') + (popTab == 'v' ? `<div class="tx-row">${list.filter(e => e[0] == 'tx1' || e[0] == 'tx2').map(([k, l]) => `<button data-k="${k}" class="${+l == tax[t] ? 'on' : ''} ${+l >= 2 && isBorder(t) ? 'hot' : ''}" ${!TUT || tutOK('k', k, true) ? '' : 'disabled'}>${l} altın</button>`).join('')}</div>` + list.filter(e => e[0] == 'txs' || e[0] == 'txm' || e[0] == 'txa' || e[0] == 'txf').map(btn).join('') : list.map(btn).join(''));
   }
   else
     pop.innerHTML = `<b>${PN[own[t]] + ' krallığı'}</b>` + (info ? `<span>${info}</span>` : '') + o.map(btn).join('');
@@ -10172,6 +10203,12 @@ function openPop(cx, cy) {
       re();
       return;
     }
+    if (k == 'txm') {
+      taxAuto = false;
+      $('log').textContent = 'Otomatik vergi kapandı. Artık her bölgenin vergisini sen belirliyorsun (1 ya da 2 altın).';
+      re();
+      return;
+    }
     if (k == 'txf') {
       taxEvery = taxEvery == 1 ? 2 : 1;
       $('log').textContent = taxEvery == 1 ? `Vergi artık her tur toplanacak (${taxOf(0)} altın/tur). Sınırdan 2 altın istediğin her bölgede her tur %15 isyan ihtimali var.` : `Vergi artık 2 turda bir toplanacak. Sınırdan 2 altın istediğin bölgelerde her toplamada %5 isyan ihtimali var.`;
@@ -10179,6 +10216,10 @@ function openPop(cx, cy) {
       return;
     }
     if (k.startsWith('tx')) {
+      if (k == 'txs')
+        taxAuto = true;
+      else
+        taxAuto = false;
       if (k == 'txa' || k == 'txs') {
         let n = 0;
         let nb2 = 0;
@@ -10189,12 +10230,12 @@ function openPop(cx, cy) {
               nb2++;
             n++;
           }
-        $('log').textContent = `${n} bölgende vergi ayarlandı. ${taxEvery == 1 ? 'Her tur' : '2 turda bir'} toplam ${taxOf(0)} altın.` + (nb2 ? ` Uyarı: ${nb2} sınır bölgesinden 2 altın istiyorsun; her toplamada %${taxEvery == 1 ? 15 : 5} isyan ihtimali var.` : '');
+        $('log').textContent = (k == 'txs' ? 'Otomatik vergi açık: sınırlar değiştikçe her tur kendiliğinden ayarlanır. ' : 'Otomatik vergi kapandı. ') + `${n} bölgende vergi ayarlandı. ${taxEvery == 1 ? 'Her tur' : '2 turda bir'} toplam ${taxOf(0)} altın.` + (nb2 ? ` Uyarı: ${nb2} sınır bölgesinden 2 altın istiyorsun; her toplamada %${taxEvery == 1 ? 15 : 5} isyan ihtimali var.` : '');
       }
       else {
         const v = +k[2];
         tax[t] = v;
-        $('log').textContent = `${NM[t]}: ${taxEvery == 1 ? 'her tur' : '2 turda bir'} ${v} altın vergi.` + (v >= 2 && isBorder(t) ? ` Uyarı: sınır bölgesinden 2 altın istemek her toplamada %${taxEvery == 1 ? 15 : 5} isyan ihtimali doğurur.` : v == 1 ? ' Halk memnun.' : '');
+        $('log').textContent = `Otomatik vergi kapandı. ${NM[t]}: ${taxEvery == 1 ? 'her tur' : '2 turda bir'} ${v} altın vergi.` + (v >= 2 && isBorder(t) ? ` Uyarı: sınır bölgesinden 2 altın istemek her toplamada %${taxEvery == 1 ? 15 : 5} isyan ihtimali doğurur.` : v == 1 ? ' Halk memnun.' : '');
       }
       re();
       return;
@@ -11787,7 +11828,7 @@ const TS = [
   tutBuild('Seviye sistemi', 'Yapıların 3 seviyesi vardır ve her seviye yeni bir güç açar. <b>Kışla:</b> sv1 +2, sv2 +4 asker/tur ve casus üretimi, sv3 +6 ve dolunca askerleri kendiliğinden sınıra yollar. <b>Maden:</b> her seviye +' + MI + ' altın; her yeni maden 5 altın daha pahalıdır (en fazla 80). <b>Sandık:</b> 50 / 70 / 100 kapasite. Kule, iskele ve surun da seviyeleri var. Şimdi başkentine basılı tut ve <b>Kışlayı yükselt</b>.', 'ub', 'y', UPC, () => bar[cap[0]] >= 2),
   tutBuild('Maden', 'Altın üç yerden gelir: bölgelerinden en fazla 15 altın temel gelir, madenler ve vergi. Madenler gelirini büyütmenin en güvenli yoludur. Başkentine basılı tut ve <b>Maden</b> kur.', 'm', 'y', MC(0), () => mn[cap[0]] >= 1),
   tutBuild('Altın sandığı', 'Altının bir sınırı vardır: <b>altın sandıklarının toplam kapasitesi</b>. Başkentinde 50\'lik bir sandık hazır gelir; sığmayan altın kaybolur. Sandığı yükseltebilir ya da başka bölgelere yenisini kurabilirsin. Dikkat: sandıklı bir bölge fethedilirse içindeki altının yarısı yağmalanır! Başkentine basılı tut ve <b>Sandığı yükselt</b>.', 'udp', 'y', DPU[1], () => dep[cap[0]] >= 2),
-  { t: 'Vergi', p: 'Her bölgen <b>2 turda bir</b> vergi verir. <b>İç bölgeler</b> 2 altın verebilir; <b>sınır bölgeleri</b> 1 altın vermeli. Sınır bölgesinden 2 altın istersen halk kızar: refah düşer ve orada isyan çıkabilir. Başkentine basılı tut, <b>Vergi</b> sekmesini aç ve <b>Akıllı vergi</b>ye dokun: iç bölgeler 2, sınırlar 1 olur.',
+  { t: 'Vergi', p: 'Her bölgen <b>2 turda bir</b> vergi verir. <b>İç bölgeler</b> 2 altın verebilir; <b>sınır bölgeleri</b> 1 altın vermeli. Sınır bölgesinden 2 altın istersen halk kızar: refah düşer ve orada isyan çıkabilir. Normalde vergiler <b>otomatik</b> ayarlanır: iç bölgeler 2, sınırlar 1. İstersen kendin de ayarlayabilirsin. Başkentine basılı tut, <b>Vergi</b> sekmesini aç ve <b>Otomatik vergi</b> düğmesine dokun.',
     allow: { lp: capOnly, tab: ['v'], k: ['txs'] },
     enter: () => {
       tutT = [cap[0]];
