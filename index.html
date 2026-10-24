@@ -4876,8 +4876,6 @@ function camGlide(tx, ty, ms) {
 async function camShow(a, t) {
   if (!camFollow || turn == 0 || !cen || over || dr || document.body.classList.contains('mbg'))
     return;
-  if (!(own[t] == 0 || Vg.has(t) || Vg.has(a)))
-    return;
   const G = zins();
   if (zk <= zmin() * 1.08)
     return;
@@ -5301,7 +5299,7 @@ function next() {
 // a bölgesinden t bölgesine saldırı. F verilirse sadece F asker savaşır (gemi çıkarması).
 async function battle(a, t, sea, F) {
   await camShow(a, t);
-  // Savaş müziği: sen ya da görünen bir bölgede savaş olunca mehter davulları girer.
+  // Savaş müziği katmanı (şu an kapalı).
   if (own[a] == 0 || own[t] == 0 || Vg.has(t))
     Mus.war();
   // Surlu bölge: sv1 en az 10, sv2 en az 15 askerle saldırılabilir ve surlar her zaman aşılamaz.
@@ -5322,7 +5320,8 @@ async function battle(a, t, sea, F) {
       return;
     }
   }
-  if (own[a] == 0 || own[t] == 0) {
+  // Çarpışma işareti: senin savaşlarında hep, kamera takibi açıkken bütün savaşlarda.
+  if (own[a] == 0 || own[t] == 0 || (camFollow && !ONLINE)) {
     nav.push({ k: 'clash', t, t0: performance.now(), dur: 480, col: COL[own[a]] });
     await sleep(420);
   }
@@ -5462,7 +5461,7 @@ async function conquerFx(a, t, old) {
   const idx = regCells(t);
   for (const i of idx)
     ov[i] = old;
-  const vis = own[a] == 0 || old == 0 || Vg.has(t) || Vg.has(a);
+  const vis = own[a] == 0 || old == 0 || Vg.has(t) || Vg.has(a) || camFollow;
   const now = performance.now();
   const [cx, cy] = cen[t];
   const fromC = () => idx.slice().sort((p, r) => Math.hypot(p % W - cx, ((p / W) | 0) - cy) - Math.hypot(r % W - cx, ((r / W) | 0) - cy));
@@ -5988,7 +5987,7 @@ function moveCap(p, t) {
 // Başkent ikinci kez düşünce bütün topraklar fethedene geçer.
 async function fall(old, me, t) {
   $('log').textContent = old == 0 ? `Başkentin düştü! Ordun zayıftı (50 askerden az), tüm toprakların ${PN[me]} tarafına geçti.` : `${PN[old]} başkentini kaybetti! Ordusu zayıftı (50 askerden az), tüm toprakları ${PN[me]} tarafına geçti.`;
-  if (old != 0 && (me == 0 || Vg.has(t)))
+  if (old != 0)
     setTimeout(() => banner(`${PN[old]} tümüyle işgal edildi!`, COL[me]), 200);
   const ord = [];
   const seen = new Set([t]);
