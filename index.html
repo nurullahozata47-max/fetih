@@ -1375,6 +1375,22 @@ main {
   line-height: 1.25;
   margin: 0 0 6px;
 }
+#camb {
+  flex: none;
+  margin-left: auto;
+  margin-right: 6px;
+  padding: 2px 8px;
+  font-size: 15px;
+  line-height: 1.2;
+  border-radius: 6px;
+}
+#camb.off {
+  opacity: .4;
+  text-decoration: line-through;
+}
+#camb + #musb {
+  margin-left: 0;
+}
 #musb {
   flex: none;
   margin-left: auto;
@@ -1722,7 +1738,7 @@ input, textarea {
 <main>
   <!-- Üst bilgi şeridi (haritanın üstünde yüzer) -->
   <div id="hudT">
-    <div class="ht-row"><h1 id="ttl">Fetih</h1><button id="musb" class="mus-tg" aria-label="Müzik">🔊</button><button id="fsb" hidden aria-label="Tam ekran">⛶</button></div>
+    <div class="ht-row"><h1 id="ttl">Fetih</h1><button id="camb" aria-label="Kamera savaşları takip etsin">🎥</button><button id="musb" class="mus-tg" aria-label="Müzik">🔊</button><button id="fsb" hidden aria-label="Tam ekran">⛶</button></div>
     <!-- Üst kutucuklar: devletler, bölge sayıları, altın -->
     <div id="chips"></div>
   </div>
@@ -4825,6 +4841,80 @@ const zclamp = k => Math.min(zmax(), Math.max(zmin(), k));
 // Oyun başında kullanılan rahat okuma yakınlığı.
 // Oyun başındaki rahat okuma yakınlığı: haritanın bir pikseli ekranda yaklaşık bir piksel (yapılar net seçilsin).
 const zread = () => Math.min(zmax(), Math.max(zfill(), 1.05 * W * S / (mw.clientWidth || innerWidth)));
+// ---- Savaş kamerası: başka devletlerin sırasında kamera saldırının olduğu yere kayar, senin sıran gelince geri döner ----
+let camFollow = true;
+try {
+  camFollow = localStorage.getItem('fetih_cam') != '0';
+}
+catch (e) { }
+let camSaved = null;
+let camAnim = 0;
+// Kamerayı (zx, zy) hedefine yumuşakça kaydırır; yakınlık aynı kalır.
+function camGlide(tx, ty, ms) {
+  const sx = zx;
+  const sy = zy;
+  const t0 = performance.now();
+  const id = ++camAnim;
+  return new Promise(res => {
+    const f = now => {
+      if (id != camAnim)
+        return res();
+      const u = Math.min(1, (now - t0) / ms);
+      const e = u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+      zx = sx + (tx - sx) * e;
+      zy = sy + (ty - sy) * e;
+      zapply();
+      if (u < 1)
+        requestAnimationFrame(f);
+      else
+        res();
+    };
+    requestAnimationFrame(f);
+  });
+}
+// Saldırıyı göster: saldıran ve hedef bölgenin ortası ekranın ortasına gelir (zaten görünüyorsa kaymaz).
+async function camShow(a, t) {
+  if (!camFollow || turn == 0 || !cen || over || dr || document.body.classList.contains('mbg'))
+    return;
+  if (!(own[t] == 0 || Vg.has(t) || Vg.has(a)))
+    return;
+  const G = zins();
+  if (zk <= zmin() * 1.08)
+    return;
+  const cw = G.w * zk;
+  const ch = G.w * H / W * zk;
+  const mx = (cen[a][0] + cen[t][0]) / 2;
+  const my = (cen[a][1] + cen[t][1]) / 2;
+  // Ekrandaki konumu: kenarlara yakın değilse kaydırmaya gerek yok.
+  const px = zx + mx / W * cw;
+  const py = zy + my / H * ch;
+  if (px > G.fw * .2 && px < G.fw * .8 && py > G.t + G.fh * .22 && py < G.t + G.fh * .78)
+    return;
+  if (!camSaved)
+    camSaved = { zx, zy, zk };
+  await camGlide(G.fw / 2 - mx / W * cw, G.t + G.fh / 2 - my / H * ch, 450);
+}
+// Senin sıran gelince kamera, bot sıralarından önceki yerine döner.
+function camBack() {
+  if (!camSaved)
+    return;
+  const c = camSaved;
+  camSaved = null;
+  if (Math.abs(c.zk - zk) > .01)
+    return;
+  camGlide(c.zx, c.zy, 500);
+}
+// Oyuncu haritayı kendisi kaydırırsa kamera hareketi durur ve geri dönüş iptal olur.
+cv.addEventListener('pointerdown', () => {
+  camAnim++;
+  if (turn != 0)
+    camSaved = null;
+});
+function camBtn() {
+  const b = document.getElementById('camb');
+  if (b)
+    b.classList.toggle('off', !camFollow);
+}
 function focusOn(t, k) {
   const G = zins();
   zk = zclamp(k || zk);
@@ -4966,6 +5056,7 @@ function start(p) {
   spySel = null;
   if (p == 0) {
     soloStart();
+    camBack();
     if (taxAuto && !ONLINE)
       taxSmart();
     if (!taxTip && !TUT && !ONLINE && (taxTip = true))
@@ -5209,6 +5300,7 @@ function next() {
 // ======================================================================
 // a bölgesinden t bölgesine saldırı. F verilirse sadece F asker savaşır (gemi çıkarması).
 async function battle(a, t, sea, F) {
+  await camShow(a, t);
   // Savaş müziği: sen ya da görünen bir bölgede savaş olunca mehter davulları girer.
   if (own[a] == 0 || own[t] == 0 || Vg.has(t))
     Mus.war();
@@ -9056,6 +9148,7 @@ function catUp(a) {
     hl += ` ${PN[own[a]]} mancınıkları rütbe aldı.`;
 }
 async function catapult(a, t) {
+  await camShow(a, t);
   const p = own[a];
   catCd[a] = rd;
   const n = Math.max(1, cat[a]);
@@ -13864,6 +13957,16 @@ const Mus = (() => {
   };
 })();
 $('musb').onclick = () => Mus.toggle();
+$('camb').onclick = () => {
+  camFollow = !camFollow;
+  try {
+    localStorage.setItem('fetih_cam', camFollow ? '1' : '0');
+  }
+  catch (e) { }
+  camBtn();
+  $('log').textContent = camFollow ? '🎥 Savaş kamerası açık: başka devletlerin sırasında kamera saldırıların olduğu yere gider, senin sıran gelince geri döner.' : '🎥 Savaş kamerası kapalı: kamera hep senin baktığın yerde kalır.';
+};
+camBtn();
 document.getElementById('mnMus').onclick = () => Mus.toggle();
 document.getElementById('mnTrk').onclick = () => Mus.nextTrack();
 document.getElementById('mnVol').oninput = e => Mus.setVol(e.target.value / 100);
