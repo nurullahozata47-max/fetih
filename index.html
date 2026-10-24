@@ -4255,7 +4255,7 @@ function drawNav(now) {
         const pe = Math.min(1, p);
         const ex = x0 + (x1 - x0) * pe;
         const ey = y0 + (y1 - y0) * pe;
-        [[12, 'rgba(255,211,107,.22)'], [6, 'rgba(255,240,190,.55)'], [2.6, '#ffffff']].forEach(([w, c]) => {
+        [[10, 'rgba(255,211,107,.1)'], [5, 'rgba(255,240,190,.28)'], [2.2, 'rgba(255,255,255,.75)']].forEach(([w, c]) => {
           g.strokeStyle = c;
           g.lineWidth = w;
           g.beginPath();
@@ -4264,7 +4264,7 @@ function drawNav(now) {
           g.stroke();
         });
         if (p < 1.15) {
-          g.fillStyle = '#fff';
+          g.fillStyle = 'rgba(255,255,255,.7)';
           g.beginPath();
           g.arc(ex, ey, 3.2, 0, 7);
           g.fill();
@@ -4278,8 +4278,8 @@ function drawNav(now) {
         const w = (u - .42) / .58;
         g.globalAlpha = fade * Math.max(0, 1 - w * 1.4);
         const gr = g.createRadialGradient(bx, by, 0, bx, by, 26 + w * 30);
-        gr.addColorStop(0, 'rgba(255,255,255,.9)');
-        gr.addColorStop(.4, 'rgba(255,211,107,.5)');
+        gr.addColorStop(0, 'rgba(255,255,255,.45)');
+        gr.addColorStop(.4, 'rgba(255,211,107,.22)');
         gr.addColorStop(1, 'rgba(255,211,107,0)');
         g.fillStyle = gr;
         g.beginPath();
@@ -4302,40 +4302,94 @@ function drawNav(now) {
       return;
     }
     if (e.k == 'cmarch') {
-      // Fetih yürüyüşü: dört küçük asker saldırı yönünden girip bölgeyi baştan sona geçer.
+      // Fetih yürüyüşü: dört asker saldırı yönünden girer; kimi önde kimi geride, 1-2 tanesi yolda düşer.
+      // Öbür uca varanlar kılıçlarını havaya kaldırıp zafer sevinci yapar.
       if (u < 0 || u > 1)
         return;
       const bx = cen[e.t][0] * S;
       const by = cen[e.t][1] * S;
-      const D = e.dur - 500;
+      const D = e.D;
       const el = now - e.t0;
-      const pr = Math.min(1, el / D);
-      const d = e.lo - 8 + (e.hi - e.lo + 4) * pr;
       const nx = -e.dy;
       const ny = e.dx;
-      const fade = el > D ? Math.max(0, 1 - (el - D) / 500) : Math.min(1, el / 200);
+      const tot = e.dur;
+      const fade = el > tot - 400 ? Math.max(0, (tot - el) / 400) : Math.min(1, el / 200);
       const dir = e.dx >= 0 ? 1 : -1;
+      const span = e.hi - e.lo + 4;
       g.save();
-      g.globalAlpha = fade;
       [-1.5, -.5, .5, 1.5].forEach((o, j) => {
-        const lag = (j % 2) * 5;
-        const px = bx + e.dx * (d - lag) + nx * o * 17;
-        const py = by + e.dy * (d - lag) + ny * o * 17;
+        const pj = Math.min(1, (el / D) * e.sp[j]);
+        const dd = e.die[j];
+        const dead = dd > 0 && pj >= dd;
+        const pp = dead ? dd : pj;
+        const d = e.lo - 8 + span * pp;
+        const px = bx + e.dx * d + nx * (o * 14 + e.lat[j]);
+        const py = by + e.dy * d + ny * (o * 14 + e.lat[j]);
+        g.globalAlpha = fade;
+        if (dead) {
+          // Düşen asker: yere yığılır, kısa bir kırmızı kıvılcım, sonra solar.
+          const tD = (dd / e.sp[j]) * D;
+          const q = Math.min(1, (el - tD) / 300);
+          g.globalAlpha = fade * Math.max(0, 1 - Math.max(0, el - tD - 700) / 600);
+          g.save();
+          g.translate(px, py - 4);
+          g.rotate(dir * q * 1.45);
+          g.scale(.86, .86);
+          soldierFig(0, 0, dir, e.col, .9, false, 0);
+          g.restore();
+          if (el - tD < 400) {
+            const w = (el - tD) / 400;
+            for (let k2 = 0; k2 < 6; k2++) {
+              const an = k2 * 1.05 + j;
+              g.globalAlpha = fade * (1 - w);
+              g.fillStyle = '#d6232f';
+              g.fillRect(px + Math.cos(an) * (3 + w * 9) - 1, py - 8 + Math.sin(an) * (3 + w * 7) - 1, 2, 2);
+            }
+          }
+          return;
+        }
+        const arrived = pj >= 1;
+        let bob = 0;
+        let sw = 0;
+        if (arrived) {
+          // Zafer: zıplar ve kılıcını başının üstünde sallar.
+          const ta = el - D / e.sp[j];
+          bob = -Math.abs(Math.sin(ta / 110)) * 4;
+          sw = .12 + Math.abs(Math.sin(ta / 160)) * .2;
+        }
         g.save();
-        g.translate(px, py - 6);
-        g.scale(1.15, 1.15);
-        soldierFig(0, 0, dir, e.col, el < D ? 0 : .6, false, el < D ? s * 12 + j * 1.3 : 0);
+        g.translate(px, py - 5 + bob);
+        g.scale(.86, .86);
+        soldierFig(0, 0, dir, e.col, sw, false, arrived ? 0 : s * 12 + j * 1.3);
         g.restore();
+        if (arrived) {
+          // Kılıç ucunda parıltı
+          const a = -2.2 + sw * 2.6;
+          const tx = px + dir * (2.6 + Math.cos(a) * 10) * .86;
+          const ty = py - 5 + bob + (-2.5 + Math.sin(a) * 10) * .86;
+          const tw2 = .6 + .4 * Math.sin(el / 70 + j);
+          g.fillStyle = `rgba(255,246,214,${(.9 * tw2).toFixed(2)})`;
+          g.beginPath();
+          g.moveTo(tx, ty - 3.5);
+          g.lineTo(tx + .9, ty - .9);
+          g.lineTo(tx + 3.5, ty);
+          g.lineTo(tx + .9, ty + .9);
+          g.lineTo(tx, ty + 3.5);
+          g.lineTo(tx - .9, ty + .9);
+          g.lineTo(tx - 3.5, ty);
+          g.lineTo(tx - .9, ty - .9);
+          g.closePath();
+          g.fill();
+        }
+        // Ayak tozu
+        if (!arrived) {
+          g.globalAlpha = fade * .22;
+          g.fillStyle = '#e9dcc0';
+          g.beginPath();
+          g.arc(px - e.dx * 7, py - e.dy * 7 + 3, 2.6, 0, 7);
+          g.fill();
+        }
       });
-      // Arkada kalan toz
-      for (let i = 0; i < 6; i++) {
-        const b = d - 10 - i * 5;
-        g.globalAlpha = fade * .25 * (1 - i / 6);
-        g.fillStyle = '#e9dcc0';
-        g.beginPath();
-        g.arc(bx + e.dx * b + nx * ((i % 3) - 1) * 10, by + e.dy * b + ny * ((i % 3) - 1) * 10 + 3, 3 + i * .6, 0, 7);
-        g.fill();
-      }
       g.restore();
       return;
     }
@@ -5326,8 +5380,17 @@ async function conquerFx(a, t, old) {
     const lo = pr(q[0]);
     const hi = pr(q[q.length - 1]);
     const D = 1900;
-    if (vis)
-      nav.push({ k: 'cmarch', t, dx, dy, lo: lo * S, hi: hi * S, col: COL[own[a]], t0: now, dur: D + 500 });
+    if (vis) {
+      // Her asker kendi hızında ilerler; 1-2 tanesi yolda düşer.
+      const sp = [0, 1, 2, 3].map(() => .84 + Math.random() * .3);
+      const die = [-1, -1, -1, -1];
+      const nd = Math.random() < .6 ? 1 : 2;
+      for (let c0 = 0; c0 < nd; c0++)
+        die[Math.floor(Math.random() * 4)] = .3 + Math.random() * .4;
+      if (die.every(v => v > 0))
+        die[0] = -1;
+      nav.push({ k: 'cmarch', t, dx, dy, lo: lo * S, hi: hi * S, col: COL[own[a]], t0: now, dur: D + 1100, D, sp, die, lat: [0, 1, 2, 3].map(() => Math.random() * 6 - 3) });
+    }
     n = 24;
     dly = D / n;
   }
@@ -12380,13 +12443,26 @@ const amHost = () => {
 // Tek oyunculu tur sayacı: senin turun 30 saniye sürer (animasyonlar ve açık pencereler sayacı durdurur).
 // Süre bitince kalan takviyeler sınır bölgelerine dağıtılır ve tur kendiliğinden biter.
 const SOLO_SEC = 30;
-let soloOn = true;
+// Varsayılan kapalı; zorluk sayfasından açılır. Seçim cihazda saklanır.
+let soloOn = false;
 try {
-  soloOn = localStorage.getItem('fetih_tmr') != '0';
+  soloOn = localStorage.getItem('fetih_tmr') == '1';
 }
 catch (e) { }
 let soloLeft = 0;
 let soloLast = 0;
+// Oyun içinde sayaca dokununca süre kapanır (zorluk sayfasından yeniden açılabilir).
+document.getElementById('tmr').addEventListener('click', () => {
+  if (ONLINE || !soloOn)
+    return;
+  soloOn = false;
+  try {
+    localStorage.setItem('fetih_tmr', '0');
+  }
+  catch (e) { }
+  document.getElementById('tmr').hidden = true;
+  $('log').textContent = 'Süreli tur kapatıldı. Yeniden açmak için: Menü → Oyuna başla → Zorluk sayfasındaki "Süreli tur".';
+});
 function soloStart() {
   soloLeft = SOLO_SEC * 1000;
   soloLast = performance.now();
