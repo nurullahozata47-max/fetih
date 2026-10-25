@@ -898,7 +898,8 @@ button:focus-visible {
 .mn-map.dim {
   opacity: .35;
 }
-#alc {
+#alc,
+#txg {
   position: fixed;
   inset: 0;
   z-index: 95;
@@ -940,6 +941,91 @@ button:focus-visible {
   padding: 14px;
   border-radius: 14px;
   font-size: 16px;
+  font-weight: 800;
+}
+#txgAuto,
+#txgGo {
+  background: linear-gradient(180deg, #ffc955, #f2b134 55%, #dc9a1f);
+  color: #12252e;
+}
+#txgMan {
+  background: rgba(255, 255, 255, .08);
+  border: 2px solid rgba(255, 211, 107, .55);
+  color: #f4efe2;
+}
+#txgAuto small,
+#txgMan small {
+  display: block;
+  font-weight: 400;
+  font-size: 12px;
+  opacity: .8;
+  margin-top: 3px;
+}
+#txg .txg-l {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+  opacity: .85;
+}
+#txg .txg-o {
+  display: flex;
+  gap: 6px;
+}
+#txg .txg-o button {
+  flex: 1;
+  margin: 0;
+  padding: 10px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  background: rgba(255, 255, 255, .06);
+  border: 2px solid rgba(255, 255, 255, .18);
+  color: #f4efe2;
+}
+#txg .txg-o button small {
+  display: block;
+  font-weight: 400;
+  font-size: 11px;
+  opacity: .75;
+}
+#txg .txg-o button.on {
+  border-color: #ffd36b;
+  background: rgba(255, 211, 107, .2);
+}
+#txg .txg-s {
+  margin: 12px 0 0;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, .25);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+}
+#txg .txg-s.warn {
+  border: 1px solid rgba(229, 86, 109, .6);
+}
+/* Gemiyle taşıma paneli */
+#pop .sp-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#pop .sp-row .sp-n {
+  flex: 1;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+}
+#pop .sp-row button {
+  min-width: 40px;
+  padding: 7px 6px;
+  font-size: 15px;
+}
+#pop .sp-go {
+  margin-top: 6px;
+  width: 100%;
+  padding: 10px;
   font-weight: 800;
 }
 #alcEnd {
@@ -1756,7 +1842,7 @@ input, textarea {
       <span class="gd-v">0/50</span>
     </div>
   </div>
-  <div id="rfInfo" hidden>Barışta (saldırmadığın her tur) refah +8 artar. Her başarısız saldırı −4, bir turda 3'ten fazla fetih her biri için −10 düşürür. Vergi 2 turda bir ya da istersen her tur toplanır: sınır bölgelerinden 2 altın istemek o bölgede isyan çıkarabilir (her tur toplanırken %15, 2 turda birde %5); 1 altın vergide halk memnundur. <b>%50</b> altında isyanlar çıkar: kötü huylu olanlar yayılır, bastırılmayan isyanlar bağımsız devlet kurar. <b>%20</b> altında ülken ikiye bölünür.</div>
+  <div id="rfInfo" hidden>Barışta (saldırmadığın her tur) refah +8 artar. Her başarısız saldırı −4, bir turda 3'ten fazla fetih her biri için −10 düşürür. Vergi 2 turda bir ya da istersen her tur toplanır: sınır bölgelerinden 2 altın istemek o bölgede isyan çıkarabilir (her tur toplanırken %15, 2 turda birde %5); 1 altın vergide halk memnundur; 2 turda bir 1 altın alınan bölgelerde askerler dayanıklı olur ve oklar orada en fazla 1-2 asker öldürür, her tur 2 altın alınırsa askerler zayıflar. <b>%50</b> altında isyanlar çıkar: kötü huylu olanlar yayılır, bastırılmayan isyanlar bağımsız devlet kurar. <b>%20</b> altında ülken ikiye bölünür.</div>
   <!-- Harita alanı: deniz (wv), harita (m) ve animasyon katmanı (fxc) üst üste -->
   <div id="mw">
     <div id="bn"></div>
@@ -2086,6 +2172,40 @@ let taxEvery = 2;
 // taxAuto: otomatik vergi (varsayılan açık). Her tur başında iç bölgeler 2, sınır bölgeleri 1 altına ayarlanır.
 let taxAuto = true;
 let taxTip = false;
+// Asker dayanıklılığı (sadece oyuncu): 2 turda bir 1 altın vergi alınan bölgede halk memnun,
+// askerler dayanıklı olur ve oklar çok daha az asker öldürür. dur: 0 Zayıf, 1-2 Normal, 3-4 Yüksek.
+// durO: dayanıklılığın kime ait olduğu (bölge el değiştirirse Normal'e döner).
+let dur = [];
+let durO = [];
+const durCls = t => own[t] != 0 || ONLINE || durO[t] != 0 ? 1 : dur[t] >= 3 ? 2 : dur[t] <= 0 ? 0 : 1;
+const DURN = ['Zayıf', 'Normal', 'Yüksek'];
+function durTick() {
+  for (let t = 0; t < N; t++)
+    if (own[t] == 0) {
+      if (durO[t] != 0) {
+        durO[t] = 0;
+        dur[t] = 1;
+      }
+      const v = dur[t];
+      if (tax[t] <= 1 && taxEvery == 2)
+        dur[t] = Math.min(4, v + 1);
+      else if (tax[t] >= 2 && taxEvery == 1)
+        dur[t] = Math.max(0, v - 1);
+      else
+        dur[t] = v > 1 ? v - 1 : v < 1 ? v + 1 : v;
+    }
+}
+// Ok kaybını dayanıklılığa göre ayarlar: Yüksek → 1-2 asker (hiç değilse 1), Zayıf → %30 fazla.
+function arrowLoss(t, k) {
+  if (k <= 0)
+    return 0;
+  const c = durCls(t);
+  if (c == 2)
+    return Math.min(k, Math.random() < .5 ? 1 : 2);
+  if (c == 0)
+    return Math.max(0, Math.min(arm[t] - 1, Math.ceil(k * 1.3)));
+  return k;
+}
 function taxSmart() {
   for (let u = 0; u < N; u++)
     if (own[u] == 0)
@@ -4996,6 +5116,10 @@ function init(noDraft, seed) {
   taxAuto = true;
   taxTip = false;
   allyAsked = false;
+  playMs = 0;
+  lateOn = false;
+  dur = Array(N).fill(1);
+  durO = Array(N).fill(-1);
   spySel = null;
   aspy = {};
   spyXp = 0;
@@ -5076,6 +5200,8 @@ function start(p) {
   const gTax = taxNow ? taxOf(p) : 0;
   if (taxNow)
     taxCollect(p);
+  if (taxNow && p == 0 && !ONLINE)
+    durTick();
   const g = Math.floor((gBase + gMine + gTax) * (pn ? .5 : 1) * (p > 0 ? [.75, 1, 1.3][DIF] : 1));
   pen[p] = 0;
   gold[p] += g;
@@ -5144,8 +5270,23 @@ const rivalsGone = () => cnt(0) > 0 && ![...Array(P).keys()].slice(1).some(q => 
 // Haritada senden başka sadece müttefiklerin (ve haraç antlaşmalıların) kaldıysa oyuncuya sorulur:
 // müttefiklerle birlikte bitir ya da ittifakları bozup savaşa devam et.
 let allyAsked = false;
+// Savaş süresi: dağıtım bittikten sonra oyunun açık olduğu süre (ms). 20. dakikadan sonra
+// başkenti düşen bot devleti ikiye bölünmez, tamamen fethedilir (uzun oyunları kısaltır).
+const LATE = 20 * 60e3;
+let playMs = 0;
+let lateOn = false;
+setInterval(() => {
+  if (over || dr || demo || TUT || ONLINE || document.hidden || !cap || cap[0] < 0 || (menuEl && !menuEl.hidden) || phase != 'r')
+    return;
+  playMs += 1000;
+  if (!lateOn && playMs >= LATE) {
+    lateOn = true;
+    banner('⏳ 20. dakika: artık başkenti düşen devlet tamamen fethedilir!', '#c98a12');
+    $('log').textContent = 'Savaş 20 dakikayı geçti. Bundan sonra bir düşmanın başkentini alırsan devleti ikiye bölünmez, bütün toprakları senin olur.';
+  }
+}, 1000);
 const alliesLeft = () => [...Array(P).keys()].slice(1).filter(q => cnt(q) > 0);
-const allyOnly = () => !ONLINE && !TUT && !allyAsked && !over && cnt(0) > 0 && alliesLeft().length > 0 && alliesLeft().every(q => ally[q] > 0);
+const allyOnly = () => !ONLINE && !TUT && !allyAsked && !over && cnt(0) > 0 && alliesLeft().length > 0 && alliesLeft().every(q => ally[q] > 1);
 function allyChoice() {
   busy = true;
   const L = alliesLeft();
@@ -5818,8 +5959,8 @@ async function capLost(old, me, t) {
   if (old == 0 || me == 0)
     Mus.jingle('cap');
   const rest = [...Array(N).keys()].filter(u => own[u] == old);
-  if (armyOf(old) < WEAK || P >= PM) {
-    await fall(old, me, t);
+  if (armyOf(old) < WEAK || P >= PM || (lateOn && old != 0)) {
+    await fall(old, me, t, lateOn && old != 0 && armyOf(old) >= WEAK);
     return;
   }
   if (rest.length < 2) {
@@ -5985,8 +6126,8 @@ function moveCap(p, t) {
   return true;
 }
 // Başkent ikinci kez düşünce bütün topraklar fethedene geçer.
-async function fall(old, me, t) {
-  $('log').textContent = old == 0 ? `Başkentin düştü! Ordun zayıftı (50 askerden az), tüm toprakların ${PN[me]} tarafına geçti.` : `${PN[old]} başkentini kaybetti! Ordusu zayıftı (50 askerden az), tüm toprakları ${PN[me]} tarafına geçti.`;
+async function fall(old, me, t, late) {
+  $('log').textContent = late ? `${PN[old]} başkentini kaybetti! Savaş 20 dakikayı geçtiği için devlet bölünmedi, tüm toprakları ${PN[me]} tarafına geçti.` : old == 0 ? `Başkentin düştü! Ordun zayıftı (50 askerden az), tüm toprakların ${PN[me]} tarafına geçti.` : `${PN[old]} başkentini kaybetti! Ordusu zayıftı (50 askerden az), tüm toprakları ${PN[me]} tarafına geçti.`;
   if (old != 0)
     setTimeout(() => banner(`${PN[old]} tümüyle işgal edildi!`, COL[me]), 200);
   const ord = [];
@@ -6290,18 +6431,21 @@ async function cover(owner, ref, tgt) {
     let k = 0;
     const fire = tw[u] >= 2;
     const np = pw(u);
+    let a0 = arm[tgt];
     for (let i = 0; i < np; i++) {
-      const d = Math.ceil(arm[tgt] * R(.2, .3) * (fire ? 1.5 : 1));
-      const h = Math.max(0, Math.min(d, arm[tgt] - 1));
-      arm[tgt] -= h;
+      const d = Math.ceil(a0 * R(.2, .3) * (fire ? 1.5 : 1));
+      const h = Math.max(0, Math.min(d, a0 - 1));
+      a0 -= h;
       k += h;
     }
+    k = arrowLoss(tgt, k);
+    arm[tgt] -= k;
     if (atk && arch[u] > 0)
       archUp(u);
     pulse(tgt, '#ffffff', u, 2 + np, fire);
     tot += k;
     if (k > 0)
-      fl.push({ t: tgt, dx: 0, txt: visSet().has(tgt) ? `-${k}` : 'Vuruldu!', col: '#ff6b6b', t0: performance.now() + 750 });
+      fl.push({ t: tgt, dx: 0, txt: visSet().has(tgt) ? `-${k}${durCls(tgt) == 2 ? ' 🛡' : ''}` : 'Vuruldu!', col: '#ff6b6b', t0: performance.now() + 750 });
   }
   ui();
   await sleep(1250);
@@ -6322,16 +6466,20 @@ async function shoot(a, t) {
   const fire = tw[a] >= 2;
   if (arch[a] > 0)
     archUp(a);
+  let a0 = arm[t];
   for (let i = 0; i < archN(a); i++) {
-    const d = Math.ceil(arm[t] * R(.2, .3) * (fire ? 1.5 : 1));
-    const h = Math.max(0, Math.min(d, arm[t] - 1));
-    arm[t] -= h;
+    const d = Math.ceil(a0 * R(.2, .3) * (fire ? 1.5 : 1));
+    const h = Math.max(0, Math.min(d, a0 - 1));
+    a0 -= h;
     k += h;
   }
+  k = arrowLoss(t, k);
+  arm[t] -= k;
+  const dz = durCls(t);
   pulse(t, '#ffffff', a, 2 + archN(a), fire);
   if (k > 0)
-    fl.push({ t, dx: 0, txt: visSet().has(t) ? `-${k}` : 'Vuruldu!', col: '#ff6b6b', t0: performance.now() + 750 });
-  $('log').textContent = k > 0 ? `${PN[own[a]]} okçuları ${NM[t]} bölgesinde ${visSet().has(t) ? k + ' asker' : 'birlikleri'} vurdu.` : `${PN[own[a]]} okçuları ${NM[t]} bölgesini vurdu ama etki edemedi.`;
+    fl.push({ t, dx: 0, txt: visSet().has(t) ? `-${k}${dz == 2 ? ' 🛡' : ''}` : 'Vuruldu!', col: '#ff6b6b', t0: performance.now() + 750 });
+  $('log').textContent = k > 0 ? `${PN[own[a]]} okçuları ${NM[t]} bölgesinde ${visSet().has(t) ? k + ' asker' : 'birlikleri'} vurdu.${dz == 2 ? ' Halkı memnun bölgenin askerleri dayanıklı, oklar az işledi.' : dz == 0 && own[t] == 0 ? ' Ağır vergi yüzünden askerlerin zayıf, oklar çok işledi.' : ''}` : `${PN[own[a]]} okçuları ${NM[t]} bölgesini vurdu ama etki edemedi.`;
   await sleep(1250);
 }
 // ======================================================================
@@ -6401,6 +6549,11 @@ function treaties() {
         ally[q] = 0;
       else
         ally[q]--;
+      if (!ally[q] && !br && cnt(q) > 0) {
+        hl += tru[q] ? ` ${PN[q]} ile haraç antlaşmasının süresi doldu.` : ` ${PN[q]} ile ittifakının süresi doldu, artık düşmansınız.`;
+        if (!tru[q])
+          setTimeout(() => banner(`🤝 ${PN[q]} ile ittifak sona erdi`, COL[q]), 300);
+      }
       if (!ally[q])
         tru[q] = 0;
     }
@@ -6912,6 +7065,57 @@ async function draftPick(p, t) {
     tutCheck();
   await draftNext();
 }
+// Dağıtım bitince açılan, geçilemeyen vergi seçimi paneli: otomatik ya da elle ayarlama.
+function taxGate() {
+  if (TUT || demo || ONLINE || (navigator.webdriver && !window.TAXGATE))
+    return Promise.resolve();
+  return new Promise(res => {
+    busy = true;
+    const o = document.createElement('div');
+    o.id = 'txg';
+    let amt = 1;
+    let ev = 2;
+    const nb = () => [...Array(N).keys()].filter(u => own[u] == 0);
+    const sum = () => {
+      const L = nb();
+      const g = L.reduce((a, u) => a + (amt == 0 ? 1 : amt == 2 ? 2 : isBorder(u) ? 1 : 2), 0);
+      const durTxt = ev == 2 ? (amt == 0 ? '🛡🛡 Bütün bölgelerde askerlerin dayanıklı olur (oklar en fazla 1-2 asker öldürür).' : amt == 1 ? '🛡🛡 Sınır bölgelerinde askerlerin dayanıklı olur; iç bölgeler normal kalır.' : '🛡 Askerlerin normal dayanıklılıkta kalır.') : (amt == 2 ? '💔 Her tur 2 altın halkı yorar: askerlerin zayıflar, oklar daha çok öldürür.' : '🛡 Askerlerin normal dayanıklılıkta kalır.');
+      const rv = amt == 2 ? `⚠ Sınır bölgelerinden 2 altın istiyorsun: her toplamada %${ev == 1 ? 15 : 5} isyan ihtimali.` : '✓ Sınırlarda isyan riski yok.';
+      return `<div class="txg-s${amt == 2 ? ' warn' : ''}">💰 ${ev == 1 ? 'Her tur' : '2 turda bir'} yaklaşık <b>${g} altın</b> vergi.<br>${durTxt}<br>${rv}</div>`;
+    };
+    const step1 = () => {
+      o.innerHTML = `<div class="alc-in"><div class="alc-mark">💰</div><h2>Vergi düzenini seç</h2><p>Bölgelerin dağıtıldı. Savaş başlamadan önce vergini nasıl toplayacağına karar ver. Az vergi alırsan halk memnun olur ve askerlerin oklara karşı dayanıklı olur; çok alırsan altının artar ama isyan çıkabilir.</p><button id="txgAuto">🤖 Otomatik vergi<small>Sınır bölgeleri 1, iç bölgeler 2 altın, 2 turda bir. Sınırlar değiştikçe kendiliğinden ayarlanır. Sınır askerlerin dayanıklı olur.</small></button><button id="txgMan">✋ Kendim ayarlayacağım<small>Vergi miktarını ve ne sıklıkla toplanacağını sen seçersin</small></button></div>`;
+      o.querySelector('#txgAuto').onclick = () => done(true);
+      o.querySelector('#txgMan').onclick = step2;
+    };
+    const step2 = () => {
+      const b = (k, v, cur, t, sm) => `<button data-${k}="${v}" class="${v == cur ? 'on' : ''}">${t}<small>${sm}</small></button>`;
+      o.innerHTML = `<div class="alc-in"><div class="alc-mark">✋</div><h2>Vergini ayarla</h2><div class="txg-l">Ne kadar vergi?</div><div class="txg-o">${b('a', 0, amt, 'Cömert', 'her yer 1 altın')}${b('a', 1, amt, 'Dengeli', 'sınır 1, iç 2')}${b('a', 2, amt, 'Ağır', 'her yer 2 altın')}</div><div class="txg-l">Ne sıklıkla?</div><div class="txg-o">${b('e', 2, ev, '2 turda bir', 'halk rahat')}${b('e', 1, ev, 'Her tur', 'daha çok altın')}</div>${sum()}<button id="txgGo">⚔️ Savaşa başla</button><p style="margin:10px 0 0;font-size:12px">Oyun sırasında bir bölgene basılı tutup 💰 Vergi sekmesinden tek tek de değiştirebilirsin.</p></div>`;
+      o.querySelectorAll('[data-a]').forEach(x => x.onclick = () => {
+        amt = +x.dataset.a;
+        step2();
+      });
+      o.querySelectorAll('[data-e]').forEach(x => x.onclick = () => {
+        ev = +x.dataset.e;
+        step2();
+      });
+      o.querySelector('#txgGo').onclick = () => done(false);
+    };
+    const done = auto => {
+      taxAuto = auto;
+      taxEvery = auto ? 2 : ev;
+      taxTip = true;
+      for (const u of nb())
+        tax[u] = auto || amt == 1 ? (isBorder(u) ? 1 : 2) : amt == 0 ? 1 : 2;
+      o.remove();
+      busy = false;
+      $('log').textContent = auto ? 'Otomatik vergi seçildi: sınır bölgeleri 1, iç bölgeler 2 altın, 2 turda bir.' : `Vergini sen ayarladın: ${['her yer 1 altın', 'sınır 1, iç 2 altın', 'her yer 2 altın'][amt]}, ${taxEvery == 1 ? 'her tur' : '2 turda bir'}.`;
+      res();
+    };
+    step1();
+    document.body.appendChild(o);
+  });
+}
 async function draftNext() {
   while (dnx < N) {
     const p = dnx % P;
@@ -6934,6 +7138,9 @@ async function draftNext() {
   hl = 'Dağıtım bitti, savaş başlıyor!';
   for (let q = 0; q < P; q++)
     capChest(q);
+  busy = true;
+  ui();
+  await taxGate();
   start(0);
   focusOn(cap[0], zread());
 }
@@ -9897,6 +10104,111 @@ let popT = -1;
 let popPos = null;
 // Taşınabilir bir şey var mı: 1'den fazla asker, okçu ya da mancınık.
 const movable = t => arm[t] > 1 || arch[t] > 0 || (cat && cat[t] > 0);
+// ---- Gemiyle taşıma paneli: asker, okçu ve mancınık. Her küçük gemi 20 yer; mancınık 5 yer tutar. ----
+const CATS = 5;
+function seaPick(a, t, cx, cy) {
+  const cap0 = shipCap(a);
+  const mx = { s: Math.max(0, arm[a] - 1), a: Math.max(0, Math.min(arch[a], 5 - arch[t])), c: Math.max(0, Math.min(cat[a] || 0, CATMAX - (cat[t] || 0))) };
+  const W1 = { s: 1, a: 1, c: CATS };
+  const n = { s: 0, a: 0, c: 0 };
+  const used = () => n.s + n.a + n.c * CATS;
+  const fit = k => Math.max(0, Math.min(mx[k] - n[k], Math.floor((cap0 - used()) / W1[k])));
+  // Varsayılan: önce mancınık ve okçular, kalan yere askerler
+  n.c = fit('c');
+  n.a = fit('a');
+  n.s = fit('s');
+  const row = (k, ic, nm) => mx[k] > 0 ? `<div class="mv-lbl">${ic} ${nm}${k == 'c' ? ' (her biri 5 yer)' : ''}</div><div class="sp-row"><button data-k="${k}0">0</button><button data-k="${k}-">−</button><span class="sp-n">${n[k]}</span><button data-k="${k}+">+</button><button data-k="${k}a">Max</button></div>` : '';
+  const draw = () => {
+    const u = used();
+    const ns = Math.ceil(u / CAPS);
+    pop.classList.add('fixw');
+    pop.innerHTML = `<b>⛵ Gemiyle taşı: ${NM[a]} → ${NM[t]}</b><span>Yer: <b>${u}/${cap0}</b> · ${ns} küçük gemi (her gemi en fazla ${CAPS} yer)</span>` + row('s', '⚔', 'Asker') + row('a', '🏹', 'Okçu') + row('c', '🪨', 'Mancınık') + (mx.a == 0 && arch[a] > 0 ? '<span>🏹 Hedefte okçu için yer yok.</span>' : '') + (mx.c == 0 && cat[a] > 0 ? '<span>🪨 Hedefte mancınık için yer yok.</span>' : '') + `<button class="sp-go" data-k="go" ${u > 0 ? '' : 'disabled'}>⛵ Yola çık</button>`;
+  };
+  draw();
+  pop.hidden = false;
+  const pw = pop.offsetWidth;
+  const ph = pop.offsetHeight;
+  pop.style.left = Math.min(Math.max(cx - pw / 2, 8), innerWidth - pw - 8) + 'px';
+  let T = cy - ph - 24;
+  if (T < 8)
+    T = cy + 24;
+  pop.style.top = Math.min(Math.max(T, 8), innerHeight - ph - 8) + 'px';
+  popPos = null;
+  pop.onclick = async ev => {
+    const b = ev.target.closest && ev.target.closest('button[data-k]');
+    if (!b)
+      return;
+    const k = b.dataset.k;
+    if (k != 'go') {
+      const q = k[0];
+      const op = k[1];
+      if (op == '0')
+        n[q] = 0;
+      else if (op == '-')
+        n[q] = Math.max(0, n[q] - 1);
+      else if (op == '+')
+        n[q] += fit(q) > 0 ? 1 : 0;
+      else
+        n[q] += fit(q);
+      draw();
+      return;
+    }
+    pop.hidden = true;
+    pop.classList.remove('fixw');
+    if (own[a] != 0 || own[t] != 0 || busy || turn != 0) {
+      ui();
+      return;
+    }
+    const S1 = Math.min(n.s, arm[a] - 1);
+    const A1 = Math.min(n.a, arch[a], 5 - arch[t]);
+    const C1 = Math.min(n.c, cat[a] || 0, CATMAX - (cat[t] || 0));
+    const u = S1 + A1 + C1 * CATS;
+    if (u < 1 || u > shipCap(a) || (S1 > 0 && !supUse(t))) {
+      sel = null;
+      ui();
+      return;
+    }
+    busy = true;
+    sel = null;
+    const ns = Math.ceil(u / CAPS);
+    shUsed[a] += ns;
+    arm[a] -= S1;
+    arch[a] -= A1;
+    const av = archV[a];
+    if (!arch[a])
+      archV[a] = 0;
+    cat[a] -= C1;
+    const ccd = catCd[a];
+    const cxp = catXp[a];
+    if (!cat[a])
+      catXp[a] = 0;
+    const what = [S1 ? `${S1} asker` : '', A1 ? `${A1} okçu` : '', C1 ? `${C1} mancınık` : ''].filter(Boolean).join(', ');
+    $('log').textContent = `${ns} küçük gemi ${what} ${NM[t]} bölgene taşıyor.`;
+    ui();
+    try {
+      await sail(a, t, 'move', ns);
+    }
+    catch (e) {
+      console.error(e);
+    }
+    arm[t] += S1;
+    if (A1) {
+      arch[t] += A1;
+      archV[t] = Math.max(archV[t], av);
+    }
+    if (C1) {
+      cat[t] += C1;
+      catCd[t] = Math.max(catCd[t], ccd);
+      catXp[t] = Math.max(catXp[t], cxp);
+    }
+    mvCount++;
+    fl.push({ t, dx: 0, txt: '+' + what, col: '#fff', t0: performance.now() });
+    pulse(t, '#ffffff');
+    $('log').textContent = `${what} gemiyle ${NM[t]} bölgene ulaştı.`;
+    busy = false;
+    ui();
+  };
+}
 // ---- Taşıma paneli: seçili bölgeden hedefe asker (1 / yarısı / hepsi), okçu ve mancınık ----
 function movePick(a, t, cx, cy) {
   const mx = arm[a] - 1;
@@ -10080,6 +10392,10 @@ function openPop(cx, cy) {
     o.push(dep[t] ? ['udp', dep[t] >= 3 ? 'Altın sandığı seviye 3 (tam)' : `Sandığı yükselt: Sv${dep[t] + 1}, ${DEPV[dep[t] + 1]} kapasite (${DPU[dep[t]]} altın)`, dep[t] < 3 && gold[0] >= DPU[dep[t]]] : ['dp', `Altın sandığı: ${DEPV[1]} kapasite (${DPC} altın)`, gold[0] >= DPC]);
     inf.y += dep[t] ? ` Altın sandığı sv${dep[t]}: ${DEPV[dep[t]]} kapasite, içinde ~${depGold(t)} altın var. Bölge fethedilirse bunun yarısını kaybedersin; fetheden ayrıca seviyeye göre ek ganimet alır.` : ` Hazine sınırı: ${capOf(0)} altın (sandıklarının toplamı).`;
     o.push(['w', wall[t] >= 2 ? 'Okçulu sur (tam)' : wall[t] ? `Suru yükselt: Sv2 okçulu (${WC(1)} altın)` : `Sur (${WC(0)} altın)`, wall[t] < 2 && gold[0] >= WC(wall[t])]);
+    {
+      const c = durCls(t);
+      inf.y += ` ${['💔', '🛡', '🛡🛡'][c]} Asker dayanıklılığı: <b>${DURN[c]}</b>.` + (c == 2 ? ' Halk memnun: oklar bu bölgede en fazla 1-2 asker öldürür.' : c == 0 ? ' Ağır vergi (her tur 2 altın) halkı yordu: oklar %30 daha fazla asker öldürür.' : ' 2 turda bir 1 altın vergi alırsan dayanıklılık yükselir.');
+    }
     inf.y += wall[t] >= 2 ? ` Okçulu sur: surdaki okçular yakındaki saldırılarına ve savunmana destek verir. Bu bölgeye en az ${WALLMIN} askerle saldırılabilir. Düşman okları içeri işlemez.` : wall[t] ? ` Sur sv1: düşman okları içeri işlemez, en az ${WALLMIN1} askerle saldırılabilir. Sv2'de surun üstüne okçular çıkar.` : '';
     if (dock[t])
       o.push(dk[t] ? ['ud', dk[t] >= 3 ? 'İskele seviye 3 (tam)' : `İskeleyi yükselt: Sv${dk[t] + 1} (${dk[t] == 1 ? DC2 : DC3} altın)`, dk[t] < 3 && gold[0] >= (dk[t] == 1 ? DC2 : DC3)] : ['d', `İskele (${DC})`, gold[0] >= DC]);
@@ -10093,7 +10409,7 @@ function openPop(cx, cy) {
         o.push(['mn', mine[t] ? 'Mayın tarlası döşeli' : `Mayın döşe (${MNC} altın)`, !mine[t] && gold[0] >= MNC]);
       if (shS[t] > 0)
         o.push(['sc', 'Keşif seferi', shUsed[t] < shS[t]]);
-      inf.d += ` İskele sv${dk[t]}.${dk[t] >= 3 ? ` Mayınlar bu bölgenin ve en yakın 2 komşu kıyı bölgenin açıklarını korur; çıkarma ya da bombardıman için gelen düşman gemileri batar. Mayın tarlası bir kez patlar.${mine[t] ? ' (Döşeli)' : ''}` : ''} Gemiler: ${shS[t]} küçük (her biri ${CAPS} asker taşır), ${shL[t]} büyük (top atışı). Çıkarma: bu bölgeyi seçip herhangi bir kıyı bölgesine dokun (deniz aşırı fetihte +${LOOT} yağma); kendi kıyı bölgene dokunursan asker taşırsın.`;
+      inf.d += ` İskele sv${dk[t]}.${dk[t] >= 3 ? ` Mayınlar bu bölgenin ve en yakın 2 komşu kıyı bölgenin açıklarını korur; çıkarma ya da bombardıman için gelen düşman gemileri batar. Mayın tarlası bir kez patlar.${mine[t] ? ' (Döşeli)' : ''}` : ''} Gemiler: ${shS[t]} küçük (her biri ${CAPS} yer: asker ve okçu 1, mancınık 5 yer), ${shL[t]} büyük (top atışı). Çıkarma: bu bölgeyi seçip herhangi bir kıyı bölgesine dokun (deniz aşırı fetihte +${LOOT} yağma); kendi kıyı bölgene dokunursan asker, okçu ve mancınık taşırsın.`;
     }
     o.push(tw[t] ? ['uw', tw[t] >= 2 ? 'Okçu Kulesi seviye 2 (tam)' : `Kuleyi yükselt: Sv2 alevli oklar (${TW2} altın)`, tw[t] < 2 && gold[0] >= TW2] : ['u', `Okçu Kulesi (${TWC} altın)`, gold[0] >= TWC]);
     if (tw[t])
@@ -10133,6 +10449,7 @@ function openPop(cx, cy) {
     const nTax = taxEvery == 1 ? 'Her tur' : rd % 2 == 0 ? 'Bu tur toplandı; sonraki 2 tur sonra' : 'Gelecek tur';
     inf.v = (taxAuto ? '<b>🤖 Otomatik vergi açık:</b> her tur başında iç bölgeler 2, sınır bölgeleri 1 altına ayarlanır; bir şey yapmana gerek yok.<br>' : '<b>✋ Vergiyi sen ayarlıyorsun.</b> Kolayı için Otomatik vergiyi açabilirsin.<br>') + `${brd ? '<b>Sınır bölgesi.</b>' : '<b>İç bölge.</b>'} ${taxEvery == 1 ? 'Her tur' : '2 turda bir'} <b>${tax[t]} altın</b> verir. Toplam: ${taxOf(0)} altın. ${nTax} toplanacak.<br>` +
       (brd ? `Sınır bölgeleri 1 altın verir; 2 istersen her toplamada o bölgede isyan çıkma ihtimali olur (${taxEvery == 1 ? 'her tur toplanırken %15' : '2 turda bir toplanırken %5'}).` : 'İç bölgeler 2 altını sorunsuz verir. 1 altında halk memnun olur.') +
+      `<br>🛡 Dayanıklılık: <b>${DURN[durCls(t)]}</b> (Zayıf / Normal / Yüksek). 2 turda bir 1 altın alınan bölgelerde askerler dayanıklı olur, oklar en fazla 1-2 asker öldürür. Her tur 2 altın alınırsa askerler zayıflar.` +
       (brd && tax[t] >= 2 ? `<em class="tx-warn">⚠ Sınır bölgesinden 2 altın: her toplamada %${taxEvery == 1 ? 15 : 5} isyan ihtimali!</em>` : '');
     if (inc[t] > 0) {
       const keep = new Set(['f', 'g', 'sf', 'sc']);
@@ -10145,7 +10462,7 @@ function openPop(cx, cy) {
   }
   else if (own[t] != 0 && own[t] != NEU) {
     const q = own[t];
-    info = ally[q] > 0 ? (tru[q] ? `Haraç antlaşması: ${ally[q]} tur kaldı` : `${PN[q]} ile ittifak: ${ally[q]} tur kaldı`) : `İttifak ücretsiz ama ${PN[q]} reddedebilir. Ona saldırdıysan kabul etmesi zorlaşır.`;
+    info = ally[q] > 0 ? (tru[q] ? `Haraç antlaşması: ${ally[q]} tur kaldı` : (ally[q] == 1 ? `${PN[q]} ile ittifakın son turu: bir sonraki turda biter` : `${PN[q]} ile ittifak: ${ally[q]} tur kaldı`)) : `İttifak ücretsiz ama ${PN[q]} reddedebilir. Ona saldırdıysan kabul etmesi zorlaşır.`;
     const pq = pactsOf(q);
     info += pq.length ? ` <b>${PN[q]} şu an ${pq.map(r => PN[r]).join(' ve ')} ile müttefik.</b>${!ally[q] ? ' Seninle ittifak kurarsa bu ittifakları bozar.' : ''}` : ` ${PN[q]} şu an kimseyle müttefik değil.`;
     if (armyOf(q) < WEAK)
@@ -10911,33 +11228,9 @@ cv.addEventListener('click', async (e) => {
       return;
     }
   }
-  else if (own[t] == 0 && shipCap(sel) > 0 && arm[sel] > 1 && coastC[t].length && !reach(sel).has(t)) {
-    if (!supUse(t)) {
-      sel = null;
-      ui();
-      return;
-    }
-    busy = true;
-    ui();
-    const a = sel;
-    const F = Math.min(arm[a] - 1, shipCap(a));
-    const ns = Math.ceil(F / CAPS);
-    shUsed[a] += ns;
-    arm[a] -= F;
-    $('log').textContent = `${ns} küçük gemi ${F} askeri ${NM[t]} bölgene taşıyor.`;
-    try {
-      await sail(a, t, 'move', ns);
-    }
-    catch (e) {
-      console.error(e);
-    }
-    arm[t] += F;
-    mvCount++;
-    fl.push({ t, dx: 0, txt: `+${F} asker`, col: '#fff', t0: performance.now() });
-    pulse(t, '#ffffff');
-    $('log').textContent = `${F} asker gemiyle ${NM[t]} bölgene ulaştı.`;
-    busy = false;
-    sel = null;
+  else if (own[t] == 0 && shipCap(sel) > 0 && movable(sel) && coastC[t].length && !reach(sel).has(t)) {
+    seaPick(sel, t, e.clientX, e.clientY);
+    return;
   }
   else if (own[t] == 0 && t != sel && movable(sel) && reach(sel).has(t)) {
     // Seçili bölgeden başka kendi bölgene: kaç asker taşınacağını soran küçük panel
@@ -11579,9 +11872,9 @@ function ui(msg) {
   if (gold && !dr)
     for (let p = 0; p < P; p++)
       clampGold(p);
-  setTxt('ttl', dr ? 'Fetih, bölge seçimi' : `Fetih, tur ${rd}` + (rd <= CAPT ? ` (başkentler ${CAPT + 1 - rd} tur daha dokunulmaz)` : ''));
-  setHTML('chips', PN.slice(0, P).map((n, p) => cnt(p) == 0 && !dr ? (p > 3 ? '' : `<span class="dead" style="--c:${COL[p]}">${n}</span>`) : `<span class="${p == turn && !over ? 'on' : ''}" style="--c:${COL[p]}">${n} ${cnt(p)}<em style="font-style:normal;font-size:.85em;margin-left:4px;color:${ref[p] < 20 ? '#d63a3a' : ref[p] < 50 ? '#e5566d' : ref[p] < 70 ? '#c98a12' : '#3a9a6c'}">${p == 0 ? '' : '%' + ref[p]}</em>${armyOf(p) < WEAK && !dr ? '<em style="font-style:normal;font-size:.8em;margin-left:4px;color:#e5566d">zayıf</em>' : ''}${p == 0 ? ` (${gold[0]}/${capOf(0)} altın)` : ally[p] > 0 ? (tru[p] ? ` (haraç: ${ally[p]} tur)` : ` (ittifak: ${ally[p]} tur)`) : ''}${p > 0 && bp[p].some(v => v > 0) ? ` (+${bp[p].map((v, q) => v > 0 ? PN[q] : '').filter(Boolean).join(', ')})` : ''}</span>`).join('') + (cnt(NEU) ? `<span style="--c:#9aa3a8">Boş ${cnt(NEU)}</span>` : ''));
-  setTxt('st', msg || (spySel != null && turn == 0 ? `${PN[spySel]} casusu için hedef seç: bir düşman bölgesine dokun.` : ctk && sel != null && turn == 0 ? `Mancınıklar hazır (${NM[sel]}). Komşu bir düşman bölgesine dokun.` : ordSel != null && turn == 0 ? `${PN[ordSel]} için hedef seç: ortak bir düşmanın bölgesine dokun.` : dr ? (turn == 0 && !busy ? `Bölge seç (${N - dnx} kaldı)` + (cap[0] < 0 ? ': ilk seçimin başkent olur.' : '.') : `${PN[turn]} seçiyor…`) : bd && turn == 0 ? ({ b: 'Kışla kurmak için kendi bölgene dokun.', m: 'Maden kurmak için kendi bölgene dokun.', a: 'İttifak için o krallığın herhangi bir bölgesine dokun.', w: 'Sur için başkentine (★) dokun.' }[bd]) : turn != 0 ? `${PN[turn]} oynuyor…` : cn ? `Büyük gemiler hazır (${NM[sel]}). Kıyıdaki düşman bölgesine dokun.` : sco ? `Keşif gemisi hazır (${NM[sel]}). Kıyıdaki bir bölgeye dokun.` : sp ? `Casus hazır (${NM[sel]}). Herhangi bir düşman bölgesine dokun; içerilere gittikçe yakalanma riski artar.` : ak ? `Okçular hazır (${NM[sel]}). menzildeki düşmana dokun (2 bölge).` : phase == 'r' && !mv ? `Takviye: ${pool} birlik. Dokun: asker ekle. Basılı tut: inşa et.` : mv && bk ? (bk.src.size ? `Toplu taşıma: ${bk.src.size} bölgeden ${[...bk.src].reduce((a, u) => a + arm[u] - 1, 0)} asker seçildi. Şimdi hedef bölgeye basılı tut.` : 'Toplu taşıma: asker toplanacak bölgelere dokun, sonra hedefe basılı tut.') : mv ? (sel == null ? 'Taşımak için 2+ birlikli bölgeni seç. Basılı tut: toplu taşıma.' : `${NM[sel]} seçili. Hedef bölgene dokun, her dokunuş 1 birlik taşır.`) : sel == null ? `Saldırmak için 2+ birlikli bölgeni seç. (Fetih: ${won[0] + sup[0]}/${ext ? 5 : 3}, refah %${ref[0]})` : `${NM[sel]} seçili. Kendi bölgene dokun: asker taşı. Düşmana dokun: saldır.${shipCap(sel) > 0 ? ` Gemilerle ${Math.min(arm[sel] - 1, shipCap(sel))} asker taşıyabilirsin: denizin ötesindeki bir kıyıya dokun.` : ''} Koyu renkli düşmana dokun; bağlantılı bölgelerinden de saldırabilirsin.`));
+  setTxt('ttl', dr ? 'Fetih, bölge seçimi' : `Fetih, tur ${rd}` + (rd <= CAPT ? ` (başkentler ${CAPT + 1 - rd} tur daha dokunulmaz)` : ONLINE || TUT ? '' : ` · ⏳ ${Math.floor(playMs / 60000)} dk` + (lateOn ? ' (başkent = tam fetih)' : '')));
+  setHTML('chips', PN.slice(0, P).map((n, p) => cnt(p) == 0 && !dr ? (p > 3 ? '' : `<span class="dead" style="--c:${COL[p]}">${n}</span>`) : `<span class="${p == turn && !over ? 'on' : ''}" style="--c:${COL[p]}">${n} ${cnt(p)}<em style="font-style:normal;font-size:.85em;margin-left:4px;color:${ref[p] < 20 ? '#d63a3a' : ref[p] < 50 ? '#e5566d' : ref[p] < 70 ? '#c98a12' : '#3a9a6c'}">${p == 0 ? '' : '%' + ref[p]}</em>${armyOf(p) < WEAK && !dr ? '<em style="font-style:normal;font-size:.8em;margin-left:4px;color:#e5566d">zayıf</em>' : ''}${p == 0 ? ` (${gold[0]}/${capOf(0)} altın)` : ally[p] > 0 ? (tru[p] ? ` (haraç: ${ally[p]} tur)` : ally[p] == 1 ? ' (ittifak: son tur)' : ` (ittifak: ${ally[p]} tur)`) : ''}${p > 0 && bp[p].some(v => v > 0) ? ` (+${bp[p].map((v, q) => v > 0 ? PN[q] : '').filter(Boolean).join(', ')})` : ''}</span>`).join('') + (cnt(NEU) ? `<span style="--c:#9aa3a8">Boş ${cnt(NEU)}</span>` : ''));
+  setTxt('st', msg || (spySel != null && turn == 0 ? `${PN[spySel]} casusu için hedef seç: bir düşman bölgesine dokun.` : ctk && sel != null && turn == 0 ? `Mancınıklar hazır (${NM[sel]}). Komşu bir düşman bölgesine dokun.` : ordSel != null && turn == 0 ? `${PN[ordSel]} için hedef seç: ortak bir düşmanın bölgesine dokun.` : dr ? (turn == 0 && !busy ? `Bölge seç (${N - dnx} kaldı)` + (cap[0] < 0 ? ': ilk seçimin başkent olur.' : '.') : `${PN[turn]} seçiyor…`) : bd && turn == 0 ? ({ b: 'Kışla kurmak için kendi bölgene dokun.', m: 'Maden kurmak için kendi bölgene dokun.', a: 'İttifak için o krallığın herhangi bir bölgesine dokun.', w: 'Sur için başkentine (★) dokun.' }[bd]) : turn != 0 ? `${PN[turn]} oynuyor…` : cn ? `Büyük gemiler hazır (${NM[sel]}). Kıyıdaki düşman bölgesine dokun.` : sco ? `Keşif gemisi hazır (${NM[sel]}). Kıyıdaki bir bölgeye dokun.` : sp ? `Casus hazır (${NM[sel]}). Herhangi bir düşman bölgesine dokun; içerilere gittikçe yakalanma riski artar.` : ak ? `Okçular hazır (${NM[sel]}). menzildeki düşmana dokun (2 bölge).` : document.getElementById('txg') ? 'Vergi düzenini seç.' : phase == 'r' && !mv ? `Takviye: ${pool} birlik. Dokun: asker ekle. Basılı tut: inşa et.` : mv && bk ? (bk.src.size ? `Toplu taşıma: ${bk.src.size} bölgeden ${[...bk.src].reduce((a, u) => a + arm[u] - 1, 0)} asker seçildi. Şimdi hedef bölgeye basılı tut.` : 'Toplu taşıma: asker toplanacak bölgelere dokun, sonra hedefe basılı tut.') : mv ? (sel == null ? 'Taşımak için 2+ birlikli bölgeni seç. Basılı tut: toplu taşıma.' : `${NM[sel]} seçili. Hedef bölgene dokun, her dokunuş 1 birlik taşır.`) : sel == null ? `Saldırmak için 2+ birlikli bölgeni seç. (Fetih: ${won[0] + sup[0]}/${ext ? 5 : 3}, refah %${ref[0]})` : `${NM[sel]} seçili. Kendi bölgene dokun: asker taşı. Düşmana dokun: saldır.${shipCap(sel) > 0 ? ` Gemilerle ${shipCap(sel)} yerlik taşıma yapabilirsin (asker, okçu, mancınık): denizin ötesindeki bir kıyıya dokun.` : ''} Koyu renkli düşmana dokun; bağlantılı bölgelerinden de saldırabilirsin.`));
   const ok = turn == 0 && phase == 'a' && !busy && !over;
   const adr = dr && !ONLINE && !TUT;
   $('end').disabled = adr ? !(turn == 0 && !busy && !over && !autoDr) : !ok;
