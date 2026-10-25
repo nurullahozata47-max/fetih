@@ -2152,6 +2152,8 @@ let shL;
 let shUsed;
 let sfire;
 let away;
+// awayL: iskeleden ayrılmış büyük gemi sayısı (abluka, top atışı, eşlik). away sadece küçük gemiler içindir.
+let awayL = [];
 // Abluka: blk[iskele] = { t: hedef bölge, p: sahibi, left: kalan tur, x, y: geminin demirlediği nokta }.
 // Ablukadaki bölge vergi ve maden geliri vermez, kışlası asker üretmez, limanından gemi çıkamaz.
 let blk = [];
@@ -2173,7 +2175,7 @@ function blkClean() {
     if (blk[u] && !blkOK(u)) {
       const b = blk[u];
       blk[u] = null;
-      away[u] = Math.max(0, away[u] - 1);
+      awayL[u] = Math.max(0, awayL[u] - 1);
       if (b.p == 0 && own[u] == 0 && own[b.t] < P && own[b.t] != 0)
         hl += ` ${NM[b.t]} ablukası kalktı.`;
     }
@@ -2192,7 +2194,7 @@ async function blockade(u, t) {
   const L = cum[cum.length - 1] || 1;
   const mm = minedBy(t, p);
   const dur = Math.min(4200, Math.max(1400, L * 5));
-  away[u]++;
+  awayL[u]++;
   if (mm >= 0) {
     const kb = boomPoint(mm, P0, .8);
     const P1 = P0.slice(0, kb + 1);
@@ -2205,7 +2207,7 @@ async function blockade(u, t) {
     nav.push({ k: 'sink', x: bx, y: by, n: 1, big: true, col: COL[p], t0: performance.now(), dur: 2600 });
     sinkMsg(mm, u, 1, 0, t);
     shL[u] = Math.max(0, shL[u] - 1);
-    away[u] = Math.max(0, away[u] - 1);
+    awayL[u] = Math.max(0, awayL[u] - 1);
     ui();
     await sleep(1600);
     return false;
@@ -3894,18 +3896,26 @@ function drawDockShips(s) {
   for (let t = 0; t < N; t++) {
     if (!dk[t] || !Vg.has(t) || !dock[t])
       continue;
-    const n = shS[t] + shL[t];
-    if (!n)
+    // İskelede duran gemiler: büyükler ve küçükler ayrı sayılır, boylarına göre aralıklı dizilir.
+    const nb = Math.max(0, shL[t] - (awayL[t] || 0));
+    const ns2 = Math.max(0, shS[t] - away[t]);
+    if (!nb && !ns2)
       continue;
     const [bx, by] = dockSea(t);
     const [, , dx, dy] = dock[t];
     const list = [];
-    for (let i = 0; i < shL[t]; i++)
+    for (let i = 0; i < nb; i++)
       list.push(1);
-    for (let i = 0; i < shS[t]; i++)
+    for (let i = 0; i < ns2; i++)
       list.push(0);
-    list.slice(0, Math.max(0, n - away[t])).forEach((big, i) => {
-      const off = (i - (n - 1) / 2) * 18;
+    // Gemiler yatay duruyor: dizi yatay giderse boyları kadar, dikey giderse daha sık aralık bırakılır.
+    const horiz = Math.abs(dx) < Math.abs(dy);
+    const len = b => horiz ? (b ? 30 : 20) : (b ? 17 : 13);
+    const tot = list.reduce((a, b) => a + len(b), 0);
+    let acc = -tot / 2;
+    list.forEach((big, i) => {
+      const off = acc + len(big) / 2;
+      acc += len(big);
       drawShip(bx - dy * off, by + dx * off, dx >= 0 ? 1 : -1, !!big, COL[own[t]], s, t * 3 + i);
     });
   }
@@ -5060,11 +5070,13 @@ async function sail(a, t, mode, ns, esc) {
       away[a] += ns || 1;
       nav.push({ k: 'sail', pts: P0, cum, L, n: ns || 1, cx: sp0.cx, cy: sp0.cy, big: false, col: COL[own[a]], t0: performance.now(), dur, mode });
       if (esc) {
-        away[a]++;
+        awayL[a]++;
         nav.push({ k: 'sail', pts: P0, cum, L, n: 1, lead: 24, cx: sp0.cx, cy: sp0.cy, big: true, col: COL[own[a]], t0: performance.now(), dur, mode, noLand: 1 });
       }
       await sleep(dur + 250);
-      away[a] = Math.max(0, away[a] - (ns || 1) - (esc ? 1 : 0));
+      away[a] = Math.max(0, away[a] - (ns || 1));
+      if (esc)
+        awayL[a] = Math.max(0, awayL[a] - 1);
       lastSailEnd = P0[Math.max(0, P0.length - 2)];
       return true;
     }
@@ -5078,10 +5090,10 @@ async function sail(a, t, mode, ns, esc) {
   const y1 = cy + vy / L * 22;
   const big = shL[a] > 0 && shS[a] == 0;
   const dur = Math.min(2800, Math.max(1300, L * 9));
-  away[a]++;
+  (big ? awayL : away)[a]++;
   nav.push({ k: 'sail', x0, y0, x1, y1, cx, cy, big, col: COL[own[a]], t0: performance.now(), dur, mode });
   await sleep(dur + 250);
-  away[a] = Math.max(0, away[a] - 1);
+  (big ? awayL : away)[a] = Math.max(0, (big ? awayL : away)[a] - 1);
   return true;
 }
 // Mayın tarlaları: mine[iskele] = { korunan bölgeler, mayın noktaları }
@@ -5167,18 +5179,18 @@ async function navalStrike(u, t, sailOut) {
   const mm = sailOut ? minedBy(t, owner) : -1;
   if (mm >= 0) {
     const d1 = 1400;
-    away[u]++;
+    awayL[u]++;
     nav.push({ k: 'sail', x0: ax, y0: ay, x1: fx, y1: fy, cx: fx, cy: fy, big: true, col: COL[owner], t0: performance.now(), dur: d1, mode: 'x', noLand: 1 });
     await sleep(d1);
     nav.push({ k: 'sink', x: fx, y: fy, n, big: true, col: COL[owner], t0: performance.now(), dur: 2600 });
     sinkMsg(mm, u, n, 0, t);
     shL[u] = 0;
-    away[u] = Math.max(0, away[u] - 1);
+    awayL[u] = Math.max(0, awayL[u] - 1);
     ui();
     await sleep(1600);
     return 0;
   }
-  away[u]++;
+  awayL[u]++;
   nav.push({ k: 'strike', u, t, ax, ay, fx, fy, tx: cen[t][0] * S, ty: cen[t][1] * S, n, sailOut, t0: performance.now(), dur, col: COL[owner] });
   const tD = sailOut ? .62 : .5;
   await sleep(dur * tD);
@@ -5195,7 +5207,7 @@ async function navalStrike(u, t, sailOut) {
   $('log').textContent = `${PN[owner]} gemileri ${NM[t]} bölgesini bombaladı${vs ? `: ${k} asker vuruldu` : ''}.`;
   ui();
   await sleep(dur * (1 - tD));
-  away[u] = Math.max(0, away[u] - 1);
+  awayL[u] = Math.max(0, awayL[u] - 1);
   return k;
 }
 async function navalCover(owner, tgt) {
@@ -5433,6 +5445,7 @@ function init(noDraft, seed) {
   shUsed = Array(N).fill(0);
   sfire = Array(N).fill(0);
   away = Array(N).fill(0);
+  awayL = Array(N).fill(0);
   blk = Array(N).fill(null);
   abk = false;
   nav = [];
@@ -5480,7 +5493,7 @@ function start(p) {
     if (blk[u] && blk[u].p == p && --blk[u].left <= 0) {
       const b = blk[u];
       blk[u] = null;
-      away[u] = Math.max(0, away[u] - 1);
+      awayL[u] = Math.max(0, awayL[u] - 1);
       if (p == 0)
         hl += ` ${NM[b.t]} ablukası bitti, büyük gemin iskeleye döndü.`;
       else if (own[b.t] == 0)
@@ -7472,7 +7485,7 @@ function leaveAlly(q) {
   lg(`${PN[q]} ile ittifaktan çıktın (${EXC} altın).`);
 }
 // Başkent koruması (ilk CAPT tur) ve gizli başkent kuralları
-const CAPT = 3;
+const CAPT = 5;
 const prot = t => rd <= CAPT && cap.some((q, p) => q == t && own[t] == p);
 let kc = new Set();
 let mvd = [];
@@ -11017,7 +11030,7 @@ function openPop(cx, cy) {
       const b = blk[t];
       if (b) {
         blk[t] = null;
-        away[t] = Math.max(0, away[t] - 1);
+        awayL[t] = Math.max(0, awayL[t] - 1);
         $('log').textContent = `${NM[b.t]} ablukası kaldırıldı, büyük gemin iskeleye döndü.`;
       }
       re();
