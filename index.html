@@ -1874,7 +1874,7 @@ input, textarea {
       <span class="gd-v">0/50</span>
     </div>
   </div>
-  <div id="rfInfo" hidden>Barışta (saldırmadığın her tur) refah +8 artar. Her başarısız saldırı −4, bir turda 3'ten fazla fetih her biri için −10 düşürür. Vergi 2 turda bir ya da istersen her tur toplanır: sınır bölgelerinden 2 altın istemek o bölgede isyan çıkarabilir (her tur toplanırken %15, 2 turda birde %5); 1 altın vergide halk memnundur; 2 turda bir 1 altın alınan bölgelerde askerler dayanıklı olur ve oklar orada en fazla 1-2 asker öldürür, her tur 2 altın alınırsa askerler zayıflar. <b>%50</b> altında isyanlar çıkar: kötü huylu olanlar yayılır, bastırılmayan isyanlar bağımsız devlet kurar. <b>%20</b> altında ülken ikiye bölünür.</div>
+  <div id="rfInfo" hidden>Barışta (saldırmadığın her tur) refah +8 artar. Her başarısız saldırı −4, bir turda 3'ten fazla fetih her biri için −10 düşürür. Vergi 2 turda bir ya da istersen her tur toplanır: sınır bölgelerinden 2 altın istemek o bölgede isyan çıkarabilir (her tur toplanırken %15, 2 turda birde %5); 1 altın vergide halk memnundur; 2 turda bir 1 altın alınan bölgelerde askerler dayanıklı olur ve oklar orada %30 daha az asker öldürür, her tur 2 altın alınırsa askerler zayıflar. <b>%50</b> altında isyanlar çıkar: kötü huylu olanlar yayılır, bastırılmayan isyanlar bağımsız devlet kurar. <b>%20</b> altında ülken ikiye bölünür.</div>
   <!-- Harita alanı: deniz (wv), harita (m) ve animasyon katmanı (fxc) üst üste -->
   <div id="mw">
     <div id="bn"></div>
@@ -2321,7 +2321,7 @@ let taxEvery = 2;
 let taxAuto = true;
 let taxTip = false;
 // Asker dayanıklılığı (sadece oyuncu): 2 turda bir 1 altın vergi alınan bölgede halk memnun,
-// askerler dayanıklı olur ve oklar çok daha az asker öldürür. dur: 0 Zayıf, 1-2 Orta, 3-4 Yüksek.
+// askerler dayanıklı olur ve oklar %30 daha az asker öldürür. dur: 0 Zayıf, 1-2 Orta, 3-4 Yüksek.
 // durO: dayanıklılığın kime ait olduğu (bölge el değiştirirse Normal'e döner).
 let dur = [];
 let durO = [];
@@ -2395,13 +2395,13 @@ function durTick() {
         dur[t] = v > 1 ? v - 1 : v < 1 ? v + 1 : v;
     }
 }
-// Ok kaybını dayanıklılığa göre ayarlar: Yüksek → 1-2 asker (hiç değilse 1), Zayıf → %30 fazla.
+// Ok kaybını dayanıklılığa göre ayarlar: Yüksek → %30 az (hiç değilse 1), Zayıf → %30 fazla.
 function arrowLoss(t, k) {
   if (k <= 0)
     return 0;
   const c = durCls(t);
   if (c == 2)
-    return Math.min(k, Math.random() < .5 ? 1 : 2);
+    return Math.max(1, Math.round(k * .7));
   if (c == 0)
     return Math.max(0, Math.min(arm[t] - 1, Math.ceil(k * 1.3)));
   return k;
@@ -7342,7 +7342,7 @@ function taxGate() {
     const sum = () => {
       const L = nb();
       const g = L.reduce((a, u) => a + (amt == 0 ? 1 : amt == 2 ? 2 : isBorder(u) ? 1 : 2), 0);
-      const durTxt = ev == 2 ? (amt == 0 ? '🛡🛡 Bütün bölgelerde askerlerin dayanıklı olur (oklar en fazla 1-2 asker öldürür).' : amt == 1 ? '🛡🛡 Sınır bölgelerinde askerlerin dayanıklı olur; iç bölgeler orta kalır.' : '🛡 Askerlerin orta dayanıklılıkta kalır.') : (amt == 2 ? '💔 Her tur 2 altın halkı yorar: askerlerin zayıflar, oklar daha çok öldürür.' : '🛡 Askerlerin orta dayanıklılıkta kalır.');
+      const durTxt = ev == 2 ? (amt == 0 ? '🛡🛡 Bütün bölgelerde askerlerin dayanıklı olur (oklar %30 daha az asker öldürür).' : amt == 1 ? '🛡🛡 Sınır bölgelerinde askerlerin dayanıklı olur; iç bölgeler orta kalır.' : '🛡 Askerlerin orta dayanıklılıkta kalır.') : (amt == 2 ? '💔 Her tur 2 altın halkı yorar: askerlerin zayıflar, oklar daha çok öldürür.' : '🛡 Askerlerin orta dayanıklılıkta kalır.');
       const rv = amt == 2 ? `⚠ Sınır bölgelerinden 2 altın istiyorsun: her toplamada %${ev == 1 ? 15 : 5} isyan ihtimali.` : '✓ Sınırlarda isyan riski yok.';
       return `<div class="txg-s${amt == 2 ? ' warn' : ''}">💰 ${ev == 1 ? 'Her tur' : '2 turda bir'} yaklaşık <b>${g} altın</b> vergi.<br>${durTxt}<br>${rv}</div>`;
     };
@@ -10671,7 +10671,7 @@ function openPop(cx, cy) {
     }
     {
       const c = durCls(t);
-      inf.y += ` Asker dayanıklılığı: ${durBadge(t)}.` + (c == 2 ? ' Halk memnun: oklar bu bölgede en fazla 1-2 asker öldürür.' : c == 0 ? ' Ağır vergi (her tur 2 altın) halkı yordu: oklar %30 daha fazla asker öldürür.' : ' 2 turda bir 1 altın vergi alırsan dayanıklılık yükselir.');
+      inf.y += ` Asker dayanıklılığı: ${durBadge(t)}.` + (c == 2 ? ' Halk memnun: oklar bu bölgede %30 daha az asker öldürür.' : c == 0 ? ' Ağır vergi (her tur 2 altın) halkı yordu: oklar %30 daha fazla asker öldürür.' : ' 2 turda bir 1 altın vergi alırsan dayanıklılık yükselir.');
     }
     inf.y += wall[t] >= 2 ? ` Okçulu sur: surdaki okçular yakındaki saldırılarına ve savunmana destek verir. Bu bölgeye en az ${WALLMIN} askerle saldırılabilir. Düşman okları içeri işlemez.` : wall[t] ? ` Sur sv1: düşman okları içeri işlemez, en az ${WALLMIN1} askerle saldırılabilir. Sv2'de surun üstüne okçular çıkar.` : '';
     if (dock[t])
@@ -10730,7 +10730,7 @@ function openPop(cx, cy) {
     const nTax = taxEvery == 1 ? 'Her tur' : rd % 2 == 0 ? 'Bu tur toplandı; sonraki 2 tur sonra' : 'Gelecek tur';
     inf.v = (taxAuto ? '<b>🤖 Otomatik vergi açık:</b> her tur başında iç bölgeler 2, sınır bölgeleri 1 altına ayarlanır; bir şey yapmana gerek yok.<br>' : '<b>✋ Vergiyi sen ayarlıyorsun.</b> Kolayı için Otomatik vergiyi açabilirsin.<br>') + `${brd ? '<b>Sınır bölgesi.</b>' : '<b>İç bölge.</b>'} ${taxEvery == 1 ? 'Her tur' : '2 turda bir'} <b>${tax[t]} altın</b> verir. Toplam: ${taxOf(0)} altın. ${nTax} toplanacak.<br>` +
       (brd ? `Sınır bölgeleri 1 altın verir; 2 istersen her toplamada o bölgede isyan çıkma ihtimali olur (${taxEvery == 1 ? 'her tur toplanırken %15' : '2 turda bir toplanırken %5'}).` : 'İç bölgeler 2 altını sorunsuz verir. 1 altında halk memnun olur.') +
-      `<div class="dur-l">Bu bölgenin asker dayanıklılığı: ${durBadge(t)}</div><div class="dur-k"><i style="--dc:${DURC[0]}"></i>Zayıf <i style="--dc:${DURC[1]}"></i>Orta <i style="--dc:${DURC[2]}"></i>Yüksek <small>(haritada renkli)</small></div>2 turda bir 1 altın alınan bölgelerde askerler dayanıklı olur: oklar en fazla 1-2 asker öldürür. Her tur 2 altın alınırsa askerler zayıflar, oklar %30 daha çok öldürür.` +
+      `<div class="dur-l">Bu bölgenin asker dayanıklılığı: ${durBadge(t)}</div><div class="dur-k"><i style="--dc:${DURC[0]}"></i>Zayıf <i style="--dc:${DURC[1]}"></i>Orta <i style="--dc:${DURC[2]}"></i>Yüksek <small>(haritada renkli)</small></div>2 turda bir 1 altın alınan bölgelerde askerler dayanıklı olur: oklar %30 daha az asker öldürür. Her tur 2 altın alınırsa askerler zayıflar, oklar %30 daha çok öldürür.` +
       (brd && tax[t] >= 2 ? `<em class="tx-warn">⚠ Sınır bölgesinden 2 altın: her toplamada %${taxEvery == 1 ? 15 : 5} isyan ihtimali!</em>` : '');
     if (inc[t] > 0) {
       const keep = new Set(['f', 'g', 'sf', 'sc']);
