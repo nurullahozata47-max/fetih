@@ -1005,6 +1005,38 @@ button:focus-visible {
 #txg .txg-s.warn {
   border: 1px solid rgba(229, 86, 109, .6);
 }
+/* Dayanıklılık rozeti ve renk anahtarı */
+.dur-b {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 9px;
+  background: var(--dc);
+  color: #12252e;
+  font-weight: 800;
+  white-space: nowrap;
+}
+#pop .dur-l {
+  margin: 6px 0 4px;
+}
+#pop .dur-k {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  opacity: .9;
+}
+#pop .dur-k i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--dc);
+  margin-left: 4px;
+}
+#pop .dur-k small {
+  opacity: .7;
+}
 /* Gemiyle taşıma paneli */
 #pop .sp-row {
   display: flex;
@@ -2173,12 +2205,64 @@ let taxEvery = 2;
 let taxAuto = true;
 let taxTip = false;
 // Asker dayanıklılığı (sadece oyuncu): 2 turda bir 1 altın vergi alınan bölgede halk memnun,
-// askerler dayanıklı olur ve oklar çok daha az asker öldürür. dur: 0 Zayıf, 1-2 Normal, 3-4 Yüksek.
+// askerler dayanıklı olur ve oklar çok daha az asker öldürür. dur: 0 Zayıf, 1-2 Orta, 3-4 Yüksek.
 // durO: dayanıklılığın kime ait olduğu (bölge el değiştirirse Normal'e döner).
 let dur = [];
 let durO = [];
 const durCls = t => own[t] != 0 || ONLINE || durO[t] != 0 ? 1 : dur[t] >= 3 ? 2 : dur[t] <= 0 ? 0 : 1;
-const DURN = ['Zayıf', 'Normal', 'Yüksek'];
+const DURN = ['Zayıf', 'Orta', 'Yüksek'];
+// Dayanıklılık renkleri: Zayıf kırmızı, Orta sarı, Yüksek mavi.
+const DURC = ['#e5394b', '#f2c230', '#3a8ee8'];
+const durBadge = t => { const c = durCls(t); return `<b class="dur-b" style="--dc:${DURC[c]}">${['💔', '🛡', '🛡🛡'][c]} ${DURN[c]}</b>`; };
+// Vergi sekmesi açıkken bölgeler dayanıklılık rengine boyanır (bölge maskeleri bir kez çizilip saklanır).
+let durMK = null;
+let durM = {};
+function durTint(t) {
+  if (durMK !== cell) {
+    durMK = cell;
+    durM = {};
+  }
+  let m = durM[t];
+  if (!m) {
+    let x0 = W, y0 = H, x1 = -1, y1 = -1;
+    for (let i = 0; i < W * H; i++)
+      if (cell[i] == t) {
+        const x = i % W;
+        const y = (i / W) | 0;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    if (x1 < 0)
+      return;
+    const c = document.createElement('canvas');
+    c.width = (x1 - x0 + 1) * S;
+    c.height = (y1 - y0 + 1) * S;
+    const cg = c.getContext('2d');
+    cg.fillStyle = '#fff';
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++)
+        if (cell[y * W + x] == t)
+          cg.fillRect((x - x0) * S, (y - y0) * S, S, S);
+    m = durM[t] = { c, x: x0 * S, y: y0 * S, k: {} };
+  }
+  const col = DURC[durCls(t)];
+  let cc = m.k[col];
+  if (!cc) {
+    cc = m.k[col] = document.createElement('canvas');
+    cc.width = m.c.width;
+    cc.height = m.c.height;
+    const q = cc.getContext('2d');
+    q.drawImage(m.c, 0, 0);
+    q.globalCompositeOperation = 'source-in';
+    q.fillStyle = col;
+    q.fillRect(0, 0, cc.width, cc.height);
+  }
+  g.globalAlpha = .82;
+  g.drawImage(cc, m.x, m.y);
+  g.globalAlpha = 1;
+}
 function durTick() {
   for (let t = 0; t < N; t++)
     if (own[t] == 0) {
@@ -7079,7 +7163,7 @@ function taxGate() {
     const sum = () => {
       const L = nb();
       const g = L.reduce((a, u) => a + (amt == 0 ? 1 : amt == 2 ? 2 : isBorder(u) ? 1 : 2), 0);
-      const durTxt = ev == 2 ? (amt == 0 ? '🛡🛡 Bütün bölgelerde askerlerin dayanıklı olur (oklar en fazla 1-2 asker öldürür).' : amt == 1 ? '🛡🛡 Sınır bölgelerinde askerlerin dayanıklı olur; iç bölgeler normal kalır.' : '🛡 Askerlerin normal dayanıklılıkta kalır.') : (amt == 2 ? '💔 Her tur 2 altın halkı yorar: askerlerin zayıflar, oklar daha çok öldürür.' : '🛡 Askerlerin normal dayanıklılıkta kalır.');
+      const durTxt = ev == 2 ? (amt == 0 ? '🛡🛡 Bütün bölgelerde askerlerin dayanıklı olur (oklar en fazla 1-2 asker öldürür).' : amt == 1 ? '🛡🛡 Sınır bölgelerinde askerlerin dayanıklı olur; iç bölgeler orta kalır.' : '🛡 Askerlerin orta dayanıklılıkta kalır.') : (amt == 2 ? '💔 Her tur 2 altın halkı yorar: askerlerin zayıflar, oklar daha çok öldürür.' : '🛡 Askerlerin orta dayanıklılıkta kalır.');
       const rv = amt == 2 ? `⚠ Sınır bölgelerinden 2 altın istiyorsun: her toplamada %${ev == 1 ? 15 : 5} isyan ihtimali.` : '✓ Sınırlarda isyan riski yok.';
       return `<div class="txg-s${amt == 2 ? ' warn' : ''}">💰 ${ev == 1 ? 'Her tur' : '2 turda bir'} yaklaşık <b>${g} altın</b> vergi.<br>${durTxt}<br>${rv}</div>`;
     };
@@ -9318,6 +9402,12 @@ function taxBadge(t) {
   g.beginPath();
   g.arc(x + 1, y + 1.5, 12, 0, 7);
   g.fill();
+  if (!ONLINE) {
+    g.fillStyle = DURC[durCls(t)];
+    g.beginPath();
+    g.arc(x, y, 15.5, 0, 7);
+    g.fill();
+  }
   g.fillStyle = inc[t] ? '#7d8a91' : '#ffd36b';
   g.beginPath();
   g.arc(x, y, 12, 0, 7);
@@ -9862,6 +9952,10 @@ function anim(ts) {
   const now = performance.now();
   if (typeof menuEl != 'undefined' && !menuEl.hidden)
     drawMenuBg(ts);
+  if (taxView && !pop.hidden && !ONLINE)
+    for (let t = 0; t < N; t++)
+      if (own[t] == 0)
+        durTint(t);
   for (let t = 0; t < N; t++) {
     const [cx, cy] = cen[t];
     if (bar[t] && Vg.has(t)) {
@@ -10394,7 +10488,7 @@ function openPop(cx, cy) {
     o.push(['w', wall[t] >= 2 ? 'Okçulu sur (tam)' : wall[t] ? `Suru yükselt: Sv2 okçulu (${WC(1)} altın)` : `Sur (${WC(0)} altın)`, wall[t] < 2 && gold[0] >= WC(wall[t])]);
     {
       const c = durCls(t);
-      inf.y += ` ${['💔', '🛡', '🛡🛡'][c]} Asker dayanıklılığı: <b>${DURN[c]}</b>.` + (c == 2 ? ' Halk memnun: oklar bu bölgede en fazla 1-2 asker öldürür.' : c == 0 ? ' Ağır vergi (her tur 2 altın) halkı yordu: oklar %30 daha fazla asker öldürür.' : ' 2 turda bir 1 altın vergi alırsan dayanıklılık yükselir.');
+      inf.y += ` Asker dayanıklılığı: ${durBadge(t)}.` + (c == 2 ? ' Halk memnun: oklar bu bölgede en fazla 1-2 asker öldürür.' : c == 0 ? ' Ağır vergi (her tur 2 altın) halkı yordu: oklar %30 daha fazla asker öldürür.' : ' 2 turda bir 1 altın vergi alırsan dayanıklılık yükselir.');
     }
     inf.y += wall[t] >= 2 ? ` Okçulu sur: surdaki okçular yakındaki saldırılarına ve savunmana destek verir. Bu bölgeye en az ${WALLMIN} askerle saldırılabilir. Düşman okları içeri işlemez.` : wall[t] ? ` Sur sv1: düşman okları içeri işlemez, en az ${WALLMIN1} askerle saldırılabilir. Sv2'de surun üstüne okçular çıkar.` : '';
     if (dock[t])
@@ -10449,7 +10543,7 @@ function openPop(cx, cy) {
     const nTax = taxEvery == 1 ? 'Her tur' : rd % 2 == 0 ? 'Bu tur toplandı; sonraki 2 tur sonra' : 'Gelecek tur';
     inf.v = (taxAuto ? '<b>🤖 Otomatik vergi açık:</b> her tur başında iç bölgeler 2, sınır bölgeleri 1 altına ayarlanır; bir şey yapmana gerek yok.<br>' : '<b>✋ Vergiyi sen ayarlıyorsun.</b> Kolayı için Otomatik vergiyi açabilirsin.<br>') + `${brd ? '<b>Sınır bölgesi.</b>' : '<b>İç bölge.</b>'} ${taxEvery == 1 ? 'Her tur' : '2 turda bir'} <b>${tax[t]} altın</b> verir. Toplam: ${taxOf(0)} altın. ${nTax} toplanacak.<br>` +
       (brd ? `Sınır bölgeleri 1 altın verir; 2 istersen her toplamada o bölgede isyan çıkma ihtimali olur (${taxEvery == 1 ? 'her tur toplanırken %15' : '2 turda bir toplanırken %5'}).` : 'İç bölgeler 2 altını sorunsuz verir. 1 altında halk memnun olur.') +
-      `<br>🛡 Dayanıklılık: <b>${DURN[durCls(t)]}</b> (Zayıf / Normal / Yüksek). 2 turda bir 1 altın alınan bölgelerde askerler dayanıklı olur, oklar en fazla 1-2 asker öldürür. Her tur 2 altın alınırsa askerler zayıflar.` +
+      `<div class="dur-l">Bu bölgenin asker dayanıklılığı: ${durBadge(t)}</div><div class="dur-k"><i style="--dc:${DURC[0]}"></i>Zayıf <i style="--dc:${DURC[1]}"></i>Orta <i style="--dc:${DURC[2]}"></i>Yüksek <small>(haritada renkli)</small></div>2 turda bir 1 altın alınan bölgelerde askerler dayanıklı olur: oklar en fazla 1-2 asker öldürür. Her tur 2 altın alınırsa askerler zayıflar, oklar %30 daha çok öldürür.` +
       (brd && tax[t] >= 2 ? `<em class="tx-warn">⚠ Sınır bölgesinden 2 altın: her toplamada %${taxEvery == 1 ? 15 : 5} isyan ihtimali!</em>` : '');
     if (inc[t] > 0) {
       const keep = new Set(['f', 'g', 'sf', 'sc']);
