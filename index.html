@@ -1874,7 +1874,7 @@ input, textarea {
       <span class="gd-v">0/50</span>
     </div>
   </div>
-  <div id="rfInfo" hidden>Barışta (saldırmadığın her tur) refah +8 artar. Her başarısız saldırı −4, bir turda 3'ten fazla fetih her biri için −10 düşürür. Vergi 2 turda bir ya da istersen her tur toplanır: sınır bölgelerinden 2 altın istemek o bölgede isyan çıkarabilir (her tur toplanırken %15, 2 turda birde %5); 1 altın vergide halk memnundur. Sınır askerlerinin dayanıklılığı vergiye bağlıdır: 2 turda bir ve her yerden 1 altın alırsan Yüksek (oklar %30 daha az öldürür), sınırdan 2 altın alırsan Zayıf (%30 daha çok); iç bölgeler hep Orta. <b>%50</b> altında isyanlar çıkar: kötü huylu olanlar yayılır, bastırılmayan isyanlar bağımsız devlet kurar. <b>%20</b> altında ülken ikiye bölünür.</div>
+  <div id="rfInfo" hidden>Barışta (saldırmadığın her tur) refah +8 artar. Her başarısız saldırı −4, bir turda 3'ten fazla fetih her biri için −10 düşürür. Vergi 2 turda bir ya da istersen her tur toplanır: sınır bölgelerinden 2 altın istemek o bölgede isyan çıkarabilir (her tur toplanırken %15, 2 turda birde %5); 1 altın vergide halk memnundur. Sınır askerlerinin dayanıklılığı vergiye bağlıdır: 2 turda bir ve her yerden 1 altın alırsan Yüksek (askerler saldırıda, savunmada, ok, mancınık ve top ateşinde %30 daha az kayıp verir), sınırdan 2 altın alırsan Zayıf (%30 daha çok kayıp); iç bölgeler hep Orta. <b>%50</b> altında isyanlar çıkar: kötü huylu olanlar yayılır, bastırılmayan isyanlar bağımsız devlet kurar. <b>%20</b> altında ülken ikiye bölünür.</div>
   <!-- Harita alanı: deniz (wv), harita (m) ve animasyon katmanı (fxc) üst üste -->
   <div id="mw">
     <div id="bn"></div>
@@ -2240,12 +2240,15 @@ async function escortFire(a, t) {
   nav.push({ k: 'strike', u: a, t, ax: ex, ay: ey, fx: ex, fy: ey, tx: cen[t][0] * S, ty: cen[t][1] * S, n, sailOut: false, t0: performance.now(), dur, col: COL[own[a]] });
   await sleep(dur * .5);
   let k = 0;
+  let a0 = arm[t];
   for (let i = 0; i < n; i++) {
-    const d = Math.ceil(arm[t] * R(.28, .4));
-    const h = Math.max(0, Math.min(d, arm[t] - 1));
-    arm[t] -= h;
+    const d = Math.ceil(a0 * R(.28, .4));
+    const h = Math.max(0, Math.min(d, a0 - 1));
+    a0 -= h;
     k += h;
   }
+  k = arrowLoss(t, k);
+  arm[t] -= k;
   if (k > 0)
     fl.push({ t, dx: 0, txt: visSet().has(t) ? `-${k} top` : 'Top!', col: '#ff6b6b', t0: performance.now() });
   ui();
@@ -2332,7 +2335,7 @@ let durO = [];
 let durP = [];
 let durN = [];
 const durCls = t => own[t] != 0 || ONLINE || durO[t] != 0 || !isBorder(t) ? 1 : dur[t];
-const DURRULE = 'Sadece <b>sınır bölgelerinin</b> dayanıklılığı değişir; iç bölgeler hep Orta kalır. 🔵 <b>Yüksek</b>: vergi 2 turda bir ve her yerden 1 altın. 🟡 <b>Orta</b>: sınır 1 iç 2 altın ya da her tur 1 altın. 🔴 <b>Zayıf</b>: sınırdan 2 altın. Değişim art arda 2 vergi toplamasından sonra olur. Yüksek: oklar %30 daha az öldürür; Zayıf: %30 daha çok.';
+const DURRULE = 'Sadece <b>sınır bölgelerinin</b> dayanıklılığı değişir; iç bölgeler hep Orta kalır. 🔵 <b>Yüksek</b>: vergi 2 turda bir ve her yerden 1 altın. 🟡 <b>Orta</b>: sınır 1 iç 2 altın ya da her tur 1 altın. 🔴 <b>Zayıf</b>: sınırdan 2 altın. Değişim art arda 2 vergi toplamasından sonra olur. Yüksek askerler her yerde %30 daha dayanıklıdır (saldırı, savunma, ok, mancınık, top); Zayıf askerler %30 daha çok kayıp verir.';
 // Sınır bölgesinin vergi düzenine göre gideceği dayanıklılık.
 function durGoal(t) {
   if (tax[t] >= 2)
@@ -2433,7 +2436,7 @@ function durTick() {
       }
     }
 }
-// Ok kaybını dayanıklılığa göre ayarlar: Yüksek → %30 az (hiç değilse 1), Zayıf → %30 fazla.
+// Ok, mancınık ve top kaybını dayanıklılığa göre ayarlar: Yüksek → %30 az (hiç değilse 1), Zayıf → %30 fazla. Savaş zarlarında da aynı oran uygulanır.
 function arrowLoss(t, k) {
   if (k <= 0)
     return 0;
@@ -5195,12 +5198,15 @@ async function navalStrike(u, t, sailOut) {
   const tD = sailOut ? .62 : .5;
   await sleep(dur * tD);
   let k = 0;
+  let a0 = arm[t];
   for (let i = 0; i < n; i++) {
-    const d = Math.ceil(arm[t] * R(.28, .4));
-    const h = Math.max(0, Math.min(d, arm[t] - 1));
-    arm[t] -= h;
+    const d = Math.ceil(a0 * R(.28, .4));
+    const h = Math.max(0, Math.min(d, a0 - 1));
+    a0 -= h;
     k += h;
   }
+  k = arrowLoss(t, k);
+  arm[t] -= k;
   const vs = visSet().has(t);
   if (k > 0)
     fl.push({ t, dx: 0, txt: vs ? `-${k}` : 'Top!', col: '#ff6b6b', t0: performance.now() });
@@ -5791,13 +5797,17 @@ async function battle(a, t, sea, F) {
   }
   let A = F != null ? F : arm[a] - 1;
   let D = arm[t];
+  // Dayanıklılık: Yüksek bölgenin askeri her kayıpta %30 ihtimalle kurtulur, Zayıf bölgeninki %30 ihtimalle bir asker fazla kaybeder.
+  const dA = durCls(a);
+  const dD = durCls(t);
+  const hit = c => c == 2 ? (Math.random() < .3 ? 0 : 1) : c == 0 ? (Math.random() < .3 ? 2 : 1) : 1;
   while (A > 0 && D > 0) {
     const x = Math.ceil(Math.random() * 6);
     const y = Math.ceil(Math.random() * 6) + wall[t];
     if (HUM.has(own[a]) && DIF < 2 ? x >= y : x > y)
-      D--;
+      D = Math.max(0, D - hit(dD));
     else
-      A--;
+      A = Math.max(0, A - hit(dA));
   }
   const w = D == 0;
   $('log').textContent = `${PN[own[a]]}: ${NM[a]} → ${NM[t]} ${w ? 'fethedildi' : 'savunuldu'}${k1 + k2 > 0 ? ` (okçu desteği: ${visSet().has(t) ? k1 : '?'} savunucu, ${k2} saldıran vuruldu)` : ''}`;
@@ -7351,7 +7361,10 @@ function botPick(p) {
         else
           e++;
       });
-      return a * 1.6 + f * .4 - e * .35 + R(0, 1.6) - (t >= N - NI ? .3 : 0);
+      // Başkente yakın bölgeler öncelikli: başkent etrafından genişlenir, uzak kıyılara dağılmaz.
+      const hd = HD[cap[p]][t];
+      const dc = hd < 99 ? hd : 4 + Math.hypot(cen[t][0] - cen[cap[p]][0], cen[t][1] - cen[cap[p]][1]) / 25;
+      return a * 1.6 + f * .4 - e * .35 + R(0, 1.6) - (t >= N - NI ? .3 : 0) - dc * .8;
     };
   return fr.map(t => [sc(t), t]).sort((a, b) => b[0] - a[0])[0][1];
 }
@@ -7393,7 +7406,7 @@ function taxGate() {
     const sum = () => {
       const L = nb();
       const g = L.reduce((a, u) => a + (amt == 0 ? 1 : amt == 2 ? 2 : isBorder(u) ? 1 : 2), 0);
-      const durTxt = amt == 2 ? '🔴 Sınırdan 2 altın halkı yorar: sınır askerlerin <b>Zayıf</b> olur, oklar %30 daha çok öldürür.' : ev == 2 && amt == 0 ? '🔵 Sınır askerlerin <b>Yüksek</b> dayanıklılığa çıkar: oklar %30 daha az öldürür.' : '🟡 Askerlerin <b>Orta</b> dayanıklılıkta kalır.';
+      const durTxt = amt == 2 ? '🔴 Sınırdan 2 altın halkı yorar: sınır askerlerin <b>Zayıf</b> olur: her yerde %30 daha çok kayıp.' : ev == 2 && amt == 0 ? '🔵 Sınır askerlerin <b>Yüksek</b> dayanıklılığa çıkar: saldırıda, savunmada, ok, mancınık ve top ateşinde %30 daha az kayıp.' : '🟡 Askerlerin <b>Orta</b> dayanıklılıkta kalır.';
       const rv = amt == 2 ? `⚠ Sınır bölgelerinden 2 altın istiyorsun: her toplamada %${ev == 1 ? 15 : 5} isyan ihtimali.` : '✓ Sınırlarda isyan riski yok.';
       return `<div class="txg-s${amt == 2 ? ' warn' : ''}">💰 ${ev == 1 ? 'Her tur' : '2 turda bir'} yaklaşık <b>${g} altın</b> vergi.<br>${durTxt}<br><small>Dayanıklılık sadece sınır bölgelerinde değişir, 2 vergi toplamasından sonra. İç bölgeler hep Orta.</small><br>${rv}</div>`;
     };
@@ -9705,7 +9718,7 @@ async function catapult(a, t) {
         wTxt.push('surlar yıkıldı');
         catUp(a);
       }
-      const k = Math.max(0, Math.min(arm[t] - 1, 1 + Math.floor(Math.random() * 2)));
+      const k = arrowLoss(t, Math.max(0, Math.min(arm[t] - 1, 1 + Math.floor(Math.random() * 2))));
       arm[t] -= k;
       killed += k;
       fl.push({ t, dx: 0, txt: 'İsabet!', col: '#ffd36b', t0: performance.now() });
@@ -10722,7 +10735,7 @@ function openPop(cx, cy) {
     }
     {
       const c = durCls(t);
-      inf.y += ` Asker dayanıklılığı: ${durBadge(t)}.` + (c == 2 ? ' Halk memnun: oklar bu bölgede %30 daha az asker öldürür.' : c == 0 ? ' Sınırdan 2 altın vergi halkı yordu: oklar %30 daha fazla asker öldürür.' : !isBorder(t) ? ' İç bölgeler hep Orta kalır.' : ' Vergiyi 2 turda bir ve her yerden 1 altın alırsan sınır askerleri Yüksek olur.') + durNext(t);
+      inf.y += ` Asker dayanıklılığı: ${durBadge(t)}.` + (c == 2 ? ' Halk memnun: buranın askerleri saldırıda, savunmada, ok, mancınık ve top ateşinde %30 daha az kayıp verir.' : c == 0 ? ' Sınırdan 2 altın vergi halkı yordu: buranın askerleri her yerde %30 daha çok kayıp verir.' : !isBorder(t) ? ' İç bölgeler hep Orta kalır.' : ' Vergiyi 2 turda bir ve her yerden 1 altın alırsan sınır askerleri Yüksek olur.') + durNext(t);
     }
     inf.y += wall[t] >= 2 ? ` Okçulu sur: surdaki okçular yakındaki saldırılarına ve savunmana destek verir. Bu bölgeye en az ${WALLMIN} askerle saldırılabilir. Düşman okları içeri işlemez.` : wall[t] ? ` Sur sv1: düşman okları içeri işlemez, en az ${WALLMIN1} askerle saldırılabilir. Sv2'de surun üstüne okçular çıkar.` : '';
     if (dock[t])
