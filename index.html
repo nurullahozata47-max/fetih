@@ -974,6 +974,22 @@ button:focus-visible {
   opacity: .8;
   margin-top: 3px;
 }
+#txg .alc-in {
+  position: relative;
+}
+#txg .txg-x {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .08);
+  color: #f4efe2;
+  font-size: 16px;
+}
 #txg .txg-l {
   margin: 12px 0 6px;
   font-size: 13px;
@@ -2969,6 +2985,9 @@ let taxEvery = 2;
 // taxAuto: otomatik vergi (varsayılan açık). Her tur başında iç bölgeler 2, sınır bölgeleri 1 altına ayarlanır.
 let taxAuto = true;
 let taxTip = false;
+// taxMode: ülke geneli vergi düzeni (0 Cömert: her yer 1, 1 Dengeli: sınır 1 iç 2, 2 Ağır: her yer 2).
+// Her tur başında bütün bölgelere uygulanır; sınırlar değişince kendiliğinden ayarlanır.
+let taxMode = 1;
 // Asker dayanıklılığı (sadece oyuncu): ülke genelinde bir seviyedir ve bütün SINIR bölgelerine uygulanır;
 // iç bölgeler hep Orta. Böylece fetihle sınır değişince kazanılan seviye kaybolmaz: yeni sınırlar da hemen aynı seviyededir.
 //   2 turda bir vergi ve (çoğunlukla) her yerden 1 altın → Yüksek; sınır 1 iç 2 ya da her tur vergi → Orta;
@@ -3099,7 +3118,59 @@ function arrowLoss(t, k) {
 function taxSmart() {
   for (let u = 0; u < N; u++)
     if (own[u] == 0)
-      tax[u] = isBorder(u) ? 1 : 2;
+      tax[u] = taxMode == 0 ? 1 : taxMode == 2 ? 2 : isBorder(u) ? 1 : 2;
+}
+// Sade vergi düzenleyici: miktar (Cömert / Dengeli / Ağır) ve sıklık (2 turda bir / her tur) + özet.
+function taxEdit(o, amt, ev, goLabel, onGo, onClose, note) {
+  const nb = () => [...Array(N).keys()].filter(u => own[u] == 0);
+  const sum = () => {
+    const g = nb().reduce((a, u) => a + (amt == 0 ? 1 : amt == 2 ? 2 : isBorder(u) ? 1 : 2), 0);
+    const durTxt = amt == 2 ? '🔴 Sınırdan 2 altın halkı yorar: sınır askerlerin <b>Zayıf</b> olur: ok, mancınık ve top ateşinde %30, savaşta %10 daha çok kayıp.' : ev == 2 && amt == 0 ? '🔵 Sınır askerlerin <b>Yüksek</b> dayanıklılığa çıkar: ok, mancınık ve top ateşinde %30, savaşta %10 daha az kayıp.' : '🟡 Askerlerin <b>Orta</b> dayanıklılıkta kalır.';
+    const rv = amt == 2 ? `⚠ Sınır bölgelerinden 2 altın istiyorsun: her toplamada %${ev == 1 ? 15 : 5} isyan ihtimali.` : '✓ Sınırlarda isyan riski yok.';
+    return `<div class="txg-s${amt == 2 ? ' warn' : ''}">💰 ${ev == 1 ? 'Her tur' : '2 turda bir'} yaklaşık <b>${g} altın</b> vergi.<br>${durTxt}<br><small>Dayanıklılık sadece sınır bölgelerinde geçerli; seviye 2 vergi toplamasından sonra değişir. İç bölgeler hep Orta.</small><br>${rv}</div>`;
+  };
+  const draw = () => {
+    const b = (k, v, cur, t, sm) => `<button data-${k}="${v}" class="${v == cur ? 'on' : ''}">${t}<small>${sm}</small></button>`;
+    o.innerHTML = `<div class="alc-in">${onClose ? '<button class="txg-x" aria-label="Kapat">✕</button>' : ''}<div class="alc-mark">✋</div><h2>Vergini ayarla</h2><div class="txg-l">Ne kadar vergi?</div><div class="txg-o">${b('a', 0, amt, 'Cömert', 'her yer 1 altın')}${b('a', 1, amt, 'Dengeli', 'sınır 1, iç 2')}${b('a', 2, amt, 'Ağır', 'her yer 2 altın')}</div><div class="txg-l">Ne sıklıkla?</div><div class="txg-o">${b('e', 2, ev, '2 turda bir', 'halk rahat')}${b('e', 1, ev, 'Her tur', 'daha çok altın')}</div>${sum()}<button id="txgGo">${goLabel}</button>${note ? `<p style="margin:10px 0 0;font-size:12px">${note}</p>` : ''}</div>`;
+    o.querySelectorAll('[data-a]').forEach(x => x.onclick = () => {
+      amt = +x.dataset.a;
+      draw();
+    });
+    o.querySelectorAll('[data-e]').forEach(x => x.onclick = () => {
+      ev = +x.dataset.e;
+      draw();
+    });
+    o.querySelector('#txgGo').onclick = () => onGo(amt, ev);
+    const xb = o.querySelector('.txg-x');
+    if (xb)
+      xb.onclick = onClose;
+  };
+  draw();
+}
+// Oyun içinde vergi paneli (bölge panelindeki 💰 Vergi sekmesinden açılır).
+function openTaxPanel() {
+  if (document.getElementById('txg'))
+    return;
+  const o = document.createElement('div');
+  o.id = 'txg';
+  const close = () => {
+    o.remove();
+    ui();
+  };
+  const st = `Şu an sınırların: <b>${['🔴 Zayıf', '🟡 Orta', '🔵 Yüksek'][durL]}</b>${durLP >= 0 && durLP != durL ? ` (bir vergi toplaması sonra ${['🔴 Zayıf', '🟡 Orta', '🔵 Yüksek'][durLP]})` : ''}.`;
+  taxEdit(o, taxMode, taxEvery, '✓ Kaydet', (a, e) => {
+    taxMode = a;
+    taxEvery = e;
+    taxAuto = true;
+    taxSmart();
+    $('log').textContent = `Vergi düzeni: ${['Cömert (her yer 1 altın)', 'Dengeli (sınır 1, iç 2 altın)', 'Ağır (her yer 2 altın)'][a]}, ${e == 1 ? 'her tur' : '2 turda bir'}. Toplam ${taxOf(0)} altın.`;
+    close();
+  }, close, st);
+  o.onclick = e => {
+    if (e.target == o)
+      close();
+  };
+  document.body.appendChild(o);
 }
 function taxCollect(p) {
   let n = 0;
@@ -6413,6 +6484,7 @@ function init(noDraft, seed) {
   catXp = Array(N).fill(0);
   taxEvery = 2;
   taxAuto = true;
+  taxMode = 1;
   taxTip = false;
   allyAsked = false;
   playMs = 0;
@@ -8406,38 +8478,22 @@ function taxGate() {
     o.id = 'txg';
     let amt = 1;
     let ev = 2;
-    const nb = () => [...Array(N).keys()].filter(u => own[u] == 0);
-    const sum = () => {
-      const L = nb();
-      const g = L.reduce((a, u) => a + (amt == 0 ? 1 : amt == 2 ? 2 : isBorder(u) ? 1 : 2), 0);
-      const durTxt = amt == 2 ? '🔴 Sınırdan 2 altın halkı yorar: sınır askerlerin <b>Zayıf</b> olur: ok, mancınık ve top ateşinde %30, savaşta %10 daha çok kayıp.' : ev == 2 && amt == 0 ? '🔵 Sınır askerlerin <b>Yüksek</b> dayanıklılığa çıkar: ok, mancınık ve top ateşinde %30, savaşta %10 daha az kayıp.' : '🟡 Askerlerin <b>Orta</b> dayanıklılıkta kalır.';
-      const rv = amt == 2 ? `⚠ Sınır bölgelerinden 2 altın istiyorsun: her toplamada %${ev == 1 ? 15 : 5} isyan ihtimali.` : '✓ Sınırlarda isyan riski yok.';
-      return `<div class="txg-s${amt == 2 ? ' warn' : ''}">💰 ${ev == 1 ? 'Her tur' : '2 turda bir'} yaklaşık <b>${g} altın</b> vergi.<br>${durTxt}<br><small>Dayanıklılık sadece sınır bölgelerinde değişir, 2 vergi toplamasından sonra. İç bölgeler hep Orta.</small><br>${rv}</div>`;
-    };
     const step1 = () => {
       o.innerHTML = `<div class="alc-in"><div class="alc-mark">💰</div><h2>Vergi düzenini seç</h2><p>Bölgelerin dağıtıldı. Savaş başlamadan önce vergini nasıl toplayacağına karar ver. Az vergi alırsan halk memnun olur ve sınırdaki askerlerin oklara karşı dayanıklı olur; çok alırsan altının artar ama isyan çıkabilir ve sınır askerlerin zayıflar.</p><button id="txgAuto">🤖 Otomatik vergi<small>Sınır bölgeleri 1, iç bölgeler 2 altın, 2 turda bir. Sınırlar değiştikçe kendiliğinden ayarlanır. Askerlerin Orta dayanıklılıkta kalır.</small></button><button id="txgMan">✋ Kendim ayarlayacağım<small>Vergi miktarını ve ne sıklıkla toplanacağını sen seçersin</small></button></div>`;
       o.querySelector('#txgAuto').onclick = () => done(true);
       o.querySelector('#txgMan').onclick = step2;
     };
-    const step2 = () => {
-      const b = (k, v, cur, t, sm) => `<button data-${k}="${v}" class="${v == cur ? 'on' : ''}">${t}<small>${sm}</small></button>`;
-      o.innerHTML = `<div class="alc-in"><div class="alc-mark">✋</div><h2>Vergini ayarla</h2><div class="txg-l">Ne kadar vergi?</div><div class="txg-o">${b('a', 0, amt, 'Cömert', 'her yer 1 altın')}${b('a', 1, amt, 'Dengeli', 'sınır 1, iç 2')}${b('a', 2, amt, 'Ağır', 'her yer 2 altın')}</div><div class="txg-l">Ne sıklıkla?</div><div class="txg-o">${b('e', 2, ev, '2 turda bir', 'halk rahat')}${b('e', 1, ev, 'Her tur', 'daha çok altın')}</div>${sum()}<button id="txgGo">⚔️ Savaşa başla</button><p style="margin:10px 0 0;font-size:12px">Oyun sırasında bir bölgene basılı tutup 💰 Vergi sekmesinden tek tek de değiştirebilirsin.</p></div>`;
-      o.querySelectorAll('[data-a]').forEach(x => x.onclick = () => {
-        amt = +x.dataset.a;
-        step2();
-      });
-      o.querySelectorAll('[data-e]').forEach(x => x.onclick = () => {
-        ev = +x.dataset.e;
-        step2();
-      });
-      o.querySelector('#txgGo').onclick = () => done(false);
-    };
+    const step2 = () => taxEdit(o, amt, ev, '⚔️ Savaşa başla', (a, e) => {
+      amt = a;
+      ev = e;
+      done(false);
+    }, null, 'Oyun sırasında bir bölgene basılı tutup 💰 Vergi sekmesinden yeniden ayarlayabilirsin.');
     const done = auto => {
-      taxAuto = auto;
+      taxAuto = true;
+      taxMode = auto ? 1 : amt;
       taxEvery = auto ? 2 : ev;
       taxTip = true;
-      for (const u of nb())
-        tax[u] = auto || amt == 1 ? (isBorder(u) ? 1 : 2) : amt == 0 ? 1 : 2;
+      taxSmart();
       o.remove();
       busy = false;
       $('log').textContent = auto ? 'Otomatik vergi seçildi: sınır bölgeleri 1, iç bölgeler 2 altın, 2 turda bir.' : `Vergini sen ayarladın: ${['her yer 1 altın', 'sınır 1, iç 2 altın', 'her yer 2 altın'][amt]}, ${taxEvery == 1 ? 'her tur' : '2 turda bir'}.`;
@@ -11444,7 +11500,7 @@ function cellAt(cx, cy) {
 }
 // Yapı panelinin sekmeleri: her düğme bir kategoriye aittir.
 const POP_TABS = [['y', '🏰', 'Yapılar'], ['o', '⚔️', 'Ordu'], ['d', '⚓', 'Deniz'], ['v', '💰', 'Vergi']];
-const POP_CAT = { txf: 'v', txm: 'v', b: 'y', ub: 'y', m: 'y', um: 'y', dp: 'y', udp: 'y', w: 'y', u: 'y', uw: 'y', cm: 'y', c: 'o', g: 'o', k: 'o', f: 'o', d: 'd', ud: 'd', ss: 'd', sl: 'd', sf: 'd', ab: 'd', abx: 'd', gs: 'd', mn: 'd', sc: 'd', ct: 'o', cf: 'o', tx1: 'v', tx2: 'v', txa: 'v', txs: 'v' };
+const POP_CAT = { txp: 'v', txf: 'v', txm: 'v', b: 'y', ub: 'y', m: 'y', um: 'y', dp: 'y', udp: 'y', w: 'y', u: 'y', uw: 'y', cm: 'y', c: 'o', g: 'o', k: 'o', f: 'o', d: 'd', ud: 'd', ss: 'd', sl: 'd', sf: 'd', ab: 'd', abx: 'd', gs: 'd', mn: 'd', sc: 'd', ct: 'o', cf: 'o', tx1: 'v', tx2: 'v', txa: 'v', txs: 'v' };
 let popTab = 'y';
 let popT = -1;
 let popPos = null;
@@ -11791,20 +11847,11 @@ function openPop(cx, cy) {
       o.push(['f', shot[t] ? 'Okçular yoruldu' : `Okçu ateşi (${archN(t)})`, !shot[t]]);
     if (archN(t) > 0)
       inf.o += ' Okçular 2 bölge uzağa ok atar ve yakındaki saldırılarına destek verir.' + (arch[t] > 0 ? (archVet(t) ? ' ★ Tecrübeli okçular: savunmada da savaşırlar.' : ` Acemi okçular sadece saldırıda savaşır; 2 saldırıya katılınca tecrübeli olur ve savunmaya da katılır (${Math.min(archV[t], ARCHVET)}/${ARCHVET}).`) : '');
-    // Vergi sekmesi: 1-5 arası seviye ve tüm bölgelere uygulama.
+    // Vergi sekmesi: kısa bilgi + sade vergi paneli düğmesi.
     const brd = isBorder(t);
-    for (let v = 1; v <= 2; v++)
-      o.push(['tx' + v, String(v), true]);
-    o.push(['txs', taxAuto ? '🤖 Otomatik vergi açık ✓ (iç 2, sınır 1)' : '🤖 Otomatik vergiyi aç (iç 2, sınır 1)', true]);
-    if (taxAuto)
-      o.push(['txm', '✋ Vergiyi kendim ayarlayacağım', true]);
-    o.push(['txf', taxEvery == 1 ? '⏱ Vergi her tur toplanıyor (2 turda bire çevir)' : '⏱ Vergi 2 turda bir toplanıyor (her tura çevir)', true]);
-    o.push(['txa', `Tüm bölgelerime ${tax[t]} altın uygula`, true]);
-    const nTax = taxEvery == 1 ? 'Her tur' : rd % 2 == 0 ? 'Bu tur toplandı; sonraki 2 tur sonra' : 'Gelecek tur';
-    inf.v = (taxAuto ? '<b>🤖 Otomatik vergi açık:</b> her tur başında iç bölgeler 2, sınır bölgeleri 1 altına ayarlanır; bir şey yapmana gerek yok.<br>' : '<b>✋ Vergiyi sen ayarlıyorsun.</b> Kolayı için Otomatik vergiyi açabilirsin.<br>') + `${brd ? '<b>Sınır bölgesi.</b>' : '<b>İç bölge.</b>'} ${taxEvery == 1 ? 'Her tur' : '2 turda bir'} <b>${tax[t]} altın</b> verir. Toplam: ${taxOf(0)} altın. ${nTax} toplanacak.<br>` +
-      (brd ? `Sınır bölgeleri 1 altın verir; 2 istersen her toplamada o bölgede isyan çıkma ihtimali olur (${taxEvery == 1 ? 'her tur toplanırken %15' : '2 turda bir toplanırken %5'}).` : 'İç bölgeler 2 altını sorunsuz verir. 1 altında halk memnun olur.') +
-      `<div class="dur-l">Bu bölgenin asker dayanıklılığı: ${durBadge(t)}</div><div class="dur-k"><i style="--dc:${DURC[0]}"></i>Zayıf <i style="--dc:${DURC[1]}"></i>Orta <i style="--dc:${DURC[2]}"></i>Yüksek <small>(haritada renkli)</small></div>${durNext(t) ? durNext(t) + '<br>' : ''}${DURRULE}` +
-      (brd && tax[t] >= 2 ? `<em class="tx-warn">⚠ Sınır bölgesinden 2 altın: her toplamada %${taxEvery == 1 ? 15 : 5} isyan ihtimali!</em>` : '');
+    o.push(['txp', '💰 Vergiyi ayarla', true]);
+    inf.v = `<b>${['Cömert', 'Dengeli', 'Ağır'][taxMode]}</b> vergi, ${taxEvery == 1 ? 'her tur' : '2 turda bir'} · toplam <b>${taxOf(0)} altın</b>. ${brd ? 'Sınır bölgesi' : 'İç bölge'}: ${tax[t]} altın.` +
+      `<div class="dur-l">Asker dayanıklılığı: ${durBadge(t)}</div><div class="dur-k"><i style="--dc:${DURC[0]}"></i>Zayıf <i style="--dc:${DURC[1]}"></i>Orta <i style="--dc:${DURC[2]}"></i>Yüksek <small>(haritada renkli)</small></div>${durNext(t)}`;
     if (inc[t] > 0) {
       const keep = new Set(['f', 'g', 'sf', 'sc']);
       for (let i = o.length - 1; i >= 0; i--)
@@ -11875,7 +11922,7 @@ function openPop(cx, cy) {
         const tk = !TUT || tutOK('tab', c, true);
         return `<button data-tab="${c}" class="${c == popTab ? 'on' : ''} ${TUT && tk && c != popTab ? 'tut-hl' : ''}" ${tk ? '' : 'disabled'}><i>${ic}</i>${nm}${n ? `<em>${n}</em>` : ''}</button>`;
       }).join('')}</div>` : '') +
-      (ti ? `<span>${ti}</span>` : '') + (popTab == 'v' ? `<div class="tx-row">${list.filter(e => e[0] == 'tx1' || e[0] == 'tx2').map(([k, l]) => `<button data-k="${k}" class="${+l == tax[t] ? 'on' : ''} ${+l >= 2 && isBorder(t) ? 'hot' : ''}" ${!TUT || tutOK('k', k, true) ? '' : 'disabled'}>${l} altın</button>`).join('')}</div>` + list.filter(e => e[0] == 'txs' || e[0] == 'txm' || e[0] == 'txa' || e[0] == 'txf').map(btn).join('') : list.map(btn).join(''));
+      (ti ? `<span>${ti}</span>` : '') + (popTab == 'v' ? list.map(btn).join('') : popTab == 'zz' ? `<div class="tx-row">${list.filter(e => e[0] == 'tx1' || e[0] == 'tx2').map(([k, l]) => `<button data-k="${k}" class="${+l == tax[t] ? 'on' : ''} ${+l >= 2 && isBorder(t) ? 'hot' : ''}" ${!TUT || tutOK('k', k, true) ? '' : 'disabled'}>${l} altın</button>`).join('')}</div>` + list.filter(e => e[0] == 'txs' || e[0] == 'txm' || e[0] == 'txa' || e[0] == 'txf').map(btn).join('') : list.map(btn).join(''));
   }
   else
     pop.innerHTML = `<b>${PN[own[t]] + ' krallığı'}</b>` + (info ? `<span>${info}</span>` : '') + o.map(btn).join('');
@@ -11964,6 +12011,12 @@ function openPop(cx, cy) {
         $('log').textContent = `${NM[t]}: kıyı açıklarına ${mine[t].pts.length} mayın döşendi (${mine[t].prot.length} bölge korunuyor).`;
       }
       re();
+      return;
+    }
+    if (k == 'txp') {
+      pop.hidden = true;
+      tutEvent('txp');
+      openTaxPanel();
       return;
     }
     if (k == 'txm') {
@@ -13709,13 +13762,13 @@ const TS = [
   tutBuild('Seviye sistemi', 'Yapıların 3 seviyesi vardır ve her seviye yeni bir güç açar. <b>Kışla:</b> sv1 +2, sv2 +4 asker/tur ve casus üretimi, sv3 +6 ve dolunca askerleri kendiliğinden sınıra yollar. <b>Maden:</b> her seviye +' + MI + ' altın; her yeni maden 5 altın daha pahalıdır (en fazla 80). <b>Sandık:</b> 50 / 70 / 100 kapasite. Kule, iskele ve surun da seviyeleri var. Şimdi başkentine basılı tut ve <b>Kışlayı yükselt</b>.', 'ub', 'y', UPC, () => bar[cap[0]] >= 2),
   tutBuild('Maden', 'Altın üç yerden gelir: bölgelerinden en fazla 15 altın temel gelir, madenler ve vergi. Madenler gelirini büyütmenin en güvenli yoludur. Başkentine basılı tut ve <b>Maden</b> kur.', 'm', 'y', MC(0), () => mn[cap[0]] >= 1),
   tutBuild('Altın sandığı', 'Altının bir sınırı vardır: <b>altın sandıklarının toplam kapasitesi</b>. Başkentinde 50\'lik bir sandık hazır gelir; sığmayan altın kaybolur. Sandığı yükseltebilir ya da başka bölgelere yenisini kurabilirsin. Dikkat: sandıklı bir bölge fethedilirse içindeki altının yarısı yağmalanır! Başkentine basılı tut ve <b>Sandığı yükselt</b>.', 'udp', 'y', DPU[1], () => dep[cap[0]] >= 2),
-  { t: 'Vergi', p: 'Her bölgen <b>2 turda bir</b> vergi verir. <b>İç bölgeler</b> 2 altın verebilir; <b>sınır bölgeleri</b> 1 altın vermeli. Sınır bölgesinden 2 altın istersen halk kızar: refah düşer ve orada isyan çıkabilir. Normalde vergiler <b>otomatik</b> ayarlanır: iç bölgeler 2, sınırlar 1. İstersen kendin de ayarlayabilirsin. Başkentine basılı tut, <b>Vergi</b> sekmesini aç ve <b>Otomatik vergi</b> düğmesine dokun.',
-    allow: { lp: capOnly, tab: ['v'], k: ['txs'] },
+  { t: 'Vergi', p: 'Her bölgen <b>2 turda bir</b> vergi verir. <b>İç bölgeler</b> 2 altın verebilir; <b>sınır bölgeleri</b> 1 altın vermeli. Sınır bölgesinden 2 altın istersen halk kızar: refah düşer ve orada isyan çıkabilir. Vergi düzenini istediğin an değiştirebilirsin. Başkentine basılı tut, <b>Vergi</b> sekmesini aç ve <b>Vergiyi ayarla</b> düğmesine dokun.',
+    allow: { lp: capOnly, tab: ['v'], k: ['txp'] },
     enter: () => {
       tutT = [cap[0]];
       tData.ev = new Set();
     },
-    done: () => tData.ev && tData.ev.has('txs') },
+    done: () => tData.ev && tData.ev.has('txp') },
   tutBuild('Sur', 'Sur bölgeni korur: <b>düşman okları surun içine işlemez</b>. Suru 2. seviyeye yükseltirsen üstüne <b>okçular</b> çıkar: yakındaki saldırılarına ve savunmana ok atarlar, ayrıca o bölgeye <b>en az 15 askerle</b> saldırılabilir. Başkentine basılı tut ve <b>Sur</b> ör; panel kapanınca surun örülüşünü izle.', 'w', 'y', WC(0), () => wall[cap[0]] >= 1),
   { t: 'Ordu ve deniz', p: '<b>Ordu</b> sekmesi: okçu eğitirsin (komşu bölgelere ok atar), kışla 2. seviyedeyse <b>casus</b> üretirsin; casus düşman bölgesindeki askerleri ve binaları gösterir ama içerilere gittikçe yakalanabilir. <b>Mancınık</b> (kışla 3. seviye) 2 turda bir komşu düşmana taş atar ve surları yıkabilir. <b>Okçu kulesi</b> 2 bölge uzağa ok atar, 2. seviyede alevli ok fırlatır. <b>Deniz</b> sekmesi (kıyıda): iskele kur; küçük gemiler denizden asker taşır ve çıkarma yapar, büyük gemiler top atar, 3. seviye iskele kıyına mayın döşer.', next: 1 },
   { t: 'Asker taşı', p: 'Asker taşımak kolay: parlayan bölgene dokunup seç, sonra yanındaki parlayan kendi bölgene dokun. Küçük bir panel açılır: <b>1</b>, <b>Yarısı</b> ya da <b>Hepsi</b>. Birini seç. İpucu: alttaki <b>Toplu taşıma</b> düğmesiyle birçok bölgeden askerleri tek bir yerde toplayabilirsin.',
