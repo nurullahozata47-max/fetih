@@ -3599,16 +3599,17 @@ function drawShark(e, u, s) {
   g.globalAlpha = 1;
   g.fillStyle = '#3c4a52';
   g.beginPath();
-  g.moveTo(x - fd * 6.5, y + 1);
-  g.quadraticCurveTo(x - fd * 2.5, y + 1 - fh * .7, x + fd * 2, y + 1 - fh);
-  g.quadraticCurveTo(x + fd * 1.5, y + 1 - fh * .45, x + fd * 5, y + 1);
+  // Yüzgecin ucu geriye yatık: ön kenar (gidiş yönünde) dışbükey, arka kenar içbükey
+  g.moveTo(x + fd * 6.5, y + 1);
+  g.quadraticCurveTo(x + fd * 2.5, y + 1 - fh * .7, x - fd * 2, y + 1 - fh);
+  g.quadraticCurveTo(x - fd * 1.5, y + 1 - fh * .45, x - fd * 5, y + 1);
   g.closePath();
   g.fill();
   g.fillStyle = 'rgba(255,255,255,.18)';
   g.beginPath();
-  g.moveTo(x - fd * 4, y + 1);
-  g.quadraticCurveTo(x - fd * 1.5, y + 1 - fh * .6, x + fd * 1.2, y + 1 - fh * .95);
-  g.lineTo(x - fd * 1, y + 1);
+  g.moveTo(x + fd * 4, y + 1);
+  g.quadraticCurveTo(x + fd * 1.5, y + 1 - fh * .6, x - fd * 1.2, y + 1 - fh * .95);
+  g.lineTo(x + fd * 1, y + 1);
   g.closePath();
   g.fill();
   g.restore();
