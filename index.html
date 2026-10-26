@@ -3494,7 +3494,7 @@ function seaLife(now) {
     const p = seaSpotVisible();
     sea.nW = now + 40000 + Math.random() * 10000;
     if (p)
-      sea.whale = { x: p[0], y: p[1], dir: Math.random() < .5 ? 1 : -1, t0: now, dur: 9000 };
+      sea.whale = { x: p[0], y: p[1], dir: Math.random() < .5 ? 1 : -1, t0: now, dur: 12000 };
   }
   const s = now / 1000;
   if (sea.shark) {
@@ -3558,156 +3558,271 @@ function drawShark(e, u, s) {
   g.fill();
   g.restore();
 }
-// Kaşalot: sırtı yüzeye çıkar, öne eğik geniş bir nefes (U biçiminde açılan su püskürmesi) verir,
-// sırtını kamburlaştırıp dalar; dalarken kuyruğunu kaldırıp suya vurur.
+// Kaşalot (yandan görünüm): gövde, su altındaki bir çemberin üstünde yuvarlanarak hareket eder.
+// Önce iri, küt başı yüzeye çıkar ve nefes verir (öne eğik, U biçiminde açılan püskürme), sırt yavaşça
+// geçer, sonra kuyruk sapı dikleşir; kuyruk yüzgeçleri havaya kalkıp suya kayarak iner ve su sıçrar.
+// Bütün hareket yumuşak eğrilerle zamana bağlıdır.
+const smq = q => q <= 0 ? 0 : q >= 1 ? 1 : q * q * q * (q * (q * 6 - 15) + 10);
+function whalePose(u) {
+  // Baş açısı: çıkış (hızlı) → nefes (yavaş, tepede) → dalış (kuyruk dahil)
+  const A0 = -0.85;
+  const A1 = 0.12;
+  const A2 = 0.45;
+  const B = 1.6;
+  const AE = 0.95 + B;
+  if (u < .16)
+    return A0 + (A1 - A0) * smq(u / .16);
+  if (u < .5)
+    return A1 + (A2 - A1) * smq((u - .16) / .34);
+  return A2 + (AE - A2) * smq((u - .5) / .22);
+}
 function drawWhale(e, u, s) {
-  const x = e.x + e.dir * u * 20;
-  const y = e.y;
   const d = e.dir;
-  g.save();
-  // Halkalar
-  const ring = (cx, cy, q, a) => {
-    if (q <= 0 || q >= 1)
-      return;
-    g.globalAlpha = (1 - q) * a;
-    g.strokeStyle = '#e9f6ff';
-    g.lineWidth = 1.2;
-    g.beginPath();
-    g.ellipse(cx, cy, 6 + q * 26, 2 + q * 7, 0, 0, 7);
-    g.stroke();
-  };
-  ring(x, y + 2, u / .25, .6);
-  // Sırt: 0-.62 arası görünür; .5'ten sonra kamburlaşıp batar
-  if (u < .66) {
-    const up = Math.min(1, u / .12);
-    const dn = u > .48 ? Math.max(0, 1 - (u - .48) / .18) : 1;
-    const hb = up * dn;
-    const arch = u > .48 ? (u - .48) / .18 : 0;
-    g.save();
-    g.beginPath();
-    g.rect(x - 40, y - 30, 80, 31.5);
-    g.clip();
-    g.globalAlpha = 1;
-    const by0 = y + 1.5 + (1 - hb) * 9;
-    // Gövde: uzun koyu gri sırt; kaşalotun iri, küt başı önde
-    g.fillStyle = '#5a646b';
-    g.strokeStyle = 'rgba(20,28,32,.8)';
-    g.lineWidth = 1;
-    g.beginPath();
-    g.moveTo(x - d * 26, by0);
-    g.quadraticCurveTo(x - d * 14, by0 - 7 * hb - arch * 4, x + d * 4, by0 - 8 * hb - arch * 5);
-    g.lineTo(x + d * 20, by0 - 8.5 * hb - arch * 3);
-    g.quadraticCurveTo(x + d * 27, by0 - 7 * hb, x + d * 27, by0);
-    g.closePath();
-    g.fill();
-    g.stroke();
-    // Sırttaki küçük kambur çıkıntılar
-    g.fillStyle = '#4d565c';
-    for (let k = 0; k < 3; k++) {
-      g.beginPath();
-      g.ellipse(x - d * (6 + k * 6), by0 - 7 * hb - arch * 4 + k * 1.3, 2.2, 1.4 * hb, 0, Math.PI, 0);
-      g.fill();
-    }
-    // Islak parlaklık
-    g.strokeStyle = 'rgba(255,255,255,.28)';
-    g.lineWidth = 1.2;
-    g.beginPath();
-    g.moveTo(x - d * 14, by0 - 5.5 * hb - arch * 3);
-    g.quadraticCurveTo(x + d * 2, by0 - 8 * hb - arch * 4, x + d * 18, by0 - 7.5 * hb - arch * 2);
-    g.stroke();
-    g.restore();
-    // Sırt kenarında köpük
-    g.globalAlpha = .5 * hb;
-    g.strokeStyle = '#e9f6ff';
-    g.lineWidth = 1;
-    g.beginPath();
-    g.ellipse(x, y + 1.5, 24, 2.2, 0, 0, 7);
-    g.stroke();
+  const wy = e.y;
+  const Rr = 34;
+  const hmax = 3;
+  const B = 1.6;
+  const cx = e.x + d * u * 14;
+  const cy = wy + Rr - hmax;
+  const aH = whalePose(u);
+  const bob = Math.sin(s * 1.6) * .5;
+  const P = a => [cx + d * Rr * Math.sin(a), cy - Rr * Math.cos(a) + bob];
+  const Nn = a => [d * Math.sin(a), -Math.cos(a)];
+  // Gövde kalınlığı (baştan kuyruğa): kaşalotun kutu gibi iri başı, inceden kuyruk sapı
+  const thT = q => q < .3 ? 7.2 - Math.pow(Math.max(0, .08 - q) / .08, 2) * 3 : q < .75 ? 7.2 - (q - .3) / .45 * 3.4 : 3.8 - (q - .75) / .25 * 2.6;
+  const thB = q => q < .3 ? 5.6 : q < .75 ? 5.6 - (q - .3) / .45 * 2.2 : 3.4 - (q - .75) / .25 * 2.3;
+  const n = 44;
+  const top = [];
+  const bot = [];
+  for (let i = 0; i <= n; i++) {
+    const q = i / n;
+    const a = aH - q * B;
+    const [px, py] = P(a);
+    const [nx, ny] = Nn(a);
+    top.push([px + nx * thT(q), py + ny * thT(q)]);
+    bot.push([px - nx * thB(q), py - ny * thB(q)]);
   }
-  // Nefes: .14-.42 arası, başın önünden öne eğik ve U biçiminde açılan püskürme
-  if (u > .14 && u < .46) {
-    const q = (u - .14) / .32;
-    const bx = x + d * 19;
-    const by = y - 3;
-    // İnce su zerreleri: iki kola ayrılıp U biçiminde açılan, öne eğik püskürme
-    for (let i = 0; i < 46; i++) {
+  g.save();
+  // Su yüzeyinin altını gizle
+  g.beginPath();
+  g.rect(e.x - 120, wy - 80, 240, 80.6);
+  g.clip();
+  // Gövde
+  const gr = g.createLinearGradient(0, wy - 16, 0, wy + 2);
+  gr.addColorStop(0, '#6b767d');
+  gr.addColorStop(1, '#3f474d');
+  g.fillStyle = gr;
+  g.beginPath();
+  g.moveTo(top[0][0], top[0][1]);
+  for (let i = 1; i <= n; i++)
+    g.lineTo(top[i][0], top[i][1]);
+  for (let i = n; i >= 0; i--)
+    g.lineTo(bot[i][0], bot[i][1]);
+  // Küt baş ucu
+  {
+    const [hx, hy] = P(aH);
+    const [tx, ty] = [d * Math.cos(aH), Math.sin(aH)];
+    g.quadraticCurveTo(hx + tx * 9, hy + ty * 9, top[0][0], top[0][1]);
+  }
+  g.closePath();
+  g.fill();
+  g.strokeStyle = 'rgba(18,24,28,.7)';
+  g.lineWidth = .9;
+  g.stroke();
+  // Islak parlaklık ve sırttaki küçük kamburlar
+  g.strokeStyle = 'rgba(255,255,255,.32)';
+  g.lineWidth = 1.1;
+  g.beginPath();
+  for (let i = 2; i <= n * .7; i++) {
+    const q = i / n;
+    const a = aH - q * B;
+    const [px, py] = P(a);
+    const [nx, ny] = Nn(a);
+    const k = thT(q) - 1.6;
+    i == 2 ? g.moveTo(px + nx * k, py + ny * k) : g.lineTo(px + nx * k, py + ny * k);
+  }
+  g.stroke();
+  g.fillStyle = '#566167';
+  for (const q of [.58, .66, .73]) {
+    const a = aH - q * B;
+    const [px, py] = P(a);
+    const [nx, ny] = Nn(a);
+    g.beginPath();
+    g.arc(px + nx * (thT(q) - .4), py + ny * (thT(q) - .4), 1.5, 0, 7);
+    g.fill();
+  }
+  g.restore();
+  // Su çizgisinde gövdenin kestiği yerlerde köpük
+  {
+    const cuts = [];
+    for (let i = 0; i < n; i++) {
+      const y1 = (top[i][1] + bot[i][1]) / 2;
+      const y2 = (top[i + 1][1] + bot[i + 1][1]) / 2;
+      if ((y1 - wy) * (y2 - wy) <= 0)
+        cuts.push((top[i][0] + bot[i][0]) / 2);
+    }
+    g.strokeStyle = '#e9f6ff';
+    g.lineWidth = 1.1;
+    for (const x of cuts) {
+      g.globalAlpha = .55;
+      g.beginPath();
+      g.ellipse(x, wy + 1, 5 + Math.sin(s * 5 + x) * 1, 1.6, 0, 0, 7);
+      g.stroke();
+    }
+    // Gövde boyunca su çizgisi parıltısı
+    if (cuts.length >= 2) {
+      g.globalAlpha = .35;
+      g.beginPath();
+      g.moveTo(Math.min(...cuts) - 4, wy + 1.5);
+      g.lineTo(Math.max(...cuts) + 4, wy + 1.5);
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+  }
+  // Yüzeye çıkış halkası
+  if (u < .3) {
+    const q = u / .3;
+    g.globalAlpha = (1 - q) * .5;
+    g.strokeStyle = '#e9f6ff';
+    g.lineWidth = 1.1;
+    g.beginPath();
+    g.ellipse(e.x, wy + 1, 10 + q * 34, 3 + q * 8, 0, 0, 7);
+    g.stroke();
+    g.globalAlpha = 1;
+  }
+  // Nefes: baş tepedeyken, ileri doğru eğik ve iki kola ayrılan ince su zerreleri + sis
+  if (u > .17 && u < .5) {
+    const q = (u - .17) / .33;
+    const env = Math.sin(Math.min(1, q * 1.15) * Math.PI);
+    const [hx, hy] = P(aH - .06);
+    const [nx, ny] = Nn(aH - .06);
+    const bx = hx + nx * 6.5 + d * 2;
+    const by = hy + ny * 6.5;
+    for (let i = 0; i < 60; i++) {
+      const life = (q * 2.2 + hsh(i, 5, 3)) % 1;
       const side = i % 2 ? 1 : -1;
-      const sp = .18 + hsh(i, 3, 5) * .3;
-      const a = -Math.PI / 2 + d * .4 + side * sp;
-      const v = 14 + hsh(i, 7, 2) * 18;
-      const tq = Math.min(1, q * 1.6);
-      const px = bx + Math.cos(a) * v * tq;
-      const py = by + Math.sin(a) * v * tq + q * q * 16;
-      g.globalAlpha = Math.max(0, (1 - q) * (.5 + hsh(i, 1, 9) * .4));
+      const a = -Math.PI / 2 + d * .55 + side * (.16 + hsh(i, 3, 7) * .28);
+      const v = 12 + hsh(i, 9, 1) * 16;
+      const px = bx + Math.cos(a) * v * life;
+      const py = by + Math.sin(a) * v * life + life * life * 10;
+      g.globalAlpha = env * (1 - life) * .8;
       g.fillStyle = i % 3 ? '#ffffff' : '#d6eeff';
       g.beginPath();
-      g.arc(px, py, .8 + hsh(i, 2, 4) * .9 + q * .6, 0, 7);
+      g.arc(px, py, .7 + life * 1.2, 0, 7);
       g.fill();
     }
-    // Hafif sis bulutu
-    const mg = g.createRadialGradient(bx + d * 6, by - 16 - q * 4, 0, bx + d * 6, by - 16 - q * 4, 14 + q * 8);
-    mg.addColorStop(0, `rgba(255,255,255,${(.32 * (1 - q)).toFixed(3)})`);
+    const mx = bx + d * 8;
+    const my = by - 15;
+    const mg = g.createRadialGradient(mx, my, 0, mx, my, 16);
+    mg.addColorStop(0, `rgba(255,255,255,${(.28 * env).toFixed(3)})`);
     mg.addColorStop(1, 'rgba(255,255,255,0)');
     g.globalAlpha = 1;
     g.fillStyle = mg;
     g.beginPath();
-    g.arc(bx + d * 6, by - 16 - q * 4, 14 + q * 8, 0, 7);
+    g.arc(mx, my, 16, 0, 7);
     g.fill();
   }
-  // Kuyruk: .62-.9 arası yükselir, havada asılı kalır, suya vurarak iner
-  if (u > .6 && u < .92) {
-    const q = (u - .6) / .32;
-    const lift = q < .55 ? Math.sin(q / .55 * Math.PI / 2) : Math.cos((q - .55) / .45 * Math.PI / 2);
-    const tx = x - d * 14;
-    const ty = y + 2 - lift * 16;
+  // Kuyruk kaldırma: gövde suya gömüldükten sonra kuyruk sapı dikine yükselir, geniş kuyruk yüzgeçleri
+  // arkadan görülür (yukarı kıvrık uçlu U biçimi), bir an asılı kalır, suyu damlatarak yavaşça iner ve suya vurur.
+  if (u > .64 && u < .99) {
+    const q = (u - .64) / .35;
+    const up = q < .42 ? smq(q / .42) : q < .6 ? 1 : 1 - smq((q - .6) / .4);
+    const lean = d * (q < .6 ? 2 : 2 + (q - .6) * 10);
+    const tx = cx + d * Rr * Math.sin(0.95) - d * 6;
+    const Hs = 17 * up;
     g.save();
     g.beginPath();
-    g.rect(tx - 30, y - 40, 60, 42);
+    g.rect(tx - 40, wy - 60, 80, 60.6);
     g.clip();
-    g.globalAlpha = 1;
-    g.fillStyle = '#4b5258';
-    // Kuyruk sapı
+    const topX = tx + lean;
+    const topY = wy - Hs;
+    const gr2 = g.createLinearGradient(0, topY - 6, 0, wy);
+    gr2.addColorStop(0, '#6b767d');
+    gr2.addColorStop(1, '#3f474d');
+    g.fillStyle = gr2;
+    g.strokeStyle = 'rgba(18,24,28,.7)';
+    g.lineWidth = .9;
+    // Kuyruk sapı: aşağıda kalın, yukarı inceliyor
     g.beginPath();
-    g.moveTo(tx - 2.5, y + 3);
-    g.lineTo(tx - 1.5, ty + 2);
-    g.lineTo(tx + 1.5, ty + 2);
-    g.lineTo(tx + 2.5, y + 3);
+    g.moveTo(tx - 4.2, wy + 1);
+    g.quadraticCurveTo(tx - 3.2 + lean * .4, wy - Hs * .5, topX - 1.6, topY + 2);
+    g.lineTo(topX + 1.6, topY + 2);
+    g.quadraticCurveTo(tx + 3.2 + lean * .4, wy - Hs * .5, tx + 4.2, wy + 1);
     g.closePath();
     g.fill();
-    // Yatay kuyruk yüzgeçleri (U biçimi)
+    g.stroke();
+    // Kuyruk yüzgeçleri: iki geniş kanat, ortada çentik, uçlar hafif yukarı kıvrık
+    const sp = 16 * Math.min(1, up * 1.3);
     g.beginPath();
-    g.moveTo(tx, ty + 2);
-    g.quadraticCurveTo(tx - 6, ty - 1, tx - 12, ty - 4);
-    g.quadraticCurveTo(tx - 7, ty + 3, tx, ty + 4);
-    g.quadraticCurveTo(tx + 7, ty + 3, tx + 12, ty - 4);
-    g.quadraticCurveTo(tx + 6, ty - 1, tx, ty + 2);
+    g.moveTo(topX, topY + 2.5);
+    g.bezierCurveTo(topX - sp * .35, topY + 3.5, topX - sp * .8, topY + 1.5, topX - sp, topY - 3.5);
+    g.bezierCurveTo(topX - sp * .75, topY - 3.2, topX - sp * .35, topY - 2, topX - 1, topY - .2);
+    g.lineTo(topX, topY + .8);
+    g.lineTo(topX + 1, topY - .2);
+    g.bezierCurveTo(topX + sp * .35, topY - 2, topX + sp * .75, topY - 3.2, topX + sp, topY - 3.5);
+    g.bezierCurveTo(topX + sp * .8, topY + 1.5, topX + sp * .35, topY + 3.5, topX, topY + 2.5);
+    g.closePath();
     g.fill();
-    // Kuyruktan süzülen su damlaları
-    g.fillStyle = '#e9f6ff';
-    for (let i = 0; i < 5; i++) {
-      const ph = (s * 1.6 + i / 5) % 1;
-      g.globalAlpha = (1 - ph) * .7 * lift;
-      g.fillRect(tx - 10 + i * 5, ty + ph * (y - ty + 2), 1.2, 1.6);
+    g.stroke();
+    // Yüzgecin açık renkli alt yüzü
+    g.fillStyle = 'rgba(220,226,230,.35)';
+    g.beginPath();
+    g.ellipse(topX - sp * .45, topY + .2, sp * .32, 1.1, -.12, 0, 7);
+    g.ellipse(topX + sp * .45, topY + .2, sp * .32, 1.1, .12, 0, 7);
+    g.fill();
+    // Kuyruktan dökülen su
+    if (up > .3) {
+      g.fillStyle = '#e9f6ff';
+      for (let i = 0; i < 10; i++) {
+        const ph = (s * 1.2 + i / 10) % 1;
+        const sx = topX + (i / 9 - .5) * sp * 1.8;
+        const yy = topY + 2 + ph * (wy - topY);
+        g.globalAlpha = (1 - ph) * .8;
+        g.fillRect(sx - .5, yy, 1, 2);
+      }
+      g.globalAlpha = 1;
     }
     g.restore();
+    // Kuyruk sapının suya girdiği yerde köpük
+    g.globalAlpha = .55 * Math.min(1, up * 2);
+    g.strokeStyle = '#e9f6ff';
+    g.lineWidth = 1.1;
+    g.beginPath();
+    g.ellipse(tx, wy + 1, 6 + Math.sin(s * 6) * .8, 1.7, 0, 0, 7);
+    g.stroke();
+    g.globalAlpha = 1;
+    if (q > .9 && !e.spT)
+      e.spT = performance.now();
+    e.spX = tx;
   }
-  // Kuyruğun suya vuruşu: sıçrama ve halkalar
-  if (u > .84) {
-    const q = (u - .84) / .16;
-    const tx = x - d * 14;
-    for (let i = 0; i < 12; i++) {
-      const a = -Math.PI / 2 + (i - 5.5) * .2;
-      const v = 10 + (i % 4) * 4;
-      g.globalAlpha = Math.max(0, 1 - q);
-      g.fillStyle = i % 2 ? '#ffffff' : '#cfeaff';
-      g.beginPath();
-      g.arc(tx + Math.cos(a) * v * q, y + 1 + Math.sin(a) * v * q * 1.4 + q * q * 18, 1.6, 0, 7);
-      g.fill();
+  // Kuyruğun suya vuruşu
+  if (e.spT) {
+    const q = (performance.now() - e.spT) / 1100;
+    if (q < 1) {
+      const sx = e.spX ?? cx;
+      for (let i = 0; i < 16; i++) {
+        const a = -Math.PI / 2 + (i - 7.5) * .16;
+        const v = 9 + (i % 4) * 4;
+        g.globalAlpha = Math.max(0, 1 - q);
+        g.fillStyle = i % 2 ? '#ffffff' : '#cfeaff';
+        g.beginPath();
+        g.arc(sx + Math.cos(a) * v * q * 1.2, wy + Math.sin(a) * v * q * 1.6 + q * q * 22, 1.5, 0, 7);
+        g.fill();
+      }
+      for (const k of [0, .3]) {
+        const qq = q - k;
+        if (qq <= 0)
+          continue;
+        g.globalAlpha = (1 - qq) * .6;
+        g.strokeStyle = '#e9f6ff';
+        g.lineWidth = 1.2;
+        g.beginPath();
+        g.ellipse(sx, wy + 1, 6 + qq * 26, 2 + qq * 6, 0, 0, 7);
+        g.stroke();
+      }
+      g.globalAlpha = 1;
     }
-    ring(tx, y + 2, q, .7);
-    ring(tx, y + 2, q - .25, .5);
   }
-  g.restore();
 }
 // Harita dışında kalan açık deniz: ekran boyunda dalga çizgileri ve parıltılar (haritadakiyle aynı tarz).
 let owvT = 0;
