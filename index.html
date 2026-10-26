@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Fetih</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b171d">
@@ -1238,17 +1238,128 @@ button:focus-visible {
   animation: tutPulse .8s ease-in-out infinite;
   color: #ffb3b3;
 }
-#mnOn {
+#menu #mnOn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-top: 10px;
   width: 100%;
-  padding: 13px;
+  padding: 11px 12px;
   border-radius: 12px;
   background: rgba(63, 185, 138, .18);
   border: 2px solid rgba(63, 185, 138, .6);
   color: #f4efe2;
   font-weight: 700;
   font-size: 16px;
-  animation: rowIn .5s ease-out 1.6s both;
+  text-align: left;
+  animation: rowIn .45s ease-out .5s both;
+}
+#menu #mnOn b {
+  font-size: 28px;
+}
+#menu #mnOn small {
+  display: block;
+  font-weight: 400;
+  font-size: 12px;
+  margin-top: 2px;
+  opacity: .8;
+}
+#menu #mnOn i {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 24px;
+  opacity: .5;
+}
+/* Ayarlar düğmesi ve paneli */
+#menu {
+  touch-action: none;
+}
+#menu .mn-maps2 {
+  touch-action: pan-y;
+}
+#menu #mnSet {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  right: 12px;
+  z-index: 3;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .1);
+  border: 1px solid rgba(255, 255, 255, .2);
+  font-size: 22px;
+  line-height: 42px;
+  text-align: center;
+}
+#mnSetP {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: calc(env(safe-area-inset-top, 0px) + 62px) 12px 12px;
+  background: rgba(6, 14, 20, .45);
+}
+#mnSetP[hidden] {
+  display: none;
+}
+#mnSetP .set-card {
+  width: min(300px, 100%);
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #16303c, #0d1d25);
+  border: 1px solid rgba(255, 211, 107, .4);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .5);
+  animation: pgIn .2s ease-out both;
+}
+#mnSetP .set-hd {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 17px;
+}
+#menu #mnSetP .set-hd button {
+  margin-left: auto;
+  flex: none;
+  min-width: 0;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .08);
+  color: #f4efe2;
+  font-size: 16px;
+}
+#mnSetP .set-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  font-size: 14px;
+  font-weight: 600;
+}
+#mnSetP .set-row span {
+  opacity: .8;
+}
+#menu #mnSetP .set-row button {
+  margin-left: auto;
+  flex: none;
+  min-width: 0;
+  width: auto;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .08);
+  color: #f4efe2;
+  font-size: 15px;
+  font-weight: 700;
+}
+#mnSetP .set-row input {
+  flex: 1;
+  margin-left: 10px;
+  accent-color: #ffd36b;
 }
 #mnInst {
   margin-top: 8px;
@@ -1915,13 +2026,12 @@ input, textarea {
     <div class="mn-pg" data-pg="home">
       <button id="mnGo" class="mn-cta">Oyuna başla</button>
       <button id="mnCont" hidden>Oyuna devam et</button>
-      <button id="mnOn">🌐 Online oyna</button>
       <button id="mnInst" hidden>📲 Telefona uygulama olarak yükle</button>
-      <div class="mn-mus"><button id="mnMus" class="mus-tg" aria-label="Müzik">🔊</button><span>Müzik</span><button id="mnTrk" class="mn-trk">⚔️ Marş</button><input id="mnVol" type="range" min="0" max="100" value="70" aria-label="Müzik sesi"></div>
     </div>
     <div class="mn-pg" data-pg="map" hidden>
       <div class="mn-hd"><button class="mn-back" data-to="home" aria-label="Geri">‹</button><h3>Harita seç</h3></div>
       <div class="mn-maps2"><button class="mn-map" data-m="r" style="--k:0"><b>🎲</b><span>Rastgele<small>Her oyunda yeni kıtalar ve adalar</small></span><i>›</i></button><button class="mn-map" data-m="am" style="--k:1"><b>🌎</b><span>Amerika<small>Kuzey ve Güney Amerika, gerçek kıta</small></span><i>›</i></button><button class="mn-map" data-m="osm" style="--k:2"><b>🌙</b><span>Osmanlı<small>1600 yılı, Budin'den Yemen'e</small></span><i>›</i></button><button class="mn-map" data-m="byz" style="--k:3"><b>🏛️</b><span>Bizans<small>600 yılı, Jüstinyen sonrası Doğu Roma</small></span><i>›</i></button><button class="mn-map" data-m="arb" style="--k:4"><b>🐪</b><span>Arabistan<small>Arap Yarımadası, çöller ve kervan yolları</small></span><i>›</i></button><button class="mn-map" data-m="eur" style="--k:5"><b>🏰</b><span>Avrupa<small>İberya'dan Volga'ya bütün kıta</small></span><i>›</i></button></div>
+      <button id="mnOn"><b>🌐</b><span>Online oyna<small>Arkadaşlarınla internet üzerinden oyna</small></span><i>›</i></button>
     </div>
     <div class="mn-pg" data-pg="dif" hidden>
       <div class="mn-hd"><button class="mn-back" data-to="map" aria-label="Geri">‹</button><h3>Zorluk</h3><em id="mnMapNm"></em></div>
@@ -1939,6 +2049,8 @@ input, textarea {
     </div>
   </div>
   <div id="onl" hidden><div class="on-card" id="onc"></div></div>
+  <button id="mnSet" aria-label="Ayarlar">⚙️</button>
+  <div id="mnSetP" hidden><div class="set-card"><div class="set-hd"><b>⚙️ Ayarlar</b><button id="mnSetX" aria-label="Kapat">✕</button></div><div class="set-row"><span>Müzik</span><button id="mnMus" class="mus-tg" aria-label="Müzik">🔊</button></div><div class="set-row"><span>Parça</span><button id="mnTrk" class="mn-trk">⚔️ Marş</button></div><div class="set-row"><span>Ses düzeyi</span><input id="mnVol" type="range" min="0" max="100" value="70" aria-label="Müzik sesi"></div></div></div>
 </div>
 <script>
 // ======================================================================
@@ -14762,6 +14874,10 @@ const Mus = (() => {
     get on() {
       return on;
     },
+    auto() {
+      if (on)
+        ensure();
+    },
     toggle() {
       on = !on;
       if (on)
@@ -14871,6 +14987,25 @@ $('camb').onclick = () => {
 };
 camBtn();
 document.getElementById('mnMus').onclick = () => Mus.toggle();
+(() => {
+  const sp = document.getElementById('mnSetP');
+  document.getElementById('mnSet').onclick = () => {
+    sp.hidden = false;
+  };
+  document.getElementById('mnSetX').onclick = () => {
+    sp.hidden = true;
+  };
+  sp.onclick = e => {
+    if (e.target == sp)
+      sp.hidden = true;
+  };
+})();
+// Uygulama açılınca müzik dokunmadan başlamayı dener (ana ekrana eklenmiş uygulamada tarayıcı izin verir);
+// izin yoksa ilk dokunuşta başlar.
+try {
+  Mus.auto();
+}
+catch (e) { }
 document.getElementById('mnTrk').onclick = () => Mus.nextTrack();
 document.getElementById('mnVol').oninput = e => Mus.setVol(e.target.value / 100);
 Mus.apply();
