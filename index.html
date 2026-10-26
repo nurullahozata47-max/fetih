@@ -3457,6 +3457,258 @@ function fbmGrid(sc, s) {
 // Denizi ve kıyı dalgalarını ayrı tuvale çizer (her karede).
 // Performans: deniz tuvali yarı çözünürlüktedir ve saniyede ~16 kez yenilenir (dalgalar yavaş).
 let lastWave = -1e9;
+// ---- Deniz canlıları: ara sıra köpek balığı yüzgeci (~30 sn) ve nefes alan kaşalot (~45 sn) ----
+// Ekranda görünen denizde, kıyıdan uzak rastgele bir yerde çıkarlar.
+const sea = { shark: null, whale: null, nS: 0, nW: 0 };
+function seaSpotVisible() {
+  const rc = cv.getBoundingClientRect();
+  const mr = mw.getBoundingClientRect();
+  const x0 = Math.max(0, (mr.left - rc.left) / rc.width) * W * S;
+  const x1 = Math.min(1, (mr.right - rc.left) / rc.width) * W * S;
+  const y0 = Math.max(0, (mr.top - rc.top) / rc.height) * H * S;
+  const y1 = Math.min(1, (mr.bottom - rc.top) / rc.height) * H * S;
+  if (x1 - x0 < 40 || y1 - y0 < 40)
+    return null;
+  for (let k = 0; k < 50; k++) {
+    const x = x0 + 30 + Math.random() * Math.max(1, x1 - x0 - 60);
+    const y = y0 + 40 + Math.random() * Math.max(1, y1 - y0 - 80);
+    if (seaClear(x, y, 7))
+      return [x, y];
+  }
+  return null;
+}
+function seaLife(now) {
+  if (document.hidden || !cell || !cell.length)
+    return;
+  if (!sea.nS)
+    sea.nS = now + 8000 + Math.random() * 10000;
+  if (!sea.nW)
+    sea.nW = now + 20000 + Math.random() * 15000;
+  if (!sea.shark && now > sea.nS) {
+    const p = seaSpotVisible();
+    sea.nS = now + 26000 + Math.random() * 8000;
+    if (p)
+      sea.shark = { x: p[0], y: p[1], dir: Math.random() < .5 ? 1 : -1, t0: now, dur: 6500 };
+  }
+  if (!sea.whale && now > sea.nW) {
+    const p = seaSpotVisible();
+    sea.nW = now + 40000 + Math.random() * 10000;
+    if (p)
+      sea.whale = { x: p[0], y: p[1], dir: Math.random() < .5 ? 1 : -1, t0: now, dur: 9000 };
+  }
+  const s = now / 1000;
+  if (sea.shark) {
+    const e = sea.shark;
+    const u = (now - e.t0) / e.dur;
+    if (u >= 1)
+      sea.shark = null;
+    else
+      drawShark(e, u, s);
+  }
+  if (sea.whale) {
+    const e = sea.whale;
+    const u = (now - e.t0) / e.dur;
+    if (u >= 1)
+      sea.whale = null;
+    else
+      drawWhale(e, u, s);
+  }
+}
+// Köpek balığı: yalnız sırt yüzgeci görünür; yükselir, iz bırakarak süzülür, yavaşça batar.
+function drawShark(e, u, s) {
+  const rise = Math.min(1, u / .15);
+  const sink = u > .7 ? 1 - (u - .7) / .3 : 1;
+  const h = Math.max(0, rise * sink);
+  const x = e.x + e.dir * u * 46;
+  const y = e.y + Math.sin(s * 2.4) * .6;
+  // Dümen suyu (V şeklinde açılan iz) ve yüzgecin dibindeki köpük
+  g.save();
+  g.globalAlpha = .28 * h;
+  g.strokeStyle = '#e9f6ff';
+  g.lineWidth = .9;
+  for (const k of [-1, 1]) {
+    g.beginPath();
+    g.moveTo(x - e.dir * 2, y + 1);
+    g.quadraticCurveTo(x - e.dir * 12, y + 1 + k * 3, x - e.dir * 24, y + 1 + k * 7);
+    g.stroke();
+  }
+  g.globalAlpha = .55 * h;
+  g.beginPath();
+  g.ellipse(x, y + 1, 5, 1.4, 0, 0, 7);
+  g.stroke();
+  // Yüzgeç: kavisli üçgen, su çizgisinin altı kesik
+  g.beginPath();
+  g.rect(x - 12, y - 16, 24, 17);
+  g.clip();
+  const fh = 13 * h;
+  g.globalAlpha = 1;
+  g.fillStyle = '#3c4a52';
+  g.beginPath();
+  g.moveTo(x - e.dir * 6.5, y + 1);
+  g.quadraticCurveTo(x - e.dir * 2.5, y + 1 - fh * .7, x + e.dir * 2, y + 1 - fh);
+  g.quadraticCurveTo(x + e.dir * 1.5, y + 1 - fh * .45, x + e.dir * 5, y + 1);
+  g.closePath();
+  g.fill();
+  g.fillStyle = 'rgba(255,255,255,.18)';
+  g.beginPath();
+  g.moveTo(x - e.dir * 4, y + 1);
+  g.quadraticCurveTo(x - e.dir * 1.5, y + 1 - fh * .6, x + e.dir * 1.2, y + 1 - fh * .95);
+  g.lineTo(x - e.dir * 1, y + 1);
+  g.closePath();
+  g.fill();
+  g.restore();
+}
+// Kaşalot: sırtı yüzeye çıkar, öne eğik geniş bir nefes (U biçiminde açılan su püskürmesi) verir,
+// sırtını kamburlaştırıp dalar; dalarken kuyruğunu kaldırıp suya vurur.
+function drawWhale(e, u, s) {
+  const x = e.x + e.dir * u * 20;
+  const y = e.y;
+  const d = e.dir;
+  g.save();
+  // Halkalar
+  const ring = (cx, cy, q, a) => {
+    if (q <= 0 || q >= 1)
+      return;
+    g.globalAlpha = (1 - q) * a;
+    g.strokeStyle = '#e9f6ff';
+    g.lineWidth = 1.2;
+    g.beginPath();
+    g.ellipse(cx, cy, 6 + q * 26, 2 + q * 7, 0, 0, 7);
+    g.stroke();
+  };
+  ring(x, y + 2, u / .25, .6);
+  // Sırt: 0-.62 arası görünür; .5'ten sonra kamburlaşıp batar
+  if (u < .66) {
+    const up = Math.min(1, u / .12);
+    const dn = u > .48 ? Math.max(0, 1 - (u - .48) / .18) : 1;
+    const hb = up * dn;
+    const arch = u > .48 ? (u - .48) / .18 : 0;
+    g.save();
+    g.beginPath();
+    g.rect(x - 40, y - 30, 80, 31.5);
+    g.clip();
+    g.globalAlpha = 1;
+    const by0 = y + 1.5 + (1 - hb) * 9;
+    // Gövde: uzun koyu gri sırt; kaşalotun iri, küt başı önde
+    g.fillStyle = '#5a646b';
+    g.strokeStyle = 'rgba(20,28,32,.8)';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(x - d * 26, by0);
+    g.quadraticCurveTo(x - d * 14, by0 - 7 * hb - arch * 4, x + d * 4, by0 - 8 * hb - arch * 5);
+    g.lineTo(x + d * 20, by0 - 8.5 * hb - arch * 3);
+    g.quadraticCurveTo(x + d * 27, by0 - 7 * hb, x + d * 27, by0);
+    g.closePath();
+    g.fill();
+    g.stroke();
+    // Sırttaki küçük kambur çıkıntılar
+    g.fillStyle = '#4d565c';
+    for (let k = 0; k < 3; k++) {
+      g.beginPath();
+      g.ellipse(x - d * (6 + k * 6), by0 - 7 * hb - arch * 4 + k * 1.3, 2.2, 1.4 * hb, 0, Math.PI, 0);
+      g.fill();
+    }
+    // Islak parlaklık
+    g.strokeStyle = 'rgba(255,255,255,.28)';
+    g.lineWidth = 1.2;
+    g.beginPath();
+    g.moveTo(x - d * 14, by0 - 5.5 * hb - arch * 3);
+    g.quadraticCurveTo(x + d * 2, by0 - 8 * hb - arch * 4, x + d * 18, by0 - 7.5 * hb - arch * 2);
+    g.stroke();
+    g.restore();
+    // Sırt kenarında köpük
+    g.globalAlpha = .5 * hb;
+    g.strokeStyle = '#e9f6ff';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.ellipse(x, y + 1.5, 24, 2.2, 0, 0, 7);
+    g.stroke();
+  }
+  // Nefes: .14-.42 arası, başın önünden öne eğik ve U biçiminde açılan püskürme
+  if (u > .14 && u < .46) {
+    const q = (u - .14) / .32;
+    const bx = x + d * 19;
+    const by = y - 3;
+    // İnce su zerreleri: iki kola ayrılıp U biçiminde açılan, öne eğik püskürme
+    for (let i = 0; i < 46; i++) {
+      const side = i % 2 ? 1 : -1;
+      const sp = .18 + hsh(i, 3, 5) * .3;
+      const a = -Math.PI / 2 + d * .4 + side * sp;
+      const v = 14 + hsh(i, 7, 2) * 18;
+      const tq = Math.min(1, q * 1.6);
+      const px = bx + Math.cos(a) * v * tq;
+      const py = by + Math.sin(a) * v * tq + q * q * 16;
+      g.globalAlpha = Math.max(0, (1 - q) * (.5 + hsh(i, 1, 9) * .4));
+      g.fillStyle = i % 3 ? '#ffffff' : '#d6eeff';
+      g.beginPath();
+      g.arc(px, py, .8 + hsh(i, 2, 4) * .9 + q * .6, 0, 7);
+      g.fill();
+    }
+    // Hafif sis bulutu
+    const mg = g.createRadialGradient(bx + d * 6, by - 16 - q * 4, 0, bx + d * 6, by - 16 - q * 4, 14 + q * 8);
+    mg.addColorStop(0, `rgba(255,255,255,${(.32 * (1 - q)).toFixed(3)})`);
+    mg.addColorStop(1, 'rgba(255,255,255,0)');
+    g.globalAlpha = 1;
+    g.fillStyle = mg;
+    g.beginPath();
+    g.arc(bx + d * 6, by - 16 - q * 4, 14 + q * 8, 0, 7);
+    g.fill();
+  }
+  // Kuyruk: .62-.9 arası yükselir, havada asılı kalır, suya vurarak iner
+  if (u > .6 && u < .92) {
+    const q = (u - .6) / .32;
+    const lift = q < .55 ? Math.sin(q / .55 * Math.PI / 2) : Math.cos((q - .55) / .45 * Math.PI / 2);
+    const tx = x - d * 14;
+    const ty = y + 2 - lift * 16;
+    g.save();
+    g.beginPath();
+    g.rect(tx - 30, y - 40, 60, 42);
+    g.clip();
+    g.globalAlpha = 1;
+    g.fillStyle = '#4b5258';
+    // Kuyruk sapı
+    g.beginPath();
+    g.moveTo(tx - 2.5, y + 3);
+    g.lineTo(tx - 1.5, ty + 2);
+    g.lineTo(tx + 1.5, ty + 2);
+    g.lineTo(tx + 2.5, y + 3);
+    g.closePath();
+    g.fill();
+    // Yatay kuyruk yüzgeçleri (U biçimi)
+    g.beginPath();
+    g.moveTo(tx, ty + 2);
+    g.quadraticCurveTo(tx - 6, ty - 1, tx - 12, ty - 4);
+    g.quadraticCurveTo(tx - 7, ty + 3, tx, ty + 4);
+    g.quadraticCurveTo(tx + 7, ty + 3, tx + 12, ty - 4);
+    g.quadraticCurveTo(tx + 6, ty - 1, tx, ty + 2);
+    g.fill();
+    // Kuyruktan süzülen su damlaları
+    g.fillStyle = '#e9f6ff';
+    for (let i = 0; i < 5; i++) {
+      const ph = (s * 1.6 + i / 5) % 1;
+      g.globalAlpha = (1 - ph) * .7 * lift;
+      g.fillRect(tx - 10 + i * 5, ty + ph * (y - ty + 2), 1.2, 1.6);
+    }
+    g.restore();
+  }
+  // Kuyruğun suya vuruşu: sıçrama ve halkalar
+  if (u > .84) {
+    const q = (u - .84) / .16;
+    const tx = x - d * 14;
+    for (let i = 0; i < 12; i++) {
+      const a = -Math.PI / 2 + (i - 5.5) * .2;
+      const v = 10 + (i % 4) * 4;
+      g.globalAlpha = Math.max(0, 1 - q);
+      g.fillStyle = i % 2 ? '#ffffff' : '#cfeaff';
+      g.beginPath();
+      g.arc(tx + Math.cos(a) * v * q, y + 1 + Math.sin(a) * v * q * 1.4 + q * q * 18, 1.6, 0, 7);
+      g.fill();
+    }
+    ring(tx, y + 2, q, .7);
+    ring(tx, y + 2, q - .25, .5);
+  }
+  g.restore();
+}
 // Harita dışında kalan açık deniz: ekran boyunda dalga çizgileri ve parıltılar (haritadakiyle aynı tarz).
 let owvT = 0;
 function drawOuterWaves(ts) {
@@ -11440,6 +11692,7 @@ function anim(ts) {
   const now = performance.now();
   if (typeof menuEl != 'undefined' && !menuEl.hidden)
     drawMenuBg(ts);
+  seaLife(now);
   if (taxView && !pop.hidden && !ONLINE)
     for (let t = 0; t < N; t++)
       if (own[t] == 0)
@@ -13038,6 +13291,7 @@ $('mv').onclick = () => {
   }
 };
 let curAI = null;
+let lastOn = false;
 let lastGold = null;
 // ======================================================================
 // 17. YAPAY ZEKÂ (botlar)
@@ -13601,6 +13855,16 @@ function ui(msg) {
   if (gold && !dr)
     for (let p = 0; p < P; p++)
       clampGold(p);
+  {
+    const ls = !dr && !over && !demo && phase && cap && cap[0] >= 0 && cnt(0) > 0 && cnt(0) <= 6 && (typeof menuEl == 'undefined' || menuEl.hidden);
+    if (ls && !lastOn) {
+      lastOn = true;
+      banner('🔥 Son direniş! Topraklarını geri al!', '#e5566d');
+    }
+    else if (!ls && lastOn)
+      lastOn = false;
+    Mus.lastStand(ls);
+  }
   setTxt('ttl', dr ? 'Fetih, bölge seçimi' : `Fetih, tur ${rd}` + (rd <= CAPT ? ` (başkentler ${CAPT + 1 - rd} tur daha dokunulmaz)` : ONLINE || TUT ? '' : ` · ⏳ ${Math.floor(playMs / 60000)} dk` + (lateOn ? ' (başkent = tam fetih)' : '')));
   setHTML('chips', PN.slice(0, P).map((n, p) => cnt(p) == 0 && !dr ? (p > 3 ? '' : `<span class="dead" style="--c:${COL[p]}">${n}</span>`) : `<span class="${p == turn && !over ? 'on' : ''}" style="--c:${COL[p]}">${n} ${cnt(p)}<em style="font-style:normal;font-size:.85em;margin-left:4px;color:${ref[p] < 20 ? '#d63a3a' : ref[p] < 50 ? '#e5566d' : ref[p] < 70 ? '#c98a12' : '#3a9a6c'}">${p == 0 ? '' : '%' + ref[p]}</em>${armyOf(p) < WEAK && !dr ? '<em style="font-style:normal;font-size:.8em;margin-left:4px;color:#e5566d">zayıf</em>' : ''}${p == 0 ? ` (${gold[0]}/${capOf(0)} altın)` : ally[p] > 0 ? (tru[p] ? ` (haraç: ${ally[p]} tur)` : ally[p] == 1 ? ' (ittifak: son tur)' : ` (ittifak: ${ally[p]} tur)`) : ''}${p > 0 && bp[p].some((v, q) => v > 0 && cnt(q) > 0) ? ` (+${bp[p].map((v, q) => v > 0 && cnt(q) > 0 ? PN[q] : '').filter(Boolean).join(', ')})` : ''}</span>`).join('') + (cnt(NEU) ? `<span style="--c:#9aa3a8">Boş ${cnt(NEU)}</span>` : ''));
   setTxt('st', msg || (spySel != null && turn == 0 ? `${PN[spySel]} casusu için hedef seç: bir düşman bölgesine dokun.` : ctk && sel != null && turn == 0 ? `Mancınıklar hazır (${NM[sel]}). Komşu bir düşman bölgesine dokun.` : ordSel != null && turn == 0 ? `${PN[ordSel]} için hedef seç: ortak bir düşmanın bölgesine dokun.` : dr ? (turn == 0 && !busy ? `Bölge seç (${N - dnx} kaldı)` + (cap[0] < 0 ? ': ilk seçimin başkent olur.' : '.') : `${PN[turn]} seçiyor…`) : bd && turn == 0 ? ({ b: 'Kışla kurmak için kendi bölgene dokun.', m: 'Maden kurmak için kendi bölgene dokun.', a: 'İttifak için o krallığın herhangi bir bölgesine dokun.', w: 'Sur için başkentine (★) dokun.' }[bd]) : turn != 0 ? `${PN[turn]} oynuyor…` : gsk ? `⚔️ Gemi savaşı (${NM[sel]}): saldıracağın düşman gemisine ya da önünde durduğu kıyıya dokun.` : abk ? `💣 Bombardıman gemisi hazır (${NM[sel]}). Bombalanacak düşman kıyısına dokun.` : cn ? `Büyük gemiler hazır (${NM[sel]}). Kıyıdaki düşman bölgesine${foeShips(0, null).some(k => dseaOK(sel, blk[k].t)) ? ' ya da menzildeki düşman gemisine' : ''} dokun.` : sco ? `Keşif gemisi hazır (${NM[sel]}). Kıyıdaki bir bölgeye dokun.` : sp ? `Casus hazır (${NM[sel]}). Herhangi bir düşman bölgesine dokun; içerilere gittikçe yakalanma riski artar.` : ak ? `Okçular hazır (${NM[sel]}). menzildeki düşmana dokun (2 bölge).` : document.getElementById('txg') ? 'Vergi düzenini seç.' : phase == 'r' && !mv ? `Takviye: ${pool} birlik. Dokun: asker ekle. Basılı tut: inşa et.` : mv && bk ? (bk.src.size ? `Toplu taşıma: ${bk.src.size} bölgeden ${[...bk.src].reduce((a, u) => a + arm[u] - 1, 0)} asker seçildi. Şimdi hedef bölgeye basılı tut.` : 'Toplu taşıma: asker toplanacak bölgelere dokun, sonra hedefe basılı tut.') : mv ? (sel == null ? 'Taşımak için 2+ birlikli bölgeni seç. Basılı tut: toplu taşıma.' : `${NM[sel]} seçili. Hedef bölgene dokun, her dokunuş 1 birlik taşır.`) : sel == null ? `Saldırmak için 2+ birlikli bölgeni seç. (Fetih: ${won[0] + sup[0]}/${ext ? 5 : 3}, refah %${ref[0]})` : `${NM[sel]} seçili. Kendi bölgene dokun: asker taşı. Düşmana dokun: saldır.${shipCap(sel) > 0 ? ` Gemilerle ${shipCap(sel)} yerlik taşıma yapabilirsin (asker, okçu, mancınık): denizin ötesindeki bir kıyıya dokun.` : ''} Koyu renkli düşmana dokun; bağlantılı bölgelerinden de saldırabilirsin.`));
@@ -15654,9 +15918,90 @@ const Mus = (() => {
     if (s == 0 && lb % 8 == 0)
       cym(M, t, .12, 2.2);
   }
+  // 4) SEFER — 4/4, 116 vuruş, Dor dizisi. Yürüyen davul, tel arpeji, ney ve boru melodisi (diğerleriyle aynı aile).
+  const SE_CH = [0, 0, 3, 3, 4, 4, 0, 6];
+  const SE_MEL = [[0, 4], [2, 4], [3, 4], [4, 4], [3, 8], [2, 4], [1, 4], [2, 8], [4, 4], [3, 4], [2, 8], [1, 4], [-1, 4],
+    [0, 4], [2, 4], [4, 4], [5, 4], [4, 8], [3, 4], [2, 4], [3, 8], [2, 4], [1, 4], [0, 16]];
+  function stepSefer(i, t, spb) {
+    const bar = Math.floor(i / 16);
+    const s = i % 16;
+    const lb = bar % 24;
+    const ch = SE_CH[lb % 8];
+    const M = musG;
+    if (s == 0) {
+      pad(M, DOR(ch, -2), t, .05, spb * 16, 520);
+      pad(M, DOR(ch + 2, -1), t, .022, spb * 16, 1000);
+      pad(M, DOR(ch + 4, -1), t, .02, spb * 16, 1000);
+    }
+    // Yürüyüş davulu: DUM . . DUM . . DUM .  (+ hafif tef)
+    if (s == 0 || s == 6 || s == 10)
+      drum(M, t, s == 0 ? .48 : .32, 78, 46, .6);
+    if (s == 4 || s == 12)
+      drum(M, t, .1, 300, 240, .08);
+    if (s % 2 == 0)
+      pluck(M, DOR(ch + [0, 2, 4, 7, 4, 2, 4, 2][s / 2], 0) - 12, t, s % 4 == 0 ? .06 : .04, spb * 2);
+    if (lb >= 8 && lb < 16)
+      playMel(SE_MEL, s, lb - 8, 16, (d, l) => ney(M, DOR(ch * 0 + d, 1), t, .08, spb * l * .95));
+    if (lb >= 16) {
+      playMel(SE_MEL, s, lb - 16, 16, (d, l) => {
+        horn(M, DOR(d, 0), t, .07, spb * l * .95);
+        horn(M, DOR(d - 2, 0), t, .03, spb * l * .95);
+      });
+      if (s == 0 && lb % 4 == 0)
+        cym(M, t, .12, 1.6);
+    }
+  }
+  // 5) SON DİRENİŞ — 4/4, 138 vuruş. Az toprağı kalınca çalan, gaza getiren kahramanlık parçası:
+  // koşan kesik yaylılar, taiko ve trampet, koro; yükselen boru melodisi, sonunda ton bir basamak yükselir.
+  const LS_CH = [0, 0, 5, 5, 2, 2, 6, 6];
+  const LS_MEL = [[4, 4], [4, 2], [5, 2], [4, 8], [2, 4], [1, 2], [2, 2], [0, 8], [4, 4], [4, 2], [5, 2], [7, 8], [9, 6], [8, 2], [7, 8],
+    [7, 4], [7, 2], [8, 2], [9, 8], [11, 4], [9, 4], [7, 8], [8, 4], [7, 2], [5, 2], [4, 4], [5, 4], [4, 16]];
+  function stepDirenis(i, t, spb) {
+    const bar = Math.floor(i / 16);
+    const s = i % 16;
+    const lb = bar % 32;
+    const kl = lb >= 24 ? 2 : 0;
+    const ch = LS_CH[lb % 8];
+    const M = musG;
+    const N0 = (d, o) => MIN(d, o) + kl;
+    // Koşan ostinato: her on altılıkta kesik yaylı
+    const pat = [0, 0, 7, 0, 0, 7, 0, 5, 0, 0, 7, 0, 3, 0, 5, 7];
+    stac(M, N0(ch, -2) + pat[s], t, s % 4 == 0 ? .085 : .055, spb * .9);
+    // Taiko: 1, 2.5, 3, 4.5
+    if (s == 0 || s == 6 || s == 8 || s == 14)
+      drum(M, t, s == 0 || s == 8 ? .62 : .44, 66, 38, .7);
+    if (lb >= 4 && (s == 4 || s == 12))
+      snare(M, t, .09);
+    if (lb % 4 == 3 && s >= 8)
+      snare(M, t, .04 + (s - 8) * .015);
+    if (s == 0) {
+      pad(M, N0(ch, -2), t, .05, spb * 16, 480);
+      if (lb >= 4) {
+        chant(M, N0(ch, -1), t, .035, spb * 15);
+        chant(M, N0(ch + 2, -1), t, .028, spb * 15);
+      }
+    }
+    if (lb >= 8 && lb < 16 && s == 0)
+      [0, 4].forEach(k => horn(M, N0(ch + k, -1), t, .06, spb * 7));
+    if (lb >= 16) {
+      playMel(LS_MEL, s, (lb - 16) % 8, 16, (d, l) => {
+        horn(M, N0(d, 0), t, .085, spb * l * .95);
+        horn(M, N0(d, -1), t, .04, spb * l * .95);
+      });
+      if (s % 2 == 0)
+        pluck(M, N0(ch + [0, 2, 4, 7][(s / 2) % 4], 1), t, .03, spb * 1.5);
+      if (s == 0 && lb % 4 == 0)
+        cym(M, t, .18, 2);
+    }
+    if (lb == 23 && s == 15)
+      cym(M, t, .2, 2.4);
+  }
   // Çalan parça. Adım süresi (sn) parçaya göre.
-  const TRACKS = ['march', 'kusatma', 'hucum', 'karanlik'];
-  const TRK_NM = { march: '⚔️ Marş', kusatma: '🏰 Kuşatma', hucum: '🐎 Hücum', karanlik: '🔥 Karanlık Ordu', diyar: '🌿 Diyar' };
+  const TRACKS = ['march', 'kusatma', 'hucum', 'karanlik', 'sefer'];
+  const TRK_NM = { march: '⚔️ Marş', kusatma: '🏰 Kuşatma', hucum: '🐎 Hücum', karanlik: '🔥 Karanlık Ordu', sefer: '🛡️ Sefer', direnis: '🔥 Son Direniş', diyar: '🌿 Diyar' };
+  // Son direniş: oyuncunun az toprağı kalınca özel parça çalar; durum düzelince eski düzene döner.
+  let last = false;
+  let lastPrev = 'march';
   // mode: 'auto' bütün parçalar sırayla (her biri ~2 dk, yumuşak geçiş) ya da tek bir parça.
   let trk = 'march';
   let mode = 'auto';
@@ -15674,7 +16019,7 @@ const Mus = (() => {
   const tGain = () => (theme == 'game' ? .7 : 1.2) * (trk == 'march' ? 1 : .72);
   // Sıradaki parçaya geç: ses kısılır, parça değişir, ses yeniden açılır.
   function autoNext() {
-    if (swap || !ac)
+    if (swap || !ac || last)
       return;
     swap = true;
     musG.gain.setTargetAtTime(0, ac.currentTime, .5);
@@ -15687,8 +16032,12 @@ const Mus = (() => {
       swap = false;
     }, 1800);
   }
-  const curSpb = () => trk == 'diyar' ? 60 / 100 / 4 : trk == 'kusatma' ? 60 / 132 / 4 : trk == 'hucum' ? 60 / 112 / 3 : trk == 'karanlik' ? 60 / 104 / 2 : 60 / TEMPO[theme == 'menu' ? 'menu' : 'game'] / 4;
+  const curSpb = () => trk == 'direnis' ? 60 / 138 / 4 : trk == 'sefer' ? 60 / 116 / 4 : trk == 'diyar' ? 60 / 100 / 4 : trk == 'kusatma' ? 60 / 132 / 4 : trk == 'hucum' ? 60 / 112 / 3 : trk == 'karanlik' ? 60 / 104 / 2 : 60 / TEMPO[theme == 'menu' ? 'menu' : 'game'] / 4;
   function scheduleStep(i, t) {
+    if (trk == 'direnis')
+      return stepDirenis(i, t, curSpb());
+    if (trk == 'sefer')
+      return stepSefer(i, t, curSpb());
     if (trk == 'diyar')
       return stepDiyar(i, t, curSpb());
     if (trk == 'kusatma')
@@ -15785,7 +16134,7 @@ const Mus = (() => {
     warG.gain.setTargetAtTime(war * .6, now, .2);
     if (!trkT0)
       trkT0 = now;
-    if (mode == 'auto' && on && now - trkT0 > AUTO_SEC)
+    if (mode == 'auto' && on && !last && now - trkT0 > AUTO_SEC)
       autoNext();
     if (swap)
       return;
@@ -15921,6 +16270,32 @@ const Mus = (() => {
     },
     get playing() {
       return { mode, trk };
+    },
+    // Son direniş parçasını aç/kapat (yumuşak geçişle).
+    lastStand(v) {
+      v = !!v;
+      if (v == last)
+        return;
+      last = v;
+      if (!v && trk != 'direnis')
+        return;
+      const to = v ? 'direnis' : (mode == 'auto' ? lastPrev : mode);
+      if (v)
+        lastPrev = trk == 'direnis' ? 'march' : trk;
+      if (!ac || !musG) {
+        trk = to;
+        return;
+      }
+      swap = true;
+      musG.gain.setTargetAtTime(0, ac.currentTime, .35);
+      setTimeout(() => {
+        trk = to;
+        step = 0;
+        nextT = ac.currentTime + .12;
+        trkT0 = ac.currentTime;
+        musG.gain.setTargetAtTime(tGain() * (v ? 1.15 : 1), ac.currentTime + .05, .5);
+        swap = false;
+      }, 1200);
     },
     nextTrack() {
       const L = ['auto', ...TRACKS];
