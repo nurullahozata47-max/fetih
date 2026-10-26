@@ -2969,30 +2969,41 @@ let taxEvery = 2;
 // taxAuto: otomatik vergi (varsayılan açık). Her tur başında iç bölgeler 2, sınır bölgeleri 1 altına ayarlanır.
 let taxAuto = true;
 let taxTip = false;
-// Asker dayanıklılığı (sadece oyuncu, sadece sınır bölgeleri; iç bölgeler hep Orta). dur: 0 Zayıf, 1 Orta, 2 Yüksek.
-//   2 turda bir vergi: her yerden 1 altın → sınırlar Yüksek; sınır 1 iç 2 → Orta; sınırdan 2 altın → Zayıf.
-//   Her tur vergi: 1 altın → Orta; sınırdan 2 altın → Zayıf.
-// Değişim art arda 2 vergi toplamasında aynı hedef çıkınca olur (durP: bekleyen hedef, durN: sayaç).
-// durO: dayanıklılığın kime ait olduğu (bölge el değiştirirse Orta'ya döner).
+// Asker dayanıklılığı (sadece oyuncu): ülke genelinde bir seviyedir ve bütün SINIR bölgelerine uygulanır;
+// iç bölgeler hep Orta. Böylece fetihle sınır değişince kazanılan seviye kaybolmaz: yeni sınırlar da hemen aynı seviyededir.
+//   2 turda bir vergi ve (çoğunlukla) her yerden 1 altın → Yüksek; sınır 1 iç 2 ya da her tur vergi → Orta;
+//   sınırların çoğundan 2 altın → Zayıf. Seviye, art arda 2 vergi toplamasında aynı hedef çıkınca değişir.
+// Tek tek bakılınca: 2 altın vergi verilen sınır bölgesi Yüksek olamaz (en fazla Orta); 1 altın verilen sınır Zayıf olamaz.
+let durL = 1;
+let durLP = -1;
+let durLN = 0;
+// Eski bölge bazlı sayaçlar (kayıtlar ve testler bozulmasın diye boş tutulur).
 let dur = [];
 let durO = [];
 let durP = [];
 let durN = [];
-const durCls = t => own[t] != 0 || ONLINE || durO[t] != 0 || !isBorder(t) ? 1 : dur[t];
-const DURRULE = 'Sadece <b>sınır bölgelerinin</b> dayanıklılığı değişir; iç bölgeler hep Orta kalır. 🔵 <b>Yüksek</b>: vergi 2 turda bir ve her yerden 1 altın. 🟡 <b>Orta</b>: sınır 1 iç 2 altın ya da her tur 1 altın. 🔴 <b>Zayıf</b>: sınırdan 2 altın. Değişim art arda 2 vergi toplamasından sonra olur. Yüksek askerler ok, mancınık ve top ateşinde %30, savaşta (saldırı ve savunma) %10 daha az kayıp verir; Zayıf askerler aynı oranlarda daha çok kayıp verir.';
-// Sınır bölgesinin vergi düzenine göre gideceği dayanıklılık.
-function durGoal(t) {
+const durCls = t => {
+  if (own[t] != 0 || ONLINE || !isBorder(t))
+    return 1;
   if (tax[t] >= 2)
+    return durL == 0 ? 0 : 1;
+  return durL == 2 ? 2 : 1;
+};
+const DURRULE = 'Dayanıklılık <b>ülke genelindedir</b> ve bütün <b>sınır bölgelerine</b> uygulanır; iç bölgeler hep Orta kalır. Fetihle sınır değişse de seviye kaybolmaz, yeni sınırların da hemen aynı seviyede olur. 🔵 <b>Yüksek</b>: vergi 2 turda bir ve her yerden 1 altın. 🟡 <b>Orta</b>: sınır 1 iç 2 altın ya da her tur vergi. 🔴 <b>Zayıf</b>: sınırların çoğundan 2 altın. Seviye art arda 2 vergi toplamasından sonra değişir. 2 altın verilen sınır bölgesi Yüksek olamaz. Yüksek askerler ok, mancınık ve top ateşinde %30, savaşta (saldırı ve savunma) %10 daha az kayıp verir; Zayıf askerler aynı oranlarda daha çok kayıp verir.';
+// Ülkenin vergi düzenine göre gidilecek seviye.
+function durGoal() {
+  const B = [];
+  const I = [];
+  for (let u = 0; u < N; u++)
+    if (own[u] == 0)
+      (isBorder(u) ? B : I).push(u);
+  if (B.length && B.filter(u => tax[u] >= 2).length * 2 > B.length)
     return 0;
   if (taxEvery == 1)
     return 1;
-  const I = [];
-  for (let u = 0; u < N; u++)
-    if (own[u] == 0 && !isBorder(u))
-      I.push(u);
   return !I.length || I.filter(u => tax[u] <= 1).length * 2 >= I.length ? 2 : 1;
 }
-const durNext = t => own[t] == 0 && isBorder(t) && durO[t] == 0 && durP[t] >= 0 && durP[t] != durCls(t) ? ` <small>→ bir vergi toplaması sonra ${['🔴 Zayıf', '🟡 Orta', '🔵 Yüksek'][durP[t]]} olacak</small>` : '';
+const durNext = t => own[t] == 0 && isBorder(t) && durLP >= 0 && durLP != durL ? ` <small>→ bir vergi toplaması sonra sınırların ${['🔴 Zayıf', '🟡 Orta', '🔵 Yüksek'][durLP]} olacak</small>` : '';
 const DURN = ['Zayıf', 'Orta', 'Yüksek'];
 // Dayanıklılık oranları: ok, mancınık ve top ateşinde DURR (%30), savaş zarlarında DURB (%10).
 const DURR = .3;
@@ -3050,38 +3061,29 @@ function durTint(t) {
   g.globalAlpha = 1;
 }
 function durTick() {
-  for (let t = 0; t < N; t++)
-    if (own[t] == 0) {
-      if (durO[t] != 0) {
-        durO[t] = 0;
-        dur[t] = 1;
-        durP[t] = -1;
-        durN[t] = 0;
-      }
-      if (!isBorder(t)) {
-        dur[t] = 1;
-        durP[t] = -1;
-        durN[t] = 0;
-        continue;
-      }
-      const g = durGoal(t);
-      if (g == dur[t]) {
-        durP[t] = -1;
-        durN[t] = 0;
-        continue;
-      }
-      if (durP[t] == g)
-        durN[t]++;
-      else {
-        durP[t] = g;
-        durN[t] = 1;
-      }
-      if (durN[t] >= 2) {
-        dur[t] = g;
-        durP[t] = -1;
-        durN[t] = 0;
-      }
-    }
+  const g0 = durGoal();
+  if (g0 == durL) {
+    durLP = -1;
+    durLN = 0;
+    return;
+  }
+  if (durLP == g0)
+    durLN++;
+  else {
+    durLP = g0;
+    durLN = 1;
+  }
+  if (durLN >= 2) {
+    durL = g0;
+    durLP = -1;
+    durLN = 0;
+    if (g0 == 2)
+      hl += ' 🛡🛡 Halk memnun: sınır askerlerin artık Yüksek dayanıklılıkta.';
+    else if (g0 == 0)
+      hl += ' 💔 Ağır vergi halkı yordu: sınır askerlerin Zayıf dayanıklılıkta.';
+    else
+      hl += ' 🛡 Sınır askerlerinin dayanıklılığı Orta seviyeye döndü.';
+  }
 }
 // Ok, mancınık ve top kaybını dayanıklılığa göre ayarlar: Yüksek → %30 az (hiç değilse 1), Zayıf → %30 fazla. Savaş zarlarında da aynı oran uygulanır.
 function arrowLoss(t, k) {
@@ -6415,10 +6417,9 @@ function init(noDraft, seed) {
   allyAsked = false;
   playMs = 0;
   lateOn = false;
-  dur = Array(N).fill(1);
-  durO = Array(N).fill(-1);
-  durP = Array(N).fill(-1);
-  durN = Array(N).fill(0);
+  durL = 1;
+  durLP = -1;
+  durLN = 0;
   spySel = null;
   aspy = {};
   spyXp = 0;
@@ -7849,9 +7850,9 @@ function defendCapital(p, ct) {
     }
   }
 }
-// İttifak sınırı: her devletin (oyuncu dahil) en fazla 2 müttefiki olur ve ortak müttefiki olan iki devlet
-// ittifak kuramaz (üç devlet birbirine kenetlenip tek bir rakibe yüklenemesin).
-const ALLYMAX = 2;
+// İttifak sınırı: her ittifak en fazla 2 devletten oluşur; yani her devletin (oyuncu dahil) tek müttefiki olabilir
+// (üç devlet birbirine kenetlenip tek bir rakibe yüklenemesin).
+const ALLYMAX = 1;
 const isAlly = (p, q) => p != q && (p == 0 ? ally[q] > 0 && !tru[q] : q == 0 ? ally[p] > 0 && !tru[p] : bp[p][q] > 0);
 const allyList = p => [...Array(P).keys()].filter(q => q != p && cnt(q) > 0 && isAlly(p, q));
 const canAlly = (p, q) => allyList(p).length < ALLYMAX && allyList(q).length < ALLYMAX && !allyList(p).some(r => isAlly(q, r));
@@ -9585,7 +9586,7 @@ function build(t) {
     if (ally[q] > 0)
       return lg(`${PN[q]} ile zaten ittifaktasın.`);
     if (allyList(0).length >= ALLYMAX)
-      return lg(`En fazla ${ALLYMAX} müttefikin olabilir. Yeni ittifak için önce birinden ayrıl.`);
+      return lg(`Aynı anda sadece ${ALLYMAX} müttefikin olabilir (${allyList(0).map(q => PN[q]).join(', ')}). Yeni ittifak için önce ondan ayrıl.`);
     if (allyList(0).some(r => isAlly(q, r)))
       return lg(`${PN[q]} zaten müttefikinle ittifakta; üç devlet aynı ittifakta olamaz.`);
     if (tcd[q] == rd)
