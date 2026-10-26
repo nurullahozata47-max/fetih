@@ -2361,6 +2361,170 @@ function seaSpot(x, y, rMin, rMax, m, prefX, prefY) {
     }
   return best;
 }
+// ---- Gemiler için denizden giden yol (karaya hiç basmaz, mümkünse kıyıdan biraz açıktan gider) ----
+// Her deniz hücresinin karaya uzaklığı (en fazla 4). Harita değişince yeniden hesaplanır.
+let clrK = null;
+let clrG = null;
+function seaClr() {
+  if (clrK === cell && clrG)
+    return clrG;
+  clrK = cell;
+  const T = W * H;
+  const d = new Uint8Array(T).fill(9);
+  const q = [];
+  for (let i = 0; i < T; i++)
+    if (cell[i] != -1) {
+      d[i] = 0;
+      q.push(i);
+    }
+  for (let k = 0; k < q.length; k++) {
+    const i = q[k];
+    if (d[i] >= 4)
+      continue;
+    const x = i % W;
+    const y = (i / W) | 0;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx;
+        const yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H)
+          continue;
+        const j = yy * W + xx;
+        if (d[j] > d[i] + 1) {
+          d[j] = d[i] + 1;
+          q.push(j);
+        }
+      }
+  }
+  clrG = d;
+  return d;
+}
+// Bir noktaya en yakın deniz hücresi.
+function seaCellNear(px, py) {
+  const cx = Math.floor(px / S);
+  const cy = Math.floor(py / S);
+  for (let r = 0; r <= 12; r++)
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) != r)
+          continue;
+        const xx = cx + dx;
+        const yy = cy + dy;
+        if (xx >= 0 && yy >= 0 && xx < W && yy < H && cell[yy * W + xx] == -1)
+          return yy * W + xx;
+      }
+  return -1;
+}
+// İki nokta arasındaki doğru parçası tamamen denizde mi? (uç noktaların yakınındaki kıyı hücreleri tolere edilir)
+function segSea(A, B, tolEnd) {
+  const L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+  const n = Math.max(1, Math.ceil(L / 2));
+  for (let i = 0; i <= n; i++) {
+    const x = A[0] + (B[0] - A[0]) * i / n;
+    const y = A[1] + (B[1] - A[1]) * i / n;
+    if (tolEnd && (Math.hypot(x - A[0], y - A[1]) < 9 || Math.hypot(x - B[0], y - B[1]) < 9))
+      continue;
+    const cx = Math.floor(x / S);
+    const cy = Math.floor(y / S);
+    if (cx < 0 || cy < 0 || cx >= W || cy >= H)
+      continue;
+    if (cell[cy * W + cx] != -1)
+      return false;
+  }
+  return true;
+}
+// (x0,y0)'dan (x1,y1)'e deniz yolu: önce karadan en az 3 hücre açıktan, olmazsa 2, 1, 0 hücre.
+function seaRoute(x0, y0, x1, y1) {
+  const d = seaClr();
+  const s0 = seaCellNear(x0, y0);
+  const e0 = seaCellNear(x1, y1);
+  if (s0 < 0 || e0 < 0)
+    return null;
+  const T = W * H;
+  const sx = s0 % W;
+  const sy = (s0 / W) | 0;
+  const ex = e0 % W;
+  const ey = (e0 / W) | 0;
+  const near = j => {
+    const x = j % W;
+    const y = (j / W) | 0;
+    return Math.max(Math.abs(x - sx), Math.abs(y - sy)) <= 4 || Math.max(Math.abs(x - ex), Math.abs(y - ey)) <= 4;
+  };
+  for (const mc of [3, 2, 1, 0]) {
+    const prev = new Int32Array(T).fill(-2);
+    prev[s0] = -1;
+    const q = [s0];
+    let ok = false;
+    for (let k = 0; k < q.length; k++) {
+      const i = q[k];
+      if (i == e0) {
+        ok = true;
+        break;
+      }
+      const x = i % W;
+      const y = (i / W) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+        const xx = x + dx;
+        const yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H)
+          continue;
+        const j = yy * W + xx;
+        if (cell[j] != -1 || prev[j] != -2 || (d[j] < mc && !near(j)))
+          continue;
+        if (dx && dy && (cell[i + dx] != -1 || cell[i + dy * W] != -1))
+          continue;
+        prev[j] = i;
+        q.push(j);
+      }
+    }
+    if (!ok)
+      continue;
+    const cs = [];
+    for (let i = e0; i >= 0; i = prev[i])
+      cs.push(i);
+    cs.reverse();
+    const cp = cs.map(i => [(i % W + .5) * S, (((i / W) | 0) + .5) * S]);
+    // Görüş hattı sadeleştirme: bir noktadan, araya kara girmeden görülebilen en uzak noktaya atla.
+    let pts = [cp[0]];
+    let k = 0;
+    while (k < cp.length - 1) {
+      let j = Math.min(cp.length - 1, k + 8);
+      while (j > k + 1 && !segSea(cp[k], cp[j]))
+        j--;
+      pts.push(cp[j]);
+      k = j;
+    }
+    // Başlangıç ve bitiş noktalarına bağla (gemi tam bulunduğu yerden çıkar, hedef noktada durur).
+    if (segSea([x0, y0], pts[0], 1))
+      pts[0] = [x0, y0];
+    else
+      pts.unshift([x0, y0]);
+    if (segSea(pts[pts.length - 1], [x1, y1], 1))
+      pts[pts.length - 1] = [x1, y1];
+    else
+      pts.push([x1, y1]);
+    // Köşeleri yumuşat; yumuşatılan yol karaya değerse yumuşatma yapılmaz.
+    for (let it = 0; it < 2; it++) {
+      if (pts.length < 3)
+        break;
+      const o = [pts[0]];
+      for (let q = 0; q < pts.length - 1; q++) {
+        const [a1, b1] = pts[q];
+        const [a2, b2] = pts[q + 1];
+        o.push([a1 * .75 + a2 * .25, b1 * .75 + b2 * .25], [a1 * .25 + a2 * .75, b1 * .25 + b2 * .75]);
+      }
+      o.push(pts[pts.length - 1]);
+      let ok2 = true;
+      for (let q = 1; q < o.length - 2 && ok2; q++)
+        ok2 = segSea(o[q], o[q + 1]);
+      if (!ok2)
+        break;
+      pts = o;
+    }
+    return pts;
+  }
+  return null;
+}
 // Bombardıman gemisinin demirleyeceği nokta: kıyıdan biraz açıkta (etrafında ~25 px deniz), olmazsa daha yakın.
 const farSpot = (x, y) => seaSpot(x, y, 0, 90, 5) || seaSpot(x, y, 0, 70, 3) || seaSpot(x, y, 0, 40, 2) || [x, y];
 // Geminin bir kıyı bölgesinin önünde duracağı nokta (kıyıya yakın ama karaya taşmayan).
@@ -2537,11 +2701,14 @@ async function blkPatrol(p) {
     const nx = b.route[b.k];
     const sp = blkSpot(u, nx) || [b.x, b.y];
     if (nx != b.t || Math.hypot(sp[0] - b.x, sp[1] - b.y) > 2) {
+      // Kıyılar arası geçiş deniz yolundan: burunları dolaşır, karadan geçmez.
+      const pts = seaRoute(b.x, b.y, sp[0], sp[1]);
+      if (!pts)
+        continue;
       const vis = Vg.has(nx) || Vg.has(b.t) || p == 0;
-      const dur = vis ? Math.min(3000, Math.max(1600, Math.hypot(sp[0] - b.x, sp[1] - b.y) * 9)) : 60;
       b.moving = true;
-      nav.push({ k: 'sail', x0: b.x, y0: b.y, x1: sp[0], y1: sp[1], cx: sp[0], cy: sp[1], big: true, col: COL[p], t0: performance.now(), dur, mode: 'x', noLand: 1 });
-      await sleep(dur);
+      if (vis)
+        await sleep(pathNav(pts, COL[p], true, 4200));
       b.moving = false;
       b.x = sp[0];
       b.y = sp[1];
@@ -2615,7 +2782,7 @@ async function shipDuel(a, ub) {
     return;
   sfire[a] = 1;
   awayL[a]++;
-  const P0 = sp.pts.slice();
+  let P0 = sp.pts.slice();
   // Düşman geminin yanında, karaya değmeyen bir deniz noktasına yanaş (aradaki mesafe ~40).
   const [lx, ly] = P0[Math.max(0, P0.length - 2)];
   const vx = lx - b.x;
@@ -2624,7 +2791,14 @@ async function shipDuel(a, ub) {
   const sea = seaSpot(b.x, b.y, 36, 60, 3, b.x + vx / vl * 40, b.y + vy / vl * 40) || seaSpot(b.x, b.y, 30, 70, 2, lx, ly);
   const sx = sea ? sea[0] : b.x + vx / vl * 40;
   const sy = sea ? sea[1] : b.y + vy / vl * 40;
-  P0.push([sx, sy]);
+  {
+    const [ax0, ay0] = dockSea(a);
+    const rt = seaRoute(ax0, ay0, sx, sy);
+    if (rt)
+      P0 = rt;
+    else
+      P0.push([sx, sy]);
+  }
   const camOK = p == 0 || q == 0 || Vg.has(b.t);
   if (camOK)
     camShow(a, b.t);
@@ -2721,8 +2895,12 @@ async function blkRecall(u) {
     return;
   const sp = seaPath(u, b.t);
   blk[u] = null;
-  const pts = sp ? sp.pts.slice() : [[...dockSea(u)], [b.x, b.y]];
-  pts.push([b.x, b.y]);
+  const [dx0, dy0] = dockSea(u);
+  let pts = seaRoute(dx0, dy0, b.x, b.y);
+  if (!pts) {
+    pts = sp ? sp.pts.slice() : [[dx0, dy0]];
+    pts.push([b.x, b.y]);
+  }
   const ok = await shipHome(u, pts, !!b.dmg, COL[b.p], PN[b.p]);
   if (ok && b.p == 0)
     $('log').textContent = `Bombardıman gemin ${NM[u]} iskelesine döndü${b.dmg ? ' ve onarıldı' : ''}.`;
@@ -2865,13 +3043,15 @@ async function blockade(u, t) {
     await sleep(1600);
     return false;
   }
-  nav.push({ k: 'sail', pts: P0, cum, L, n: 1, big: true, cx: sp0.cx, cy: sp0.cy, col: COL[p], t0: performance.now(), dur, mode: 'x', noLand: 1 });
-  await sleep(dur);
   const [ex0, ey0] = P0[P0.length - 1];
   const [ex, ey] = farSpot(ex0, ey0);
-  if (ex != ex0 || ey != ey0) {
-    nav.push({ k: 'sail', x0: ex0, y0: ey0, x1: ex, y1: ey, cx: ex, cy: ey, big: true, col: COL[p], t0: performance.now(), dur: 700, mode: 'x', noLand: 1 });
-    await sleep(700);
+  const [dx0, dy0] = dockSea(u);
+  const RT = seaRoute(dx0, dy0, ex, ey);
+  if (RT)
+    await sleep(pathNav(RT, COL[p], true, 4200));
+  else {
+    nav.push({ k: 'sail', pts: P0, cum, L, n: 1, big: true, cx: sp0.cx, cy: sp0.cy, col: COL[p], t0: performance.now(), dur, mode: 'x', noLand: 1 });
+    await sleep(dur);
   }
   const route = blkRoute(u, t, p);
   blk[u] = { t, p, route, k: 0, x: ex, y: ey, hp: SHIPHP };
