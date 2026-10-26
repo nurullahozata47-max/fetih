@@ -3665,9 +3665,9 @@ function drawWhale(e, u, s) {
   const bob = Math.sin(s * 1.6) * .5;
   const P = a => [cx + d * Rr * Math.sin(a), cy - Rr * Math.cos(a) + bob];
   const Nn = a => [d * Math.sin(a), -Math.cos(a)];
-  // Gövde kalınlığı (baştan kuyruğa): kaşalotun kutu gibi iri başı, inceden kuyruk sapı
-  const thT = q => q < .3 ? 7.2 - Math.pow(Math.max(0, .08 - q) / .08, 2) * 3 : q < .75 ? 7.2 - (q - .3) / .45 * 3.4 : 3.8 - (q - .75) / .25 * 2.6;
-  const thB = q => q < .3 ? 5.6 : q < .75 ? 5.6 - (q - .3) / .45 * 2.2 : 3.4 - (q - .75) / .25 * 2.3;
+  // Gövde kalınlığı (baştan kuyruğa): kaşalotun kutu gibi iri başı, giderek incelen gövde ve kuyruk sapı
+  const thT = q => q < .3 ? 7.2 - Math.pow(Math.max(0, .08 - q) / .08, 2) * 3 : q < .75 ? 7.2 - (q - .3) / .45 * 3.4 : 3.8 - (q - .75) / .25 * 1.6;
+  const thB = q => q < .3 ? 5.6 : q < .75 ? 5.6 - (q - .3) / .45 * 2.2 : 3.4 - (q - .75) / .25 * 1.5;
   const n = 44;
   const top = [];
   const bot = [];
@@ -3679,12 +3679,36 @@ function drawWhale(e, u, s) {
     top.push([px + nx * thT(q), py + ny * thT(q)]);
     bot.push([px - nx * thB(q), py - ny * thB(q)]);
   }
+  // Kuyruk: gövdenin devamı olarak çizilir (ayrı parça değil). Kuyruk sapı incelir, sonra iki lob açılır:
+  // ön kenarlar dışbükey, uçlar sivri ve hafif geriye yatık, arka kenar içbükey ve ortada çentikli.
+  // Sudan ilk çıkarken hafifçe içe kıvrık, son batarken ucu hafifçe yukarı kalkık (kökten uca artan esnek bükülme).
+  const aT = aH - B;
+  const [tx0, ty0] = P(aT);
+  const dx0 = -d * Math.cos(aT);
+  const dy0 = -Math.sin(aT);
+  const [nx0, ny0] = Nn(aT);
+  const tp = Math.max(0, Math.min(1, (aT + .85) / 1.7));
+  const bend = -.42 * (1 - smq(tp / .45)) + .38 * smq((tp - .55) / .45);
+  const dirAt = k => {
+    const b = bend * k;
+    const c = Math.cos(b);
+    const sn = Math.sin(b);
+    return [dx0 * c + nx0 * sn, dy0 * c + ny0 * sn, nx0 * c - dx0 * sn, ny0 * c - dy0 * sn];
+  };
+  const tpt = (len, side) => {
+    const k = Math.min(1, len / 17);
+    const [, , nnx, nny] = dirAt(k);
+    const [mdx, mdy] = dirAt(k * .5);
+    return [tx0 + mdx * len + nnx * side, ty0 + mdy * len + nny * side];
+  };
+  const tT = thT(1);
+  const tB = thB(1);
   g.save();
   // Su yüzeyinin altını gizle
   g.beginPath();
   g.rect(e.x - 120, wy - 80, 240, 80.6);
   g.clip();
-  // Gövde
+  // Gövde + kuyruk tek bir çizgiyle
   const gr = g.createLinearGradient(0, wy - 16, 0, wy + 2);
   gr.addColorStop(0, '#6b767d');
   gr.addColorStop(1, '#3f474d');
@@ -3693,6 +3717,21 @@ function drawWhale(e, u, s) {
   g.moveTo(top[0][0], top[0][1]);
   for (let i = 1; i <= n; i++)
     g.lineTo(top[i][0], top[i][1]);
+  {
+    const Q = (c, p) => g.quadraticCurveTo(c[0], c[1], p[0], p[1]);
+    const C = (c1, c2, p) => g.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], p[0], p[1]);
+    // Üst: kuyruk sapı → üst lob ucu
+    Q(tpt(3, tT * .95), tpt(6, 1.5));
+    C(tpt(9, 2.2), tpt(12.5, 5.2), tpt(16.5, 7.6));
+    // Üst lobun arka kenarı → ortadaki çentik
+    C(tpt(15.2, 5.2), tpt(13.2, 2.4), tpt(13.6, .3));
+    g.lineTo(...tpt(12.6, -.4));
+    // Alt lob
+    C(tpt(13.2, -2.2), tpt(15.2, -4.6), tpt(16.5, -6.8));
+    C(tpt(12.5, -4.8), tpt(9, -2.1), tpt(6, -1.4));
+    // Kuyruk sapının altı → gövdenin altı
+    Q(tpt(3, -tB * .95), bot[n]);
+  }
   for (let i = n; i >= 0; i--)
     g.lineTo(bot[i][0], bot[i][1]);
   // Küt baş ucu
@@ -3706,63 +3745,25 @@ function drawWhale(e, u, s) {
   g.strokeStyle = 'rgba(18,24,28,.7)';
   g.lineWidth = .9;
   g.stroke();
-  // Kuyruk: gövdenin ucunda yandan görünen iki loblu kuyruk yüzgeci (dalışın sonunda görünür).
-  // Sudan ilk çıkarken hafifçe içe kıvrık durur, açılır; son batarken ucu hafifçe yukarı kalkar.
-  // Kıvrılma kuyruk boyunca artarak uygulanır (köke yakın az, uca doğru çok), böylece katı değil esnek görünür.
+  // Kuyruk loblarında ince ışık çizgileri ve sapın üstünde hafif sırt
   {
-    const aT = aH - B;
-    const [tx, ty] = P(aT);
-    const dx0 = -d * Math.cos(aT);
-    const dy0 = -Math.sin(aT);
-    const [nx0, ny0] = Nn(aT);
-    // Kuyruğun su üstündeki yolculuğu: 0 = arkadan çıkıyor, 1 = öne doğru batıyor
-    const tp = Math.max(0, Math.min(1, (aT + .85) / 1.7));
-    const bend = -.42 * (1 - smq(tp / .45)) + .38 * smq((tp - .55) / .45);
-    // Kuyruk boyunca bir noktanın yönü: köke yakın az, uca doğru çok kıvrılır
-    const dirAt = k => {
-      const b = bend * k;
-      const c = Math.cos(b);
-      const sn = Math.sin(b);
-      return [dx0 * c + nx0 * sn, dy0 * c + ny0 * sn, nx0 * c - dx0 * sn, ny0 * c - dy0 * sn];
+    const L = (a, b) => {
+      g.beginPath();
+      g.moveTo(...a);
+      g.lineTo(...b);
+      g.stroke();
     };
-    const pt = (len, side) => {
-      // len: kökten uzaklık, side: yüzgecin üst (+) / alt (-) yönünde açıklık
-      const k = Math.min(1, len / 17);
-      const [ddx, ddy, nnx, nny] = dirAt(k);
-      // Kıvrık bir eksen: kök noktasından itibaren adım adım ilerlemek yerine yaklaşık yay
-      const [mdx, mdy] = dirAt(k * .5);
-      return [tx + mdx * len + nnx * side, ty + mdy * len + nny * side];
-    };
-    g.fillStyle = '#4a545a';
-    g.strokeStyle = 'rgba(18,24,28,.7)';
-    g.lineWidth = .9;
-    const p0 = pt(0, 2.2);
-    const c1 = pt(8, 3.2);
-    const t1 = pt(17, 7.2);
-    const c2 = pt(13, 1.6);
-    const nt = pt(14, -.3);
-    const c3 = pt(13, -2.4);
-    const t2 = pt(17, -5.6);
-    const c4 = pt(8, -2.8);
-    const p1 = pt(0, -2.1);
+    g.strokeStyle = 'rgba(255,255,255,.2)';
+    g.lineWidth = .7;
+    const t1 = tpt(7, 1.1);
+    const t2 = tpt(15.4, 6.2);
     g.beginPath();
-    g.moveTo(p0[0], p0[1]);
-    g.quadraticCurveTo(c1[0], c1[1], t1[0], t1[1]);
-    g.quadraticCurveTo(c2[0], c2[1], nt[0], nt[1]);
-    g.quadraticCurveTo(c3[0], c3[1], t2[0], t2[1]);
-    g.quadraticCurveTo(c4[0], c4[1], p1[0], p1[1]);
-    g.closePath();
-    g.fill();
+    g.moveTo(...t1);
+    const cc = tpt(11.5, 3.2);
+    g.quadraticCurveTo(cc[0], cc[1], t2[0], t2[1]);
     g.stroke();
-    // Yüzgeç üzerinde ince parlaklık
-    const h1 = pt(5, 1.6);
-    const h2 = pt(15, 5.2);
-    g.strokeStyle = 'rgba(255,255,255,.22)';
-    g.lineWidth = .8;
-    g.beginPath();
-    g.moveTo(h1[0], h1[1]);
-    g.lineTo(h2[0], h2[1]);
-    g.stroke();
+    g.strokeStyle = 'rgba(18,24,28,.35)';
+    L(tpt(8, -.6), tpt(15.2, -5.2));
   }
   // Göz ve ağız çizgisi (başın yanında, küçük)
   {
