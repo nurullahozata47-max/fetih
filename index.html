@@ -2107,7 +2107,7 @@ const S = 5;
 const N = 72;
 const PM = 8;
 let P = 4;
-const COL = ['#f2b134', '#e5566d', '#8b7be8', '#3fb98a', '#e47fc4', '#9b6b45', '#3d5fbf', '#2fb0c4', '#9aa3a8'];
+const COL = ['#f2b134', '#e5566d', '#7b62e0', '#3fb98a', '#f59ad8', '#9b6b45', '#3d5fbf', '#2fb0c4', '#9aa3a8'];
 const PN = ['Sen', 'Kızıl', 'Mor', 'Yeşil', 'Pembe', 'Kahve', 'Lacivert', 'Turkuaz'];
 // Bölge adları: rastgele haritada hazır liste; gerçek haritalarda o yerin adları.
 const NM0 = ['Akova', 'Berra', 'Cemre', 'Dalyan', 'Elmas', 'Fırat', 'Gölova', 'Hisar', 'İlica', 'Kıyı', 'Lale', 'Meşe', 'Nehir', 'Ova', 'Pınar', 'Rüzgâr', 'Sarp', 'Tuna', 'Umut', 'Yamaç', 'Zirve', 'Çınar', 'Derya', 'Ege', 'Kaya', 'Orman', 'Sedir', 'Vadi', 'Alaz', 'Bora', 'Ceylan', 'Damla', 'Eylül', 'Fidan', 'Gökçe', 'Hazar', 'Irmak', 'Kuzey', 'Lodos', 'Mavi', 'Nilüfer', 'Okyanus', 'Poyraz', 'Rüya', 'Selin', 'Toros', 'Uçar', 'Vuslat', 'Yıldız', 'Zeybek', 'Aren', 'Bulut', 'Çağlar', 'Doruk', 'Erguvan', 'Fırtına', 'Ayaz', 'Baykal', 'Cihan', 'Deniz', 'Engin', 'Gediz', 'Hakan', 'Ilgaz', 'Kerem', 'Meltem', 'Nazlı', 'Oğuz', 'Pelin', 'Tarkan', 'Seçil', 'Yaren'];
@@ -2358,6 +2358,8 @@ function blkSpot(u, x) {
 // Gemi topları: her büyük gemi %60 isabet ettirir; isabette askerlerin %34-48'i vurulur (eskisinden %20 güçlü).
 // Iskalarsa gülleler denize düşer, kimse ölmez. Sonuç önceden hesaplanır, asker sayısı çarpmada düşer.
 const CANH = .6;
+// Tek bir geminin bir isabetinde en fazla bu kadar asker ölür (kalabalık bölgeler bir atışta erimesin).
+const SHIPMAX = 10;
 function shipVolley(t, n) {
   let a0 = arm[t];
   let k = 0;
@@ -2365,7 +2367,7 @@ function shipVolley(t, n) {
   for (let i = 0; i < n; i++)
     if (Math.random() < CANH) {
       hits++;
-      const d = Math.ceil(a0 * R(.34, .48));
+      const d = Math.min(SHIPMAX, Math.ceil(a0 * R(.34, .48)));
       const h = Math.max(0, Math.min(d, a0 - 1));
       a0 -= h;
       k += h;
@@ -2471,7 +2473,7 @@ async function blkBomb(u) {
   else {
     const k = Math.min(vol.k, arm[t] - 1);
     arm[t] -= k;
-    txt = visSet().has(t) ? `${k} asker vuruldu` : 'birlikler vuruldu';
+    txt = k > 0 ? (visSet().has(t) ? `${k} asker vuruldu` : 'birlikler vuruldu') : 'gülleler isabet etti ama kıyıda vurulacak asker yoktu';
     if (k > 0)
       fl.push({ t, dx: 0, txt: visSet().has(t) ? `-${k} top` : 'Top!', col: '#ff6b6b', t0: performance.now() });
   }
@@ -2491,6 +2493,12 @@ async function blkPatrol(p) {
     if (!b || b.p != p || !blkOK(u))
       continue;
     b.route = b.route.filter(x => blkFoe(p, x));
+    // Rota daraldıysa (kıyılar el değiştirdi) bulunduğu yerden yeniden kur.
+    if (b.route.length < 3 && blkFoe(p, b.t)) {
+      const nr = blkRoute(u, b.t, p);
+      if (nr.length > b.route.length)
+        b.route = nr;
+    }
     if (!b.route.length) {
       blk[u] = null;
       awayL[u] = Math.max(0, awayL[u] - 1);
@@ -2499,7 +2507,17 @@ async function blkPatrol(p) {
       continue;
     }
     const i0 = b.route.indexOf(b.t);
-    b.k = ((i0 >= 0 ? i0 : -1) + 1) % b.route.length;
+    // Sıradaki kıyılardan vurulacak bir şey olanı (asker ya da sur) seç; hiçbiri yoksa sıradakine geç.
+    const worth = x => arm[x] > 1 || wall[x] > 0;
+    let kk = ((i0 >= 0 ? i0 : -1) + 1) % b.route.length;
+    for (let j = 0; j < b.route.length; j++) {
+      const c = (((i0 >= 0 ? i0 : -1) + 1 + j) % b.route.length);
+      if (worth(b.route[c])) {
+        kk = c;
+        break;
+      }
+    }
+    b.k = kk;
     const nx = b.route[b.k];
     const sp = blkSpot(u, nx) || [b.x, b.y];
     if (nx != b.t || Math.hypot(sp[0] - b.x, sp[1] - b.y) > 2) {
@@ -2521,7 +2539,8 @@ async function blkPatrol(p) {
       await sleep(1200);
       continue;
     }
-    await blkBomb(u);
+    if (arm[nx] > 1 || wall[nx] > 0)
+      await blkBomb(u);
   }
 }
 let gsk = false;
@@ -2670,7 +2689,23 @@ async function blkRecall(u) {
 async function botNavalDefense(p) {
   const my = [...Array(N).keys()].filter(t => own[t] == p);
   const th = blk.map((b, ub) => b && blkOK(ub) && b.p != p && !friend(p, b.p) && b.route.some(x => own[x] == p) ? ub : -1).filter(x => x >= 0);
-  if (!th.length || Math.random() > [.6, .85, 1][DIF])
+  // Saldırı: zor (ve biraz normal) botlar kendi kıyısına gelmese de menzildeki düşman gemisine düello açar.
+  if (!th.length) {
+    if (Math.random() < [0, .25, .6][DIF]) {
+      for (const u of my) {
+        if (!(dk[u] && bigFree(u) > 0 && !sfire[u] && !blk[u]))
+          continue;
+        const fs = foeShips(p, u).filter(ub => HD[u][blk[ub].t] <= 8);
+        if (fs.length) {
+          await shipDuel(u, fs[0]);
+          ui();
+          break;
+        }
+      }
+    }
+    return;
+  }
+  if (Math.random() > [.6, .85, 1][DIF])
     return;
   for (const ub of th) {
     if (!blk[ub])
@@ -7777,6 +7812,12 @@ function defendCapital(p, ct) {
     }
   }
 }
+// İttifak sınırı: her devletin (oyuncu dahil) en fazla 2 müttefiki olur ve ortak müttefiki olan iki devlet
+// ittifak kuramaz (üç devlet birbirine kenetlenip tek bir rakibe yüklenemesin).
+const ALLYMAX = 2;
+const isAlly = (p, q) => p != q && (p == 0 ? ally[q] > 0 && !tru[q] : q == 0 ? ally[p] > 0 && !tru[p] : bp[p][q] > 0);
+const allyList = p => [...Array(P).keys()].filter(q => q != p && cnt(q) > 0 && isAlly(p, q));
+const canAlly = (p, q) => allyList(p).length < ALLYMAX && allyList(q).length < ALLYMAX && !allyList(p).some(r => isAlly(q, r));
 // Her tur başında anlaşma sürelerini, haraç ödemelerini ve bot ittifaklarını işler.
 function treaties() {
   for (let q = 1; q < P; q++) {
@@ -7822,7 +7863,7 @@ function treaties() {
     const q = al[Math.floor(Math.random() * al.length)];
     const o = al.filter(x => x != q);
     const r = o[Math.floor(Math.random() * o.length)];
-    if (!bp[q][r]) {
+    if (!bp[q][r] && canAlly(q, r)) {
       bp[q][r] = bp[r][q] = 5;
       const cn2 = [0, ...bots()].filter(x => x != q && x != r && cnt(x) > 0).sort((a, b) => cnt(b) - cnt(a));
       const tg = cn2[0] ?? 0;
@@ -9506,6 +9547,10 @@ function build(t) {
       return lg('İttifak için bir krallık seç.');
     if (ally[q] > 0)
       return lg(`${PN[q]} ile zaten ittifaktasın.`);
+    if (allyList(0).length >= ALLYMAX)
+      return lg(`En fazla ${ALLYMAX} müttefikin olabilir. Yeni ittifak için önce birinden ayrıl.`);
+    if (allyList(0).some(r => isAlly(q, r)))
+      return lg(`${PN[q]} zaten müttefikinle ittifakta; üç devlet aynı ittifakta olamaz.`);
     if (tcd[q] == rd)
       return lg(`${PN[q]} bu tur zaten bir teklifini reddetti.`);
     bd = null;
@@ -12893,12 +12938,12 @@ async function ai0(p) {
     }
     else if (ds0.length && Math.random() < pr) {
       const u = ds0[Math.floor(Math.random() * ds0.length)];
-      if (dk[u] == 1 && !iso && gold[p] >= DC2 && Math.random() < .3) {
+      if (dk[u] == 1 && !iso && gold[p] >= DC2 && Math.random() < [.25, .3, .5][DIF]) {
         dk[u] = 2;
         gold[p] -= DC2;
         pulse(u, '#c8a26b');
       }
-      else if (dk[u] == 2 && !iso && rd >= 6 && gold[p] >= DC3 && Math.random() < .2) {
+      else if (dk[u] == 2 && !iso && rd >= 6 && gold[p] >= DC3 && Math.random() < [.15, .2, .35][DIF]) {
         dk[u] = 3;
         gold[p] -= DC3;
       }
@@ -12907,7 +12952,7 @@ async function ai0(p) {
         layMines(u);
       }
       else if (shS[u] + shL[u] < 4) {
-        if (dk[u] >= 2 && !iso && gold[p] >= SLC && Math.random() < .4) {
+        if (dk[u] >= 2 && !iso && gold[p] >= SLC && Math.random() < [.3, .4, .7][DIF]) {
           shL[u]++;
           gold[p] -= SLC;
         }
@@ -13020,13 +13065,13 @@ async function ai0(p) {
   ui();
   await sleep(400);
   for (const u of mine()) {
-    if (dk[u] && bigFree(u) > 0 && !sfire[u] && !blk[u] && Math.random() < [.25, .4, .55][DIF]) {
+    if (dk[u] && bigFree(u) > 0 && !sfire[u] && !blk[u] && Math.random() < [.2, .4, .8][DIF]) {
       let bt3 = null;
       let bv3 = 2.5;
       for (let t = 0; t < N; t++) {
-        if (!abOK(u, t))
+        if (!abOK(u, t) || est(p, t) < 3)
           continue;
-        const v = tax[t] + mn[t] * MI + bar[t] * 2 + (dk[t] ? 2 : 0) + (own[t] == 0 ? .5 : 0) - HD[u][t] * .05;
+        const v = tax[t] + mn[t] * MI + bar[t] * 2 + (dk[t] ? 2 : 0) + (own[t] == 0 ? .5 : 0) + Math.min(6, est(p, t) / 4) - HD[u][t] * .05;
         if (v > bv3) {
           bv3 = v;
           bt3 = t;
@@ -15703,9 +15748,8 @@ document.getElementById('mnVol').oninput = e => Mus.setVol(e.target.value / 100)
 Mus.apply();
 // Oyunu başlat: arka planda bir harita üret ve ana menüyü göster.
 try {
-  const v = localStorage.getItem('fetih_dif');
-  if (v != null)
-    DIF = Math.max(0, Math.min(2, +v || 0));
+  // Oyun açılınca zorluk her zaman Normal seçili gelir (oyuncu yanlışlıkla Zor'da başlamasın).
+  DIF = 1;
   const mk = localStorage.getItem('fetih_map');
   if (mk == 'r' || WMAPS[mk])
     MAPK = mk;
