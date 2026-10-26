@@ -3488,13 +3488,25 @@ function seaLife(now) {
     const p = seaSpotVisible();
     sea.nS = now + 26000 + Math.random() * 8000;
     if (p)
-      sea.shark = { x: p[0], y: p[1], dir: Math.random() < .5 ? 1 : -1, t0: now, dur: 6500 };
+      for (const dir of Math.random() < .5 ? [1, -1] : [-1, 1]) {
+        const e = { x: p[0], y: p[1], dir, ph: Math.random() * 6.28, t0: now, dur: 11000 };
+        // Bütün yol denizde olmalı
+        let ok = true;
+        for (let k = 0; k <= 10 && ok; k++) {
+          const [px, py] = sharkPos(e, k / 10);
+          ok = seaClear(px, py, 3);
+        }
+        if (ok) {
+          sea.shark = e;
+          break;
+        }
+      }
   }
   if (!sea.whale && now > sea.nW) {
     const p = seaSpotVisible();
     sea.nW = now + 40000 + Math.random() * 10000;
     if (p)
-      sea.whale = { x: p[0], y: p[1], dir: Math.random() < .5 ? 1 : -1, t0: now, dur: 12000 };
+      sea.whale = { x: p[0], y: p[1], dir: Math.random() < .5 ? 1 : -1, t0: now, dur: 10000 };
   }
   const s = now / 1000;
   if (sea.shark) {
@@ -3514,53 +3526,96 @@ function seaLife(now) {
       drawWhale(e, u, s);
   }
 }
-// Köpek balığı: yalnız sırt yüzgeci görünür; yükselir, iz bırakarak süzülür, yavaşça batar.
+// Köpek balığı: yalnız sırt yüzgeci görünür. Yükselir, kıvrılarak (S çizerek) süzülür, yavaşça batar.
+// Arkasında yüzgecin yardığı suyun V biçimli dümen suyu oluşur: kesik köpük çizgileri yol boyunca açılır ve söner.
+function sharkPos(e, u) {
+  const x = e.x + e.dir * u * 90;
+  const y = e.y + Math.sin(u * Math.PI * 1.6 + e.ph) * 9 - Math.sin(e.ph) * 9;
+  return [x, y];
+}
 function drawShark(e, u, s) {
-  const rise = Math.min(1, u / .15);
-  const sink = u > .7 ? 1 - (u - .7) / .3 : 1;
+  const rise = smq(Math.min(1, u / .14));
+  const sink = u > .72 ? 1 - smq((u - .72) / .28) : 1;
   const h = Math.max(0, rise * sink);
-  const x = e.x + e.dir * u * 46;
-  const y = e.y + Math.sin(s * 2.4) * .6;
-  // Dümen suyu (V şeklinde açılan iz) ve yüzgecin dibindeki köpük
+  const [x, y0] = sharkPos(e, u);
+  const y = y0 + Math.sin(s * 2.4) * .5;
+  const [x2, y2] = sharkPos(e, Math.min(1, u + .004));
+  const tl = Math.hypot(x2 - x, y2 - y0) || 1;
+  const tx = (x2 - x) / tl;
+  const ty = (y2 - y0) / tl;
+  const fd = tx >= 0 ? 1 : -1;
   g.save();
-  g.globalAlpha = .28 * h;
-  g.strokeStyle = '#e9f6ff';
-  g.lineWidth = .9;
+  // Dümen suyu: geçmiş konumlardan iki kol; uzaklaştıkça açılır, incelir ve söner
+  const du = .012;
   for (const k of [-1, 1]) {
-    g.beginPath();
-    g.moveTo(x - e.dir * 2, y + 1);
-    g.quadraticCurveTo(x - e.dir * 12, y + 1 + k * 3, x - e.dir * 24, y + 1 + k * 7);
-    g.stroke();
+    for (let j = 1; j <= 14; j++) {
+      const ua = u - j * du;
+      if (ua < 0)
+        break;
+      const [ax, ay] = sharkPos(e, ua);
+      const [bx, by] = sharkPos(e, Math.max(0, ua - du * .7));
+      const sp = 1.5 + j * .9;
+      // Yola dik yön
+      const vx = bx - ax;
+      const vy = by - ay;
+      const vl = Math.hypot(vx, vy) || 1;
+      const nx = -vy / vl;
+      const ny = vx / vl;
+      const fade = Math.min(1, h + (j * du < .3 ? .4 : 0)) * (1 - j / 15);
+      const wob = Math.sin(s * 4 + j * 1.3 + k) * .4;
+      g.globalAlpha = .42 * fade;
+      g.strokeStyle = '#e9f6ff';
+      g.lineWidth = Math.max(.5, 1.3 - j * .06);
+      g.beginPath();
+      g.moveTo(ax + nx * k * (sp + wob), ay + ny * k * (sp + wob) * .5 + 1);
+      g.lineTo(bx + nx * k * (sp + .9 + wob), by + ny * k * (sp + .9 + wob) * .5 + 1);
+      g.stroke();
+      // Köpük kabarcıkları
+      if (j % 3 == 1) {
+        g.globalAlpha = .3 * fade;
+        g.fillStyle = '#ffffff';
+        g.beginPath();
+        g.arc(ax + nx * k * sp * .6 + Math.sin(j * 7 + s) * .8, ay + ny * k * sp * .3 + 1, .7, 0, 7);
+        g.fill();
+      }
+    }
   }
-  g.globalAlpha = .55 * h;
+  // Yüzgecin önündeki yay dalgası ve dibindeki çalkantı
+  g.globalAlpha = .6 * h;
+  g.strokeStyle = '#ffffff';
+  g.lineWidth = 1.1;
   g.beginPath();
-  g.ellipse(x, y + 1, 5, 1.4, 0, 0, 7);
+  g.ellipse(x + fd * 3, y + 1, 3.2, 1.2, 0, fd > 0 ? -Math.PI / 2 : Math.PI / 2, fd > 0 ? Math.PI / 2 : Math.PI * 1.5);
+  g.stroke();
+  g.globalAlpha = .35 * h;
+  g.beginPath();
+  g.ellipse(x - fd * 1, y + 1.2, 6, 1.5, 0, 0, 7);
   g.stroke();
   // Yüzgeç: kavisli üçgen, su çizgisinin altı kesik
   g.beginPath();
-  g.rect(x - 12, y - 16, 24, 17);
+  g.rect(x - 14, y - 18, 28, 19.2);
   g.clip();
   const fh = 13 * h;
   g.globalAlpha = 1;
   g.fillStyle = '#3c4a52';
   g.beginPath();
-  g.moveTo(x - e.dir * 6.5, y + 1);
-  g.quadraticCurveTo(x - e.dir * 2.5, y + 1 - fh * .7, x + e.dir * 2, y + 1 - fh);
-  g.quadraticCurveTo(x + e.dir * 1.5, y + 1 - fh * .45, x + e.dir * 5, y + 1);
+  g.moveTo(x - fd * 6.5, y + 1);
+  g.quadraticCurveTo(x - fd * 2.5, y + 1 - fh * .7, x + fd * 2, y + 1 - fh);
+  g.quadraticCurveTo(x + fd * 1.5, y + 1 - fh * .45, x + fd * 5, y + 1);
   g.closePath();
   g.fill();
   g.fillStyle = 'rgba(255,255,255,.18)';
   g.beginPath();
-  g.moveTo(x - e.dir * 4, y + 1);
-  g.quadraticCurveTo(x - e.dir * 1.5, y + 1 - fh * .6, x + e.dir * 1.2, y + 1 - fh * .95);
-  g.lineTo(x - e.dir * 1, y + 1);
+  g.moveTo(x - fd * 4, y + 1);
+  g.quadraticCurveTo(x - fd * 1.5, y + 1 - fh * .6, x + fd * 1.2, y + 1 - fh * .95);
+  g.lineTo(x - fd * 1, y + 1);
   g.closePath();
   g.fill();
   g.restore();
 }
 // Kaşalot (yandan görünüm): gövde, su altındaki bir çemberin üstünde yuvarlanarak hareket eder.
 // Önce iri, küt başı yüzeye çıkar ve nefes verir (öne eğik, U biçiminde açılan püskürme), sırt yavaşça
-// geçer, sonra kuyruk sapı dikleşir; kuyruk yüzgeçleri havaya kalkıp suya kayarak iner ve su sıçrar.
+// geçer ve balina sakince dalar.
 // Bütün hareket yumuşak eğrilerle zamana bağlıdır.
 const smq = q => q <= 0 ? 0 : q >= 1 ? 1 : q * q * q * (q * (q * 6 - 15) + 10);
 function whalePose(u) {
@@ -3570,11 +3625,11 @@ function whalePose(u) {
   const A2 = 0.45;
   const B = 1.6;
   const AE = 0.95 + B;
-  if (u < .16)
-    return A0 + (A1 - A0) * smq(u / .16);
-  if (u < .5)
-    return A1 + (A2 - A1) * smq((u - .16) / .34);
-  return A2 + (AE - A2) * smq((u - .5) / .22);
+  if (u < .2)
+    return A0 + (A1 - A0) * smq(u / .2);
+  if (u < .6)
+    return A1 + (A2 - A1) * smq((u - .2) / .4);
+  return A2 + (AE - A2) * smq((u - .6) / .38);
 }
 function drawWhale(e, u, s) {
   const d = e.dir;
@@ -3629,6 +3684,35 @@ function drawWhale(e, u, s) {
   g.strokeStyle = 'rgba(18,24,28,.7)';
   g.lineWidth = .9;
   g.stroke();
+  // Göz ve ağız çizgisi (başın yanında, küçük)
+  {
+    const qe = .13;
+    const a = aH - qe * B;
+    const [px, py] = P(a);
+    const [nx, ny] = Nn(a);
+    const ex = px + nx * 1.2;
+    const ey = py + ny * 1.2;
+    g.fillStyle = '#e8edf0';
+    g.beginPath();
+    g.ellipse(ex, ey, 1.6, 1.25, 0, 0, 7);
+    g.fill();
+    g.fillStyle = '#11171a';
+    g.beginPath();
+    g.arc(ex + d * .3, ey + .1, .85, 0, 7);
+    g.fill();
+    g.fillStyle = 'rgba(255,255,255,.9)';
+    g.beginPath();
+    g.arc(ex + d * .55, ey - .35, .3, 0, 7);
+    g.fill();
+    // Ağız çizgisi: baş ucundan göze doğru ince koyu çizgi
+    const [hx, hy] = P(aH - .01);
+    g.strokeStyle = 'rgba(20,26,30,.55)';
+    g.lineWidth = .7;
+    g.beginPath();
+    g.moveTo(hx - nx * 2.6, hy - ny * 2.6);
+    g.quadraticCurveTo((hx + ex) / 2 - nx * 2.8, (hy + ey) / 2 - ny * 2.8, ex - nx * 2.2 - d * 2, ey - ny * 2.2);
+    g.stroke();
+  }
   // Islak parlaklık ve sırttaki küçük kamburlar
   g.strokeStyle = 'rgba(255,255,255,.32)';
   g.lineWidth = 1.1;
@@ -3680,8 +3764,8 @@ function drawWhale(e, u, s) {
     g.globalAlpha = 1;
   }
   // Yüzeye çıkış halkası
-  if (u < .3) {
-    const q = u / .3;
+  if (u < .36) {
+    const q = u / .36;
     g.globalAlpha = (1 - q) * .5;
     g.strokeStyle = '#e9f6ff';
     g.lineWidth = 1.1;
@@ -3691,8 +3775,8 @@ function drawWhale(e, u, s) {
     g.globalAlpha = 1;
   }
   // Nefes: baş tepedeyken, ileri doğru eğik ve iki kola ayrılan ince su zerreleri + sis
-  if (u > .17 && u < .5) {
-    const q = (u - .17) / .33;
+  if (u > .21 && u < .6) {
+    const q = (u - .21) / .39;
     const env = Math.sin(Math.min(1, q * 1.15) * Math.PI);
     const [hx, hy] = P(aH - .06);
     const [nx, ny] = Nn(aH - .06);
@@ -3721,107 +3805,6 @@ function drawWhale(e, u, s) {
     g.beginPath();
     g.arc(mx, my, 16, 0, 7);
     g.fill();
-  }
-  // Kuyruk kaldırma: gövde suya gömüldükten sonra kuyruk sapı dikine yükselir, geniş kuyruk yüzgeçleri
-  // arkadan görülür (yukarı kıvrık uçlu U biçimi), bir an asılı kalır, suyu damlatarak yavaşça iner ve suya vurur.
-  if (u > .64 && u < .99) {
-    const q = (u - .64) / .35;
-    const up = q < .42 ? smq(q / .42) : q < .6 ? 1 : 1 - smq((q - .6) / .4);
-    const lean = d * (q < .6 ? 2 : 2 + (q - .6) * 10);
-    const tx = cx + d * Rr * Math.sin(0.95) - d * 6;
-    const Hs = 17 * up;
-    g.save();
-    g.beginPath();
-    g.rect(tx - 40, wy - 60, 80, 60.6);
-    g.clip();
-    const topX = tx + lean;
-    const topY = wy - Hs;
-    const gr2 = g.createLinearGradient(0, topY - 6, 0, wy);
-    gr2.addColorStop(0, '#6b767d');
-    gr2.addColorStop(1, '#3f474d');
-    g.fillStyle = gr2;
-    g.strokeStyle = 'rgba(18,24,28,.7)';
-    g.lineWidth = .9;
-    // Kuyruk sapı: aşağıda kalın, yukarı inceliyor
-    g.beginPath();
-    g.moveTo(tx - 4.2, wy + 1);
-    g.quadraticCurveTo(tx - 3.2 + lean * .4, wy - Hs * .5, topX - 1.6, topY + 2);
-    g.lineTo(topX + 1.6, topY + 2);
-    g.quadraticCurveTo(tx + 3.2 + lean * .4, wy - Hs * .5, tx + 4.2, wy + 1);
-    g.closePath();
-    g.fill();
-    g.stroke();
-    // Kuyruk yüzgeçleri: iki geniş kanat, ortada çentik, uçlar hafif yukarı kıvrık
-    const sp = 16 * Math.min(1, up * 1.3);
-    g.beginPath();
-    g.moveTo(topX, topY + 2.5);
-    g.bezierCurveTo(topX - sp * .35, topY + 3.5, topX - sp * .8, topY + 1.5, topX - sp, topY - 3.5);
-    g.bezierCurveTo(topX - sp * .75, topY - 3.2, topX - sp * .35, topY - 2, topX - 1, topY - .2);
-    g.lineTo(topX, topY + .8);
-    g.lineTo(topX + 1, topY - .2);
-    g.bezierCurveTo(topX + sp * .35, topY - 2, topX + sp * .75, topY - 3.2, topX + sp, topY - 3.5);
-    g.bezierCurveTo(topX + sp * .8, topY + 1.5, topX + sp * .35, topY + 3.5, topX, topY + 2.5);
-    g.closePath();
-    g.fill();
-    g.stroke();
-    // Yüzgecin açık renkli alt yüzü
-    g.fillStyle = 'rgba(220,226,230,.35)';
-    g.beginPath();
-    g.ellipse(topX - sp * .45, topY + .2, sp * .32, 1.1, -.12, 0, 7);
-    g.ellipse(topX + sp * .45, topY + .2, sp * .32, 1.1, .12, 0, 7);
-    g.fill();
-    // Kuyruktan dökülen su
-    if (up > .3) {
-      g.fillStyle = '#e9f6ff';
-      for (let i = 0; i < 10; i++) {
-        const ph = (s * 1.2 + i / 10) % 1;
-        const sx = topX + (i / 9 - .5) * sp * 1.8;
-        const yy = topY + 2 + ph * (wy - topY);
-        g.globalAlpha = (1 - ph) * .8;
-        g.fillRect(sx - .5, yy, 1, 2);
-      }
-      g.globalAlpha = 1;
-    }
-    g.restore();
-    // Kuyruk sapının suya girdiği yerde köpük
-    g.globalAlpha = .55 * Math.min(1, up * 2);
-    g.strokeStyle = '#e9f6ff';
-    g.lineWidth = 1.1;
-    g.beginPath();
-    g.ellipse(tx, wy + 1, 6 + Math.sin(s * 6) * .8, 1.7, 0, 0, 7);
-    g.stroke();
-    g.globalAlpha = 1;
-    if (q > .9 && !e.spT)
-      e.spT = performance.now();
-    e.spX = tx;
-  }
-  // Kuyruğun suya vuruşu
-  if (e.spT) {
-    const q = (performance.now() - e.spT) / 1100;
-    if (q < 1) {
-      const sx = e.spX ?? cx;
-      for (let i = 0; i < 16; i++) {
-        const a = -Math.PI / 2 + (i - 7.5) * .16;
-        const v = 9 + (i % 4) * 4;
-        g.globalAlpha = Math.max(0, 1 - q);
-        g.fillStyle = i % 2 ? '#ffffff' : '#cfeaff';
-        g.beginPath();
-        g.arc(sx + Math.cos(a) * v * q * 1.2, wy + Math.sin(a) * v * q * 1.6 + q * q * 22, 1.5, 0, 7);
-        g.fill();
-      }
-      for (const k of [0, .3]) {
-        const qq = q - k;
-        if (qq <= 0)
-          continue;
-        g.globalAlpha = (1 - qq) * .6;
-        g.strokeStyle = '#e9f6ff';
-        g.lineWidth = 1.2;
-        g.beginPath();
-        g.ellipse(sx, wy + 1, 6 + qq * 26, 2 + qq * 6, 0, 0, 7);
-        g.stroke();
-      }
-      g.globalAlpha = 1;
-    }
   }
 }
 // Harita dışında kalan açık deniz: ekran boyunda dalga çizgileri ve parıltılar (haritadakiyle aynı tarz).
