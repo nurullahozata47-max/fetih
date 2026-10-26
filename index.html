@@ -2539,8 +2539,10 @@ async function blkPatrol(p) {
       await sleep(1200);
       continue;
     }
-    if (arm[nx] > 1 || wall[nx] > 0)
+    if (arm[nx] > 1 || wall[nx] > 0) {
       await blkBomb(u);
+      await autoGuard(u);
+    }
   }
 }
 let gsk = false;
@@ -2671,6 +2673,30 @@ async function shipDuel(a, ub) {
   // Saldıran gemi (sağsa) iskelesine döner.
   if (sink != 1)
     await shipHome(a, P0, sink == 0, COL[p], PN[p]);
+}
+// İskele koruması: düşman gemisi bir iskelenin koruma alanındaki (iskele + yanındaki 2 kıyı) bir bölgeyi
+// bombalarsa, o iskeledeki büyük gemi kendiliğinden gemi savaşına çıkar.
+async function autoGuard(ub) {
+  const b = blk[ub];
+  if (!b)
+    return;
+  const t = b.t;
+  const q = own[t];
+  if (q == NEU || q >= P || q == b.p || friend(q, b.p))
+    return;
+  for (let gd = 0; gd < N; gd++) {
+    if (own[gd] != q || !dk[gd] || !(bigFree(gd) > 0) || blk[gd] || !guardZone(gd).includes(t) || !seaPath(gd, t))
+      continue;
+    if (q == 0 || b.p == 0 || Vg.has(t)) {
+      $('log').textContent = q == 0 ? `${NM[gd]} iskelendeki büyük gemi, kıyını korumak için düşman gemisine saldırıyor!` : `${PN[q]} iskelesindeki büyük gemi, kıyısını korumak için gemine saldırıyor!`;
+      if (turn != 0 && q == 0)
+        hl += ' ' + $('log').textContent;
+      banner(q == 0 ? '🛡 İskelen kıyını koruyor!' : `🛡 ${PN[q]} gemisi karşılık veriyor!`, COL[q]);
+      await sleep(700);
+    }
+    await shipDuel(gd, ub);
+    return;
+  }
 }
 // Bombardıman gemisini geri çağır: hasarlıysa yolda batabilir.
 async function blkRecall(u) {
@@ -2848,6 +2874,7 @@ async function blockade(u, t) {
   ui();
   await sleep(400);
   await blkBomb(u);
+  await autoGuard(u);
   if (msg && p == 0)
     $('log').textContent = msg;
   return true;
@@ -6064,10 +6091,18 @@ async function sail(a, t, mode, ns, esc) {
 }
 // Mayın tarlaları: mine[iskele] = { korunan bölgeler, mayın noktaları }
 let mine = [];
-function layMines(m) {
+// İskelenin koruma alanı: iskele bölgesi ortada, sağında ve solunda en yakın 2 kendi kıyı bölgesi (toplam 3).
+function guardZone(m) {
   const q = own[m];
   const nb2 = [...adj[m]].filter(u => own[u] == q && coastC[u].length).sort((a, b) => Math.hypot(cen[a][0] - cen[m][0], cen[a][1] - cen[m][1]) - Math.hypot(cen[b][0] - cen[m][0], cen[b][1] - cen[m][1])).slice(0, 2);
-  const prot = [m, ...nb2];
+  return [m, ...nb2];
+}
+function layMines(m) {
+  const q = own[m];
+  // O an önünde düşman gemisi demirli olan kıyıya mayın döşenmez (gemi mayının üstünde belirmesin);
+  // gemi başka bir korunan kıyıya geçerken mayına çarpar.
+  const shipAt = blk.filter(b => b && b.p != q && !friend(q, b.p));
+  const prot = guardZone(m).filter(u => !shipAt.some(b => b.t == u));
   const pts = [];
   prot.forEach(u => {
     const L = coastC[u];
@@ -6090,6 +6125,8 @@ function layMines(m) {
         const py = (yy + .5) * S;
         if (pts.some(([a, b]) => Math.hypot(a - px, b - py) < 12))
           break;
+        if (shipAt.some(b => Math.hypot(b.x - px, b.y - py) < 30))
+          continue;
         pts.push([px, py]);
         c0++;
         break;
@@ -11725,7 +11762,7 @@ function openPop(cx, cy) {
         o.push(['mn', mine[t] ? 'Mayın tarlası döşeli' : `Mayın döşe (${MNC} altın)`, !mine[t] && gold[0] >= MNC]);
       if (shS[t] > 0)
         o.push(['sc', 'Keşif seferi', shUsed[t] < shS[t]]);
-      inf.d += ` İskele sv${dk[t]}.${dk[t] >= 3 ? ` Mayınlar bu bölgenin ve en yakın 2 komşu kıyı bölgenin açıklarını korur; çıkarma ya da bombardıman için gelen düşman gemileri batar. Mayın tarlası bir kez patlar.${mine[t] ? ' (Döşeli)' : ''}` : ''} Gemiler: ${shS[t]} küçük (her biri ${CAPS} yer: asker ve okçu 1, mancınık 5 yer), ${shL[t]} büyük. Büyük gemi: top atar; 💣 kıyı bombardımanı yapar (seçtiğin düşman kıyısından başlayıp yanındaki 3 kıyıya kadar devriye gezer, her tur birini bombalar, surları döver; geri çağırana ya da batırılana kadar sürer; hasarlı gemi dönüş yolunda %35 ihtimalle batar); ⚔️ gemi savaşı yapar (düşman gemisinin yanına gidip top düellosuna girer: %50 ihtimalle gemilerden biri batar, yoksa ikisi de hasar alır); çıkarmalarda küçük gemilere eşlik eder, mayınları temizler ve karaya çıkmadan önce top atar. Çıkarma: bu bölgeyi seçip herhangi bir kıyı bölgesine dokun (deniz aşırı fetihte +${LOOT} yağma); kendi kıyı bölgene dokunursan asker, okçu ve mancınık taşırsın.`;
+      inf.d += ` İskele sv${dk[t]}.${dk[t] >= 3 ? ` Mayınlar bu bölgenin ve en yakın 2 komşu kıyı bölgenin açıklarını korur; çıkarma ya da bombardıman için gelen düşman gemileri batar. Mayın tarlası bir kez patlar.${mine[t] ? ' (Döşeli)' : ''}` : ''} Gemiler: ${shS[t]} küçük (her biri ${CAPS} yer: asker ve okçu 1, mancınık 5 yer), ${shL[t]} büyük. Büyük gemi: top atar; 💣 kıyı bombardımanı yapar (seçtiğin düşman kıyısından başlayıp yanındaki 3 kıyıya kadar devriye gezer, her tur birini bombalar, surları döver; geri çağırana ya da batırılana kadar sürer; hasarlı gemi dönüş yolunda %35 ihtimalle batar); 🛡 iskelesini korur (iskele ve yanındaki 2 kıyıdan birini düşman gemisi bombalarsa kendiliğinden saldırır); ⚔️ gemi savaşı yapar (düşman gemisinin yanına gidip top düellosuna girer: %50 ihtimalle gemilerden biri batar, yoksa ikisi de hasar alır); çıkarmalarda küçük gemilere eşlik eder, mayınları temizler ve karaya çıkmadan önce top atar. Çıkarma: bu bölgeyi seçip herhangi bir kıyı bölgesine dokun (deniz aşırı fetihte +${LOOT} yağma); kendi kıyı bölgene dokunursan asker, okçu ve mancınık taşırsın.`;
     }
     o.push(tw[t] ? ['uw', tw[t] >= 2 ? 'Okçu Kulesi seviye 2 (tam)' : `Kuleyi yükselt: Sv2 alevli oklar (${TW2} altın)`, tw[t] < 2 && gold[0] >= TW2] : ['u', `Okçu Kulesi (${TWC} altın)`, gold[0] >= TWC]);
     if (tw[t])
