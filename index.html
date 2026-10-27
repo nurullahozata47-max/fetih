@@ -3645,12 +3645,14 @@ function whalePose(u) {
   const A1 = 0.12;
   const A2 = 0.45;
   const B = 1.6;
-  const AE = 0.95 + B;
+  // Dalışta daha derine döner ve sonda oyalanmaz: kuyruk ucu da animasyon bitmeden suya girer
+  const AE = 1.5 + B;
   if (u < .2)
     return A0 + (A1 - A0) * smq(u / .2);
   if (u < .6)
     return A1 + (A2 - A1) * smq((u - .2) / .4);
-  return A2 + (AE - A2) * smq((u - .6) / .38);
+  const p = Math.min(1, (u - .6) / .34);
+  return A2 + (AE - A2) * p * p * (3 - 2 * p);
 }
 function drawWhale(e, u, s) {
   const d = e.dir;
@@ -3693,7 +3695,8 @@ function drawWhale(e, u, s) {
   const dy0 = -Math.sin(aT);
   const [nx0, ny0] = Nn(aT);
   const tp = Math.max(0, Math.min(1, (aT + .85) / 1.7));
-  const bend = -.42 * (1 - smq(tp / .45)) + .38 * smq((tp - .55) / .45);
+  // Kuyrukta hafif, yavaş bir aşağı-yukarı salınım (yüzer gibi)
+  const bend = -.42 * (1 - smq(tp / .45)) + .38 * smq((tp - .55) / .45) + Math.sin(s * 2.3) * .14;
   const dirAt = k => {
     const b = bend * k;
     const c = Math.cos(b);
@@ -3861,6 +3864,42 @@ function drawWhale(e, u, s) {
     g.fill();
   }
   g.globalAlpha = 1;
+  // Göz: başın alt arkasında küçük, kanlanmış kırmızı göz (hafif kızıl parıltı ve damarlar)
+  {
+    const [ex, ey] = bp(.31, -thB(.31) + 2.2);
+    const gl = g.createRadialGradient(ex, ey, 0, ex, ey, 3.4);
+    gl.addColorStop(0, 'rgba(210,20,24,.55)');
+    gl.addColorStop(1, 'rgba(160,0,0,0)');
+    g.fillStyle = gl;
+    g.beginPath();
+    g.arc(ex, ey, 3.4, 0, 7);
+    g.fill();
+    g.strokeStyle = 'rgba(190,25,30,.55)';
+    g.lineWidth = .25;
+    for (let k = 0; k < 4; k++) {
+      const a = k * 1.6 + .4;
+      g.beginPath();
+      g.moveTo(ex + Math.cos(a) * 1, ey + Math.sin(a) * .8);
+      g.quadraticCurveTo(ex + Math.cos(a + .3) * 1.8, ey + Math.sin(a + .3) * 1.5, ex + Math.cos(a + .1) * 2.4, ey + Math.sin(a + .1) * 1.9);
+      g.stroke();
+    }
+    const ir = g.createRadialGradient(ex, ey, 0, ex, ey, 1.2);
+    ir.addColorStop(0, '#ff3a2e');
+    ir.addColorStop(.6, '#a80d12');
+    ir.addColorStop(1, '#3a0204');
+    g.fillStyle = ir;
+    g.beginPath();
+    g.ellipse(ex, ey, 1.25, .9, 0, 0, 7);
+    g.fill();
+    g.fillStyle = '#120000';
+    g.beginPath();
+    g.ellipse(ex, ey, .4, .55, 0, 0, 7);
+    g.fill();
+    g.fillStyle = 'rgba(255,230,220,.6)';
+    g.beginPath();
+    g.arc(ex + d * .35, ey - .3, .22, 0, 7);
+    g.fill();
+  }
   g.restore();
   // Su çizgisinde gövdenin kestiği yerlerde köpük
   {
@@ -3873,7 +3912,14 @@ function drawWhale(e, u, s) {
     }
     g.strokeStyle = '#e9f6ff';
     g.lineWidth = .8;
-    for (const x of cuts) {
+    // Kuyruk yüzgeci suyu yararken de köpük
+    const tc = [];
+    {
+      const a1 = tpt(16.5, 7.6), a2 = tpt(16.5, -6.8), m = tpt(11, 0);
+      if ((a1[1] < wy || a2[1] < wy) && m[1] > wy - 4)
+        tc.push(m[0]);
+    }
+    for (const x of cuts.concat(tc)) {
       // Yumuşak beyaz çalkantı (çizgi halka yerine dağınık köpük)
       const rg = g.createRadialGradient(x, wy + .6, 0, x, wy + .6, 7);
       rg.addColorStop(0, 'rgba(235,246,252,.55)');

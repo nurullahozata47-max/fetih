@@ -1,5 +1,5 @@
 // Fetih önbellek görevlisi: oyun internetsiz de açılır; internet varken yeni sürüm otomatik gelir.
-const C = 'fetih-f15bf347';
+const C = 'fetih-3f9424e4';
 const FILES = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "favicon-48.png"];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(C).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
