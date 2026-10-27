@@ -2556,6 +2556,44 @@ function shipVolley(t, n) {
 }
 // Bombardıman gemisinin gizli dayanıklılığı: her düello ya da top isabeti 1 eksiltir, 0 olunca batar.
 const SHIPHP = 3;
+// Bir devletin (oyuncu ya da bot) en fazla 2 büyük savaş gemisi olabilir (bütün iskeleleri toplamı).
+const SLMAX = 2;
+const bigN = p => { let k = 0; for (let u = 0; u < N; u++) if (own[u] == p && dk[u]) k += shL[u] || 0; return k; };
+// Bombardıman filosundaki gemi sayısı (1 ya da 2; ikisi yan yana durur ve birlikte ateş eder).
+const blkN = b => b ? (b.n || 1) : 0;
+// Filonun ikinci gemisinin duracağı yer: öndeki geminin yanında, kıyıya paralel, karaya taşmayan deniz.
+function pairSpot(x, y, t) {
+  const tx = cen[t][0] * S;
+  const ty = cen[t][1] * S;
+  let vx = x - tx;
+  let vy = y - ty;
+  const l = Math.hypot(vx, vy) || 1;
+  vx /= l;
+  vy /= l;
+  const sp = seaSpot(x, y, 24, 40, 3, x - vy * 30 + vx * 6, y + vx * 30 + vy * 6) || seaSpot(x, y, 20, 44, 2, x + vx * 26, y + vy * 26);
+  return sp || [x + 14, y + 10];
+}
+// Filodan bir gemi batar: ikinci gemi varsa filo onunla sürer (true döner: filo tamamen yok oldu).
+function blkLoseOne(u) {
+  const b = blk[u];
+  shL[u] = Math.max(0, shL[u] - 1);
+  awayL[u] = Math.max(0, awayL[u] - 1);
+  if (!b)
+    return true;
+  if (blkN(b) > 1) {
+    b.n = 1;
+    b.hp = b.hp2 ?? SHIPHP;
+    b.dmg = !!b.dmg2;
+    if (b.x2 != null) {
+      b.x = b.x2;
+      b.y = b.y2;
+    }
+    b.x2 = b.y2 = null;
+    return false;
+  }
+  blk[u] = null;
+  return true;
+}
 // Kıyıdan top ateşiyle düşman gemisine atış: atan her büyük gemi %50 isabet; isabet gizli dayanıklılığı 1 düşürür.
 async function shipCannon(a, ub) {
   const b = blk[ub];
@@ -2576,10 +2614,8 @@ async function shipCannon(a, ub) {
     b.dmg = true;
     if (b.hp <= 0) {
       nav.push({ k: 'wreck', x: b.x, y: b.y, col: COL[b.p], t0: performance.now(), dur: 3000 });
-      blk[ub] = null;
-      shL[ub] = Math.max(0, shL[ub] - 1);
-      awayL[ub] = Math.max(0, awayL[ub] - 1);
-      $('log').textContent = own[a] == 0 ? 'Topların düşman gemisini parçaladı, gemi battı!' : `${PN[own[a]]} topları gemini batırdı!`;
+      const gone = blkLoseOne(ub);
+      $('log').textContent = (own[a] == 0 ? 'Topların düşman gemisini parçaladı, gemi battı!' : `${PN[own[a]]} topları gemini batırdı!`) + (gone ? '' : ' Filodaki diğer gemi bombardımana devam ediyor.');
       if (own[a] == 0)
         banner('💥 Düşman gemisi battı!', '#3a8ee8');
     }
@@ -2601,10 +2637,8 @@ function blkSink(u, why) {
   if (!b)
     return;
   nav.push({ k: 'sink', x: b.x, y: b.y, n: 1, big: true, col: COL[b.p], t0: performance.now(), dur: 2600 });
-  blk[u] = null;
-  shL[u] = Math.max(0, shL[u] - 1);
-  awayL[u] = Math.max(0, awayL[u] - 1);
-  const msg = b.p == 0 ? `Bombardıman gemin ${NM[b.t]} açıklarında battı (${why}).` : `${PN[b.p]} bombardıman gemisi ${NM[b.t]} açıklarında battı (${why})!`;
+  const gone = blkLoseOne(u);
+  const msg = (b.p == 0 ? `Bombardıman gemin ${NM[b.t]} açıklarında battı (${why}).` : `${PN[b.p]} bombardıman gemisi ${NM[b.t]} açıklarında battı (${why})!`) + (gone ? '' : ' Filodaki diğer gemi yoluna devam ediyor.');
   if (b.p == 0 || own[b.t] == 0 || Vg.has(b.t)) {
     $('log').textContent = msg;
     if (turn != 0)
@@ -2622,12 +2656,29 @@ async function blkBomb(u) {
   const t = b.t;
   const p = b.p;
   const dur = 1600;
-  const vol = wall[t] > 0 ? null : shipVolley(t, 1);
-  nav.push({ k: 'strike', u, t, ax: b.x, ay: b.y, fx: b.x, fy: b.y, tx: cen[t][0] * S, ty: cen[t][1] * S, n: 1, sailOut: false, miss: vol && !vol.hits, t0: performance.now(), dur, col: COL[p] });
-  await sleep(dur * .5);
+  const nS = blkN(b);
+  const vol = wall[t] > 0 ? null : shipVolley(t, nS);
+  // Surlara her gemi ayrı %50 şansla işler.
+  let wh = 0;
+  if (!vol)
+    for (let i = 0; i < nS; i++)
+      if (Math.random() < .5)
+        wh++;
+  const shp = [[b.x, b.y]];
+  if (nS > 1 && b.x2 != null)
+    shp.push([b.x2, b.y2]);
+  shp.forEach(([sx0, sy0], i) => nav.push({ k: 'strike', u, t, ax: sx0, ay: sy0, fx: sx0, fy: sy0, tx: cen[t][0] * S + (i ? 8 : 0), ty: cen[t][1] * S + (i ? 5 : 0), n: 1, sailOut: false, miss: vol ? i >= vol.hits : i >= wh, t0: performance.now() + i * 260, dur, col: COL[p] }));
+  await sleep(dur * .5 + (shp.length - 1) * 260);
   let txt = '';
   if (wall[t] > 0) {
-    if (Math.random() < .5) {
+    if (wh >= 2 && wall[t] >= 2) {
+      nav.push({ k: 'dust', x: cen[t][0] * S, y: cen[t][1] * S, big: 1, t0: performance.now(), dur: 900 });
+      makeRuin(t, u, 1, COL[p], p);
+      wall[t] = 0;
+      txt = 'iki geminin gülleleri okçulu suru tamamen yıktı';
+      fl.push({ t, dx: 0, txt: 'Sur dövüldü!', col: '#ffd36b', t0: performance.now() });
+    }
+    else if (wh > 0) {
       nav.push({ k: 'dust', x: cen[t][0] * S, y: cen[t][1] * S, big: 1, t0: performance.now(), dur: 900 });
       if (wall[t] >= 2) {
         wall[t] = 1;
@@ -2657,7 +2708,7 @@ async function blkBomb(u) {
     if (k > 0)
       fl.push({ t, dx: 0, txt: visSet().has(t) ? `-${k} top` : 'Top!', col: '#ff6b6b', t0: performance.now() });
   }
-  const msg = (p == 0 ? 'Bombardıman gemin' : `${PN[p]} gemisi`) + ` ${NM[t]} kıyısını bombaladı: ${txt}.`;
+  const msg = (p == 0 ? (nS > 1 ? 'Bombardıman gemilerin' : 'Bombardıman gemin') : `${PN[p]} ${nS > 1 ? 'gemileri' : 'gemisi'}`) + ` ${NM[t]} kıyısını bombaladı: ${txt}.`;
   if (p == 0 || own[t] == 0 || Vg.has(t)) {
     $('log').textContent = msg;
     if (turn != 0 && own[t] == 0)
@@ -2681,7 +2732,7 @@ async function blkPatrol(p) {
     }
     if (!b.route.length) {
       blk[u] = null;
-      awayL[u] = Math.max(0, awayL[u] - 1);
+      awayL[u] = Math.max(0, awayL[u] - blkN(b));
       if (p == 0)
         hl += ' Bombardıman rotasında düşman kıyısı kalmadı, büyük gemin iskeleye döndü.';
       continue;
@@ -2708,10 +2759,12 @@ async function blkPatrol(p) {
       const vis = Vg.has(nx) || Vg.has(b.t) || p == 0;
       b.moving = true;
       if (vis)
-        await sleep(pathNav(pts, COL[p], true, 4200));
+        await sleep(pathNav(pts, COL[p], true, 4200, blkN(b)));
       b.moving = false;
       b.x = sp[0];
       b.y = sp[1];
+      if (blkN(b) > 1)
+        [b.x2, b.y2] = pairSpot(b.x, b.y, nx);
     }
     b.t = nx;
     if (minedBy(nx, p) >= 0) {
@@ -2730,14 +2783,14 @@ async function blkPatrol(p) {
 }
 let gsk = false;
 // Deniz yolu animasyonu (gemi bir nokta listesi boyunca gider).
-function pathNav(pts, col, big, maxD) {
+function pathNav(pts, col, big, maxD, nShip) {
   const cum = [0];
   for (let k = 1; k < pts.length; k++)
     cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
   const L = cum[cum.length - 1] || 1;
   const dur = Math.min(maxD || 3600, Math.max(900, L * 5));
   const [ex, ey] = pts[pts.length - 1];
-  nav.push({ k: 'sail', pts, cum, L, n: 1, big, cx: ex, cy: ey, col, t0: performance.now(), dur, mode: 'x', noLand: 1 });
+  nav.push({ k: 'sail', pts, cum, L, n: nShip || 1, big, cx: ex, cy: ey, col, t0: performance.now(), dur, mode: 'x', noLand: 1 });
   return dur;
 }
 // Saldırabileceği düşman bombardıman gemileri (iskele a'dan deniz yolu olanlar).
@@ -2809,8 +2862,11 @@ async function shipDuel(a, ub) {
     return;
   }
   b.moving = true;
+  b.duel = true;
   const r = Math.random();
-  let sink = r < .25 ? 1 : r < .5 ? 2 : 0;
+  // İki gemilik filoya saldırmak daha tehlikeli: iki gemi birlikte karşılık verir.
+  const two = blkN(b) > 1;
+  let sink = two ? (r < .35 ? 1 : r < .55 ? 2 : 0) : (r < .25 ? 1 : r < .5 ? 2 : 0);
   // Gizli dayanıklılık: batmadığı her düelloda bombardıman gemisinin dayanıklılığı 1 düşer; bitince batar
   // (en geç 3. düelloda batar).
   if (sink != 2) {
@@ -2830,21 +2886,23 @@ async function shipDuel(a, ub) {
   let msg;
   if (sink == 2) {
     nav.push({ k: 'wreck', x: b.x, y: b.y, col: COL[q], t0: performance.now(), dur: 3000 });
-    blk[ub] = null;
-    shL[ub] = Math.max(0, shL[ub] - 1);
-    awayL[ub] = Math.max(0, awayL[ub] - 1);
-    msg = `${nmA} düelloyu kazandı: ${nmB} parçalanıp battı!`;
+    b.moving = false;
+    b.duel = false;
+    const gone = blkLoseOne(ub);
+    msg = `${nmA} düelloyu kazandı: ${nmB} parçalanıp battı!` + (gone ? '' : ' Filodaki diğer gemi bombardımana devam ediyor.');
   }
   else if (sink == 1) {
     nav.push({ k: 'wreck', x: sx, y: sy, col: COL[p], t0: performance.now(), dur: 3000 });
     shL[a] = Math.max(0, shL[a] - 1);
     awayL[a] = Math.max(0, awayL[a] - 1);
     b.moving = false;
+    b.duel = false;
     msg = `${nmA} düelloyu kaybetti ve parçalanıp battı. ${q == 0 ? 'Senin gemin' : PN[q] + ' gemisi'} bombardımana devam ediyor.`;
   }
   else {
     b.dmg = true;
     b.moving = false;
+    b.duel = false;
     msg = 'İki gemi de ağır hasar aldı ama batmadı. Hasarlı gemi geri dönerken %35 ihtimalle su alıp batabilir.';
   }
   if (camOK) {
@@ -2901,7 +2959,16 @@ async function blkRecall(u) {
     pts = sp ? sp.pts.slice() : [[dx0, dy0]];
     pts.push([b.x, b.y]);
   }
-  const ok = await shipHome(u, pts, !!b.dmg, COL[b.p], PN[b.p]);
+  let ok;
+  if (blkN(b) > 1 && b.x2 != null) {
+    let p2 = seaRoute(dx0, dy0, b.x2, b.y2);
+    if (!p2)
+      p2 = pts.concat([[b.x2, b.y2]]);
+    const rs = await Promise.all([shipHome(u, pts, !!b.dmg, COL[b.p], PN[b.p]), sleep(350).then(() => shipHome(u, p2, !!b.dmg2, COL[b.p], PN[b.p]))]);
+    ok = rs[0] || rs[1];
+  }
+  else
+    ok = await shipHome(u, pts, !!b.dmg, COL[b.p], PN[b.p]);
   if (ok && b.p == 0)
     $('log').textContent = `Bombardıman gemin ${NM[u]} iskelesine döndü${b.dmg ? ' ve onarıldı' : ''}.`;
 }
@@ -2911,7 +2978,7 @@ async function botNavalDefense(p) {
   const th = blk.map((b, ub) => b && blkOK(ub) && b.p != p && !friend(p, b.p) && b.route.some(x => own[x] == p) ? ub : -1).filter(x => x >= 0);
   // Saldırı: zor (ve biraz normal) botlar kendi kıyısına gelmese de menzildeki düşman gemisine düello açar.
   if (!th.length) {
-    if (Math.random() < [0, .25, .6][DIF]) {
+    if (Math.random() < [0, .3, .6][DIF]) {
       for (const u of my) {
         if (!(dk[u] && bigFree(u) > 0 && !sfire[u] && !blk[u]))
           continue;
@@ -2948,7 +3015,7 @@ async function botNavalDefense(p) {
       continue;
     }
     const dks = my.filter(u => dk[u]).sort((x, y) => HD[x][b.t] - HD[y][b.t]);
-    const big = dks.find(u => dk[u] >= 2 && shS[u] + shL[u] < 4 && gold[p] >= SLC);
+    const big = bigN(p) < SLMAX ? dks.find(u => dk[u] >= 2 && shS[u] + shL[u] < 4 && gold[p] >= SLC) : null;
     if (big != null) {
       shL[big]++;
       gold[p] -= SLC;
@@ -2967,6 +3034,71 @@ async function botNavalDefense(p) {
         dk[nd] = 1;
       }
     }
+  }
+}
+// Botun donanması (tur başına en fazla bir adım): kıyısı olan bot iskele kurar, sv2'ye çıkarır,
+// büyük savaş gemisi (en fazla 2) ve birkaç küçük gemi yapar. Denizden ulaşabileceği düşman kıyısı yoksa uğraşmaz.
+function botNavy(p) {
+  const my = [...Array(N).keys()].filter(t => own[t] == p && !inc[t]);
+  const fo = v => own[v] != p && own[v] != NEU && own[v] < P && !friend(p, own[v]);
+  const iso = !my.some(t => [...adj[t]].some(fo));
+  const coast = my.filter(u => dock[u]);
+  if (!coast.length || rd < (iso ? 1 : [5, 3, 2][DIF]))
+    return;
+  if (!iso && ![...Array(N).keys()].some(x => fo(x) && coastC[x].length > 0))
+    return;
+  const ds = my.filter(u => dk[u]);
+  const pk = (u, c) => {
+    gold[p] -= c;
+    if (Vg.has(u))
+      pulse(u, '#c8a26b');
+  };
+  if (!ds.length) {
+    if (gold[p] >= DC && Math.random() < (iso ? 1 : [.3, .6, .85][DIF])) {
+      // Sınırda olmayan (daha güvenli) bir kıyı bölgesi
+      const safe = coast.filter(u => !isBorder(u));
+      const o = safe.length ? safe : coast;
+      const u = o[Math.floor(Math.random() * o.length)];
+      dk[u] = 1;
+      pk(u, DC);
+    }
+    return;
+  }
+  const u = ds.sort((x, y) => dk[y] - dk[x] || (shS[y] + shL[y]) - (shS[x] + shL[x]))[0];
+  const room = shS[u] + shL[u] < 4;
+  const sTot = ds.reduce((a, x) => a + shS[x], 0);
+  const bTot = bigN(p);
+  if (iso) {
+    if (room && sTot < 3 && gold[p] >= SSC) {
+      shS[u]++;
+      pk(u, SSC);
+    }
+    return;
+  }
+  if (dk[u] == 1 && gold[p] >= DC2 && rd >= [8, 5, 4][DIF] && Math.random() < [.25, .55, .8][DIF]) {
+    dk[u] = 2;
+    pk(u, DC2);
+    return;
+  }
+  const bWant = DIF == 0 ? 1 : DIF == 1 ? (rd >= 12 ? 2 : 1) : 2;
+  if (dk[u] >= 2 && bTot < Math.min(SLMAX, bWant) && room && gold[p] >= SLC && Math.random() < [.25, .55, .85][DIF]) {
+    shL[u]++;
+    pk(u, SLC);
+    return;
+  }
+  if (room && sTot < [1, 2, 2][DIF] && gold[p] >= SSC && Math.random() < [.3, .5, .7][DIF]) {
+    shS[u]++;
+    pk(u, SSC);
+    return;
+  }
+  if (dk[u] == 2 && rd >= 8 && gold[p] >= DC3 && Math.random() < [.1, .2, .35][DIF]) {
+    dk[u] = 3;
+    pk(u, DC3);
+    return;
+  }
+  if (dk[u] >= 3 && !mine[u] && gold[p] >= MNC && Math.random() < .4) {
+    gold[p] -= MNC;
+    layMines(u);
   }
 }
 // Abluka gemisine top atışı: atan her büyük gemi için %50 batırma şansı.
@@ -2999,14 +3131,14 @@ async function blkShoot(a, ub) {
   await sleep(dur * .45);
 }
 // Ablukada olmayan, o tur ateş etmemiş büyük gemi sayısı.
-const bigFree = u => Math.max(0, (shL[u] || 0) - (blk[u] ? 1 : 0));
+const bigFree = u => Math.max(0, (shL[u] || 0) - blkN(blk[u]));
 // Geçersiz kalan ablukaları kaldırır (iskele düştü, gemi battı, hedef el değiştirdi...).
 function blkClean() {
   for (let u = 0; u < N; u++)
     if (blk[u] && !blkOK(u)) {
       const b = blk[u];
       blk[u] = null;
-      awayL[u] = Math.max(0, awayL[u] - 1);
+      awayL[u] = Math.max(0, awayL[u] - blkN(b));
       if (b.p == 0 && own[u] == 0)
         hl += ` ${NM[b.t]} bombardımanı bitti.`;
     }
@@ -3018,6 +3150,20 @@ async function blockade(u, t) {
   const sp0 = seaPath(u, t);
   if (!sp0)
     return false;
+  // Filo: iskeledeki boş büyük gemiler (en fazla 2). Bu iskelede tek gemi varsa, başka bir iskeledeki
+  // boştaki büyük gemi de bu iskeleye geçip filoya katılır; iki gemi yan yana gider ve birlikte bombalar.
+  let join = -1;
+  if (bigFree(u) < 2)
+    for (let v = 0; v < N; v++)
+      if (v != u && own[v] == p && dk[v] && bigFree(v) > 0 && !blk[v] && !sfire[v] && seaPath(v, t)) {
+        join = v;
+        break;
+      }
+  if (join >= 0) {
+    shL[join]--;
+    shL[u]++;
+  }
+  const nF = Math.min(2, bigFree(u));
   const P0 = sp0.pts;
   const cum = [0];
   for (let k = 1; k < P0.length; k++)
@@ -3025,7 +3171,7 @@ async function blockade(u, t) {
   const L = cum[cum.length - 1] || 1;
   const mm = minedBy(t, p);
   const dur = Math.min(4200, Math.max(1400, L * 5));
-  awayL[u]++;
+  awayL[u] += nF;
   if (mm >= 0) {
     const kb = boomPoint(mm, P0, .8);
     const P1 = P0.slice(0, kb + 1);
@@ -3033,12 +3179,13 @@ async function blockade(u, t) {
     const L1 = c1[c1.length - 1] || 1;
     const d1 = Math.min(3600, Math.max(1200, L1 * 5));
     const [bx, by] = P1[P1.length - 1];
-    nav.push({ k: 'sail', pts: P1, cum: c1, L: L1, n: 1, big: true, cx: bx, cy: by, col: COL[p], t0: performance.now(), dur: d1, mode: 'x', noLand: 1 });
+    nav.push({ k: 'sail', pts: P1, cum: c1, L: L1, n: nF, big: true, cx: bx, cy: by, col: COL[p], t0: performance.now(), dur: d1, mode: 'x', noLand: 1 });
     await sleep(d1);
     nav.push({ k: 'sink', x: bx, y: by, n: 1, big: true, col: COL[p], t0: performance.now(), dur: 2600 });
     sinkMsg(mm, u, 1, 0, t);
+    // Mayın tarlası bir kez patlar: öndeki gemi batar, yanındaki (varsa) iskeleye döner.
     shL[u] = Math.max(0, shL[u] - 1);
-    awayL[u] = Math.max(0, awayL[u] - 1);
+    awayL[u] = Math.max(0, awayL[u] - nF);
     ui();
     await sleep(1600);
     return false;
@@ -3047,19 +3194,30 @@ async function blockade(u, t) {
   const [ex, ey] = farSpot(ex0, ey0);
   const [dx0, dy0] = dockSea(u);
   const RT = seaRoute(dx0, dy0, ex, ey);
+  if (join >= 0 && (p == 0 || Vg.has(join) || Vg.has(t))) {
+    // Diğer iskeleden katılan gemi de hedefe yelken açar
+    const [jx, jy] = dockSea(join);
+    const JR = seaRoute(jx, jy, ex, ey);
+    if (JR)
+      pathNav(JR, COL[p], true, 4200);
+  }
   if (RT)
-    await sleep(pathNav(RT, COL[p], true, 4200));
+    await sleep(pathNav(RT, COL[p], true, 4200, join >= 0 ? 1 : nF));
   else {
-    nav.push({ k: 'sail', pts: P0, cum, L, n: 1, big: true, cx: sp0.cx, cy: sp0.cy, col: COL[p], t0: performance.now(), dur, mode: 'x', noLand: 1 });
+    nav.push({ k: 'sail', pts: P0, cum, L, n: nF, big: true, cx: sp0.cx, cy: sp0.cy, col: COL[p], t0: performance.now(), dur, mode: 'x', noLand: 1 });
     await sleep(dur);
   }
   const route = blkRoute(u, t, p);
-  blk[u] = { t, p, route, k: 0, x: ex, y: ey, hp: SHIPHP };
+  blk[u] = { t, p, route, k: 0, x: ex, y: ey, hp: SHIPHP, n: nF };
+  if (nF > 1) {
+    blk[u].hp2 = SHIPHP;
+    [blk[u].x2, blk[u].y2] = pairSpot(ex, ey, t);
+  }
   const q = own[t];
   pulse(t, COL[p]);
   fl.push({ t, dx: 0, dy: -20, txt: '💣 Bombardıman', col: '#cfe3ea', t0: performance.now() });
   const rn = route.map(x => NM[x]).join(' → ');
-  const msg = p == 0 ? `Büyük gemin ${NM[t]} kıyısını bombalamaya başladı. Devriye rotası: ${rn}. Her tur sıradaki kıyıyı bombalar, surları döver.` : q == 0 ? `${PN[p]} büyük gemisi ${NM[t]} kıyını bombalıyor! Her tur kıyı boyunca ilerleyecek (${rn}). Durdurmak için: büyük gemiyle ⚔️ Gemi savaşı aç ve düşman gemisine dokun, rotaya mayın döşe ya da ${NM[u]} iskelesini al.` : '';
+  const msg = p == 0 ? `${nF > 1 ? 'İki büyük gemin yan yana' : 'Büyük gemin'} ${NM[t]} kıyısını bombalamaya başladı.${join >= 0 ? ` (${NM[join]} iskelesindeki gemi de filoya katıldı.)` : ''} Devriye rotası: ${rn}. Her tur sıradaki kıyıyı bombalar, surları döver.` : q == 0 ? `${PN[p]} ${nF > 1 ? 'iki büyük gemisi' : 'büyük gemisi'} ${NM[t]} kıyını bombalıyor! Her tur kıyı boyunca ilerleyecek (${rn}). Durdurmak için: büyük gemiyle ⚔️ Gemi savaşı aç ve düşman gemisine dokun, rotaya mayın döşe ya da ${NM[u]} iskelesini al.` : '';
   if (msg) {
     $('log').textContent = msg;
     if (turn != 0)
@@ -5342,10 +5500,18 @@ function shipSmoke(x, y, s, seed) {
 function drawBlk(s) {
   for (let u = 0; u < N; u++) {
     const b = blk[u];
-    if (!b || b.moving || !blkOK(u) || !(Vg.has(b.t) || Vg.has(u)))
+    if (!b || !blkOK(u) || !(Vg.has(b.t) || Vg.has(u)))
       continue;
     const tx = cen[b.t][0] * S;
     const ty = cen[b.t][1] * S;
+    // Filonun ikinci gemisi (öndeki düelloda olsa da yerinde durur)
+    if (blkN(b) > 1 && b.x2 != null && (!b.moving || b.duel)) {
+      drawShip(b.x2, b.y2 + Math.sin(s * 1.3 + u + 2) * .8, tx >= b.x2 ? 1 : -1, true, COL[b.p], s, u * 7 + 3);
+      if (b.dmg2)
+        shipSmoke(b.x2, b.y2, s, u + 5);
+    }
+    if (b.moving)
+      continue;
     // Gemiden kıyıya kesik zincir çizgisi
     g.save();
     g.setLineDash([3, 4]);
@@ -6609,6 +6775,8 @@ function drawNav(now) {
       const P0 = e.pts;
       const cum = e.cum;
       const at = d => {
+        if (P0.length < 2)
+          return [P0[0][0], P0[0][1], 0];
         d = Math.max(0, Math.min(e.L, d));
         let j = 1;
         while (j < cum.length - 1 && cum[j] < d)
@@ -6621,11 +6789,12 @@ function drawNav(now) {
       g.globalAlpha = u > 1 ? Math.max(0, 1 - (u - 1) * 5) : 1;
       const D = ez * e.L + (e.lead || 0) * Math.min(1, u * 4);
       const nn = Math.min(3, e.n);
+      const gap = e.big ? 30 : 18;
       g.strokeStyle = 'rgba(255,255,255,.35)';
       g.lineWidth = 1.2;
       g.beginPath();
       for (let w = 0; w < 10; w++) {
-        const [x, y] = at(D - nn * 16 - w * 5);
+        const [x, y] = at(D - (nn - 1) * gap - 16 - w * 5);
         if (w == 0)
           g.moveTo(x, y);
         else
@@ -6635,7 +6804,7 @@ function drawNav(now) {
       let hx = 0;
       let hy = 0;
       for (let j = nn - 1; j >= 0; j--) {
-        const [x, y, dx] = at(D - j * 18);
+        const [x, y, dx] = at(D - j * gap);
         if (j == 0) {
           hx = x;
           hy = y;
@@ -12506,7 +12675,7 @@ function openPop(cx, cy) {
     if (dk[t]) {
       const ns = shS[t] + shL[t];
       o.push(['ss', `Küçük gemi (${SSC} altın, ${CAPS} yer)`, ns < 4 && gold[0] >= SSC]);
-      o.push(['sl', dk[t] >= 2 ? `Büyük gemi (${SLC} altın)` : 'Büyük gemi (Sv2 iskele gerekir)', dk[t] >= 2 && ns < 4 && gold[0] >= SLC]);
+      o.push(['sl', dk[t] < 2 ? 'Büyük gemi (Sv2 iskele gerekir)' : bigN(0) >= SLMAX ? `Büyük gemi (en fazla ${SLMAX})` : `Büyük gemi (${SLC} altın · ${bigN(0)}/${SLMAX})`, dk[t] >= 2 && ns < 4 && gold[0] >= SLC && bigN(0) < SLMAX]);
       if (shL[t] > 0)
         o.push(['sf', sfire[t] ? 'Toplar yorgun' : bigFree(t) ? `Top ateşi (${bigFree(t)} gemi)` : 'Büyük gemi ablukada', !sfire[t] && bigFree(t) > 0]);
       if (shL[t] > 0)
@@ -12517,7 +12686,7 @@ function openPop(cx, cy) {
         o.push(['mn', mine[t] ? 'Mayın tarlası döşeli' : `Mayın döşe (${MNC} altın)`, !mine[t] && gold[0] >= MNC]);
       if (shS[t] > 0)
         o.push(['sc', 'Keşif seferi', shUsed[t] < shS[t]]);
-      inf.d += ` İskele sv${dk[t]}.${dk[t] >= 3 ? ` Mayınlar bu bölgenin ve en yakın 2 komşu kıyı bölgenin açıklarını korur; çıkarma ya da bombardıman için gelen düşman gemileri batar. Mayın tarlası bir kez patlar.${mine[t] ? ' (Döşeli)' : ''}` : ''} Gemiler: ${shS[t]} küçük (her biri ${CAPS} yer: asker ve okçu 1, mancınık 5 yer), ${shL[t]} büyük. Büyük gemi: top atar; 💣 kıyı bombardımanı yapar (seçtiğin düşman kıyısından başlayıp yanındaki 3 kıyıya kadar devriye gezer, her tur birini bombalar, surları döver; geri çağırana ya da batırılana kadar sürer; hasarlı gemi dönüş yolunda %35 ihtimalle batar); 🛡 iskelesini korur (iskele ve yanındaki 2 kıyıdan birini düşman gemisi bombalarsa kendiliğinden saldırır); ⚔️ gemi savaşı yapar (düşman gemisinin yanına gidip top düellosuna girer: %50 ihtimalle gemilerden biri batar, yoksa ikisi de hasar alır); çıkarmalarda küçük gemilere eşlik eder, mayınları temizler ve karaya çıkmadan önce top atar. Çıkarma: bu bölgeyi seçip herhangi bir kıyı bölgesine dokun (deniz aşırı fetihte +${LOOT} yağma); kendi kıyı bölgene dokunursan asker, okçu ve mancınık taşırsın.`;
+      inf.d += ` İskele sv${dk[t]}.${dk[t] >= 3 ? ` Mayınlar bu bölgenin ve en yakın 2 komşu kıyı bölgenin açıklarını korur; çıkarma ya da bombardıman için gelen düşman gemileri batar. Mayın tarlası bir kez patlar.${mine[t] ? ' (Döşeli)' : ''}` : ''} Gemiler: ${shS[t]} küçük (her biri ${CAPS} yer: asker ve okçu 1, mancınık 5 yer), ${shL[t]} büyük. Büyük gemi (devlet başına en fazla 2): top atar; 💣 kıyı bombardımanı yapar (iki büyük gemin varsa ikisi yan yana gidip birlikte bombalar, diğer iskeledeki gemi de filoya katılır; seçtiğin düşman kıyısından başlayıp yanındaki 3 kıyıya kadar devriye gezer, her tur birini bombalar, surları döver; geri çağırana ya da batırılana kadar sürer; hasarlı gemi dönüş yolunda %35 ihtimalle batar); 🛡 iskelesini korur (iskele ve yanındaki 2 kıyıdan birini düşman gemisi bombalarsa kendiliğinden saldırır); ⚔️ gemi savaşı yapar (düşman gemisinin yanına gidip top düellosuna girer: %50 ihtimalle gemilerden biri batar, yoksa ikisi de hasar alır); çıkarmalarda küçük gemilere eşlik eder, mayınları temizler ve karaya çıkmadan önce top atar. Çıkarma: bu bölgeyi seçip herhangi bir kıyı bölgesine dokun (deniz aşırı fetihte +${LOOT} yağma); kendi kıyı bölgene dokunursan asker, okçu ve mancınık taşırsın.`;
     }
     o.push(tw[t] ? ['uw', tw[t] >= 2 ? 'Okçu Kulesi seviye 2 (tam)' : `Kuleyi yükselt: Sv2 alevli oklar (${TW2} altın)`, tw[t] < 2 && gold[0] >= TW2] : ['u', `Okçu Kulesi (${TWC} altın)`, gold[0] >= TWC]);
     if (tw[t])
@@ -12778,7 +12947,7 @@ function openPop(cx, cy) {
     }
     if (k == 'ss' || k == 'sl') {
       const c0 = k == 'ss' ? SSC : SLC;
-      if (dk[t] && (k == 'ss' || dk[t] >= 2) && shS[t] + shL[t] < 4 && gold[0] >= c0) {
+      if (dk[t] && (k == 'ss' || (dk[t] >= 2 && bigN(0) < SLMAX)) && shS[t] + shL[t] < 4 && gold[0] >= c0) {
         gold[0] -= c0;
         (k == 'ss' ? shS : shL)[t]++;
         pulse(t, '#9bd1ff');
@@ -13614,8 +13783,32 @@ async function ai0(p) {
     }
   }
   const ct = cap[p];
+  // Kışla: normalde en az bir kışla sv2'ye (casus) çıkar; zorda sv3'e (mancınık).
+  {
+    const bs = mine().filter(t => bar[t] && !inc[t]);
+    const bmax = Math.max(0, ...bs.map(t => bar[t]));
+    const want = [1, 2, 3][DIF];
+    if (!bs.length && gold[p] >= BC && rd >= 2 && Math.random() < [.2, .5, .7][DIF]) {
+      // Kışlası olmayan bot önce başkentine (ya da yakınına) bir kışla kurar
+      const o = [ct, ...near2(ct)].filter(t => own[t] == p && !inc[t] && !bar[t]);
+      if (o.length) {
+        bar[o[0]] = 1;
+        gold[p] -= BC;
+      }
+    }
+    else if (bs.length && bmax < want && gold[p] >= UPC && rd >= (bmax == 1 ? 3 : 7) && Math.random() < [.3, .6, .75][DIF]) {
+      const o = bs.filter(t => bar[t] == bmax).sort((x, y) => (y == ct ? 2 : near2(ct).has(y) ? 1 : 0) - (x == ct ? 2 : near2(ct).has(x) ? 1 : 0));
+      bar[o[0]]++;
+      gold[p] -= UPC;
+      pulse(o[0], '#ffffff');
+    }
+  }
+  // Donanma: iskele, büyük ve küçük gemiler (inşaattan önce, yoksa altın hep binalara gider).
+  botNavy(p);
   // İnşa: hazine doluysa tur başına birden çok yapı alır. Yapılacak yeri olmayan seçenek listeye girmez (tur boşa gitmez).
   const nb = gold[p] >= capOf(p) * .8 ? 3 : gold[p] >= capOf(p) * .5 ? 2 : 1;
+  // Sv3 kışla: zorda serbest; normalde nadiren (oyunun ilerleyen turlarında, turda %4 ihtimalle).
+  const allow3 = DIF == 2 || (DIF == 1 ? rd >= 25 && Math.random() < .04 : Math.random() < .2);
   for (let k = 0; k < nb; k++) {
     const o0 = mine().filter(t => !inc[t]);
     const frw = o0.filter(t => wall[t] < 2 && gold[p] >= WC(wall[t]) + 20 && arm[t] >= 4 && [...adj[t]].some(v => own[v] != p && own[v] != NEU && !friend(p, own[v])));
@@ -13630,7 +13823,10 @@ async function ai0(p) {
       opts.push(['b', 3]);
     if (gold[p] >= TWC && (twN.length || o0.some(t => tw[t] == 1)))
       opts.push(['tw', 1]);
-    if (gold[p] >= UPC && o0.some(t => bar[t] && bar[t] < 3))
+    // Normal botlar kışlayı genelde sv2'de bırakır, sv3'ü nadiren yapar.
+    const ubOK = t => bar[t] && bar[t] < (allow3 ? 3 : 2);
+    const ubC = o0.filter(ubOK);
+    if (gold[p] >= UPC && ubC.length)
       opts.push(['ub', 3]);
     if (gold[p] >= UPC && o0.some(t => mn[t] && mn[t] < 3))
       opts.push(['um', 1.2]);
@@ -13669,7 +13865,7 @@ async function ai0(p) {
     }
     else if (ty == 'ub') {
       // Önce sınırdaki ve seviyesi yüksek kışlalar: sv3 kışla mancınık açar.
-      const o = o0.filter(t => bar[t] && bar[t] < 3).sort((x, y) => ((isFront(p, y) ? 2 : 0) + bar[y]) - ((isFront(p, x) ? 2 : 0) + bar[x]));
+      const o = ubC.sort((x, y) => ((isFront(p, y) ? 2 : 0) + bar[y]) - ((isFront(p, x) ? 2 : 0) + bar[x]));
       bar[o[0]]++;
       gold[p] -= UPC;
       pulse(o[0], '#ffffff');
@@ -13711,46 +13907,6 @@ async function ai0(p) {
       }
       ui();
       await sleep(400);
-    }
-  }
-  const iso = !mine().some(t => [...adj[t]].some(v => own[v] != p && own[v] != NEU && !friend(p, own[v])));
-  if (rd >= 3 || iso) {
-    const ds0 = mine().filter(u => dk[u] && !inc[u]);
-    const pr = iso ? 1 : .5;
-    if (!ds0.length && gold[p] >= DC && Math.random() < pr) {
-      const o = mine().filter(u => dock[u] && !inc[u]);
-      if (o.length) {
-        const u = o[Math.floor(Math.random() * o.length)];
-        dk[u] = 1;
-        gold[p] -= DC;
-        pulse(u, '#c8a26b');
-      }
-    }
-    else if (ds0.length && Math.random() < pr) {
-      const u = ds0[Math.floor(Math.random() * ds0.length)];
-      if (dk[u] == 1 && !iso && gold[p] >= DC2 && Math.random() < [.25, .3, .5][DIF]) {
-        dk[u] = 2;
-        gold[p] -= DC2;
-        pulse(u, '#c8a26b');
-      }
-      else if (dk[u] == 2 && !iso && rd >= 6 && gold[p] >= DC3 && Math.random() < [.15, .2, .35][DIF]) {
-        dk[u] = 3;
-        gold[p] -= DC3;
-      }
-      else if (dk[u] >= 3 && !mine[u] && gold[p] >= MNC && Math.random() < .5) {
-        gold[p] -= MNC;
-        layMines(u);
-      }
-      else if (shS[u] + shL[u] < 4) {
-        if (dk[u] >= 2 && !iso && gold[p] >= SLC && Math.random() < [.3, .4, .7][DIF]) {
-          shL[u]++;
-          gold[p] -= SLC;
-        }
-        else if (gold[p] >= SSC) {
-          shS[u]++;
-          gold[p] -= SSC;
-        }
-      }
     }
   }
   if (rev[p] > 0) {
