@@ -3636,8 +3636,7 @@ function drawShark(e, u, s) {
   g.restore();
 }
 // Kaşalot (yandan görünüm): gövde, su altındaki bir çemberin üstünde yuvarlanarak hareket eder.
-// Önce iri, küt başı yüzeye çıkar ve nefes verir (öne eğik, U biçiminde açılan püskürme), sırt yavaşça
-// geçer ve balina sakince dalar.
+// Önce kutu gibi iri başı yüzeye çıkar, sırtı yavaşça geçer ve balina sakince dalar.
 // Bütün hareket yumuşak eğrilerle zamana bağlıdır.
 const smq = q => q <= 0 ? 0 : q >= 1 ? 1 : q * q * q * (q * (q * 6 - 15) + 10);
 function whalePose(u) {
@@ -3657,7 +3656,7 @@ function drawWhale(e, u, s) {
   const d = e.dir;
   const wy = e.y;
   const Rr = 34;
-  const hmax = 3;
+  const hmax = 9.5;
   const B = 1.6;
   const cx = e.x + d * u * 14;
   const cy = wy + Rr - hmax;
@@ -3666,8 +3665,11 @@ function drawWhale(e, u, s) {
   const P = a => [cx + d * Rr * Math.sin(a), cy - Rr * Math.cos(a) + bob];
   const Nn = a => [d * Math.sin(a), -Math.cos(a)];
   // Gövde kalınlığı (baştan kuyruğa): kaşalotun kutu gibi iri başı, giderek incelen gövde ve kuyruk sapı
-  const thT = q => q < .3 ? 7.2 - Math.pow(Math.max(0, .08 - q) / .08, 2) * 3 : q < .75 ? 7.2 - (q - .3) / .45 * 3.4 : 3.8 - (q - .75) / .25 * 1.6;
-  const thB = q => q < .3 ? 5.6 : q < .75 ? 5.6 - (q - .3) / .45 * 2.2 : 3.4 - (q - .75) / .25 * 1.5;
+  // Kaşalot: gövdenin üçte biri kadar, kutu gibi düz üstlü dev baş; arkasında hafif çukur, sırtta alçak
+  // bir hörgüç ve kuyruğa doğru küçük çıkıntılar; gövde kuyruk sapına doğru incelir.
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const thT = q => q < .34 ? 8.2 + q * 1.2 : q < .5 ? lerp(8.6, 7.4, (q - .34) / .16) : q < .64 ? lerp(7.4, 7.9, Math.sin((q - .5) / .14 * Math.PI / 2)) : lerp(7.9, 2.3, Math.pow((q - .64) / .36, 1.15));
+  const thB = q => q < .34 ? 6.4 : q < .55 ? lerp(6.4, 6.0, (q - .34) / .21) : lerp(6.0, 2.0, Math.pow((q - .55) / .45, 1.1));
   const n = 44;
   const top = [];
   const bot = [];
@@ -3709,9 +3711,10 @@ function drawWhale(e, u, s) {
   g.rect(e.x - 120, wy - 80, 240, 80.6);
   g.clip();
   // Gövde + kuyruk tek bir çizgiyle
-  const gr = g.createLinearGradient(0, wy - 16, 0, wy + 2);
-  gr.addColorStop(0, '#6b767d');
-  gr.addColorStop(1, '#3f474d');
+  const gr = g.createLinearGradient(0, wy - 18, 0, wy + 2);
+  gr.addColorStop(0, '#7896ad');
+  gr.addColorStop(.45, '#4f7088');
+  gr.addColorStop(1, '#2b4558');
   g.fillStyle = gr;
   g.beginPath();
   g.moveTo(top[0][0], top[0][1]);
@@ -3734,11 +3737,17 @@ function drawWhale(e, u, s) {
   }
   for (let i = n; i >= 0; i--)
     g.lineTo(bot[i][0], bot[i][1]);
-  // Küt baş ucu
+  // Kutu gibi küt baş: neredeyse dik ön yüz, yuvarlatılmış köşeler
   {
     const [hx, hy] = P(aH);
-    const [tx, ty] = [d * Math.cos(aH), Math.sin(aH)];
-    g.quadraticCurveTo(hx + tx * 9, hy + ty * 9, top[0][0], top[0][1]);
+    const tfx = d * Math.cos(aH);
+    const tfy = Math.sin(aH);
+    const [nx, ny] = Nn(aH);
+    const b0 = thB(0);
+    const t0 = thT(0);
+    g.quadraticCurveTo(hx + tfx * 3.2 - nx * b0, hy + tfy * 3.2 - ny * b0, hx + tfx * 3.6 - nx * b0 * .45, hy + tfy * 3.6 - ny * b0 * .45);
+    g.lineTo(hx + tfx * 3.8 + nx * t0 * .4, hy + tfy * 3.8 + ny * t0 * .4);
+    g.quadraticCurveTo(hx + tfx * 3.4 + nx * t0, hy + tfy * 3.4 + ny * t0, top[0][0], top[0][1]);
   }
   g.closePath();
   g.fill();
@@ -3765,56 +3774,115 @@ function drawWhale(e, u, s) {
     g.strokeStyle = 'rgba(18,24,28,.35)';
     L(tpt(8, -.6), tpt(15.2, -5.2));
   }
-  // Göz ve ağız çizgisi (başın yanında, küçük)
-  {
-    const qe = .13;
-    const a = aH - qe * B;
+  // Gövde üzerindeki noktalar: q baştan kuyruğa, off sırttan (+) karına (-)
+  const bp = (q, off) => {
+    const a = aH - q * B;
     const [px, py] = P(a);
     const [nx, ny] = Nn(a);
-    const ex = px + nx * 1.2;
-    const ey = py + ny * 1.2;
-    g.fillStyle = '#e8edf0';
+    return [px + nx * off, py + ny * off];
+  };
+  // Buruşuk deri: gövde boyunca ince, hafif dalgalı açık ve koyu çizgiler
+  g.lineWidth = .6;
+  for (let k = 0; k < 7; k++) {
+    const f = -.35 + k * .17;
+    const q0 = .06 + hsh(k, 2, 5) * .12;
+    const q1 = .55 + hsh(k, 7, 3) * .3;
+    g.strokeStyle = k % 2 ? 'rgba(255,255,255,.1)' : 'rgba(10,25,38,.16)';
     g.beginPath();
-    g.ellipse(ex, ey, 1.6, 1.25, 0, 0, 7);
-    g.fill();
-    g.fillStyle = '#11171a';
-    g.beginPath();
-    g.arc(ex + d * .3, ey + .1, .85, 0, 7);
-    g.fill();
-    g.fillStyle = 'rgba(255,255,255,.9)';
-    g.beginPath();
-    g.arc(ex + d * .55, ey - .35, .3, 0, 7);
-    g.fill();
-    // Ağız çizgisi: baş ucundan göze doğru ince koyu çizgi
-    const [hx, hy] = P(aH - .01);
-    g.strokeStyle = 'rgba(20,26,30,.55)';
-    g.lineWidth = .7;
-    g.beginPath();
-    g.moveTo(hx - nx * 2.6, hy - ny * 2.6);
-    g.quadraticCurveTo((hx + ex) / 2 - nx * 2.8, (hy + ey) / 2 - ny * 2.8, ex - nx * 2.2 - d * 2, ey - ny * 2.2);
+    for (let j = 0; j <= 16; j++) {
+      const q = q0 + (q1 - q0) * j / 16;
+      const off = (f >= 0 ? thT(q) : thB(q)) * f + Math.sin(j * 1.7 + k) * .35;
+      const [x, y] = bp(q, off);
+      j ? g.lineTo(x, y) : g.moveTo(x, y);
+    }
     g.stroke();
   }
-  // Islak parlaklık ve sırttaki küçük kamburlar
-  g.strokeStyle = 'rgba(255,255,255,.32)';
-  g.lineWidth = 1.1;
+  // Islak parlaklık (sırt boyunca)
+  g.strokeStyle = 'rgba(255,255,255,.3)';
+  g.lineWidth = 1;
   g.beginPath();
-  for (let i = 2; i <= n * .7; i++) {
-    const q = i / n;
-    const a = aH - q * B;
-    const [px, py] = P(a);
-    const [nx, ny] = Nn(a);
-    const k = thT(q) - 1.6;
-    i == 2 ? g.moveTo(px + nx * k, py + ny * k) : g.lineTo(px + nx * k, py + ny * k);
+  for (let j = 0; j <= 30; j++) {
+    const q = .02 + j / 30 * .7;
+    const [x, y] = bp(q, thT(q) - 1.4);
+    j ? g.lineTo(x, y) : g.moveTo(x, y);
   }
   g.stroke();
-  g.fillStyle = '#566167';
-  for (const q of [.58, .66, .73]) {
-    const a = aH - q * B;
+  // Sırttaki hörgüç ve kuyruğa doğru küçük çıkıntılar
+  g.fillStyle = '#6585a0';
+  for (const [q, r] of [[.6, 1.6], [.7, 1], [.76, .85], [.81, .7], [.86, .55]]) {
+    const [nx, ny] = Nn(aH - q * B);
+    const ang = Math.atan2(ny, nx);
+    const [x, y] = bp(q, thT(q) - .6);
+    // Sadece dışa bakan yarım: gövdeden yumuşakça kabaran çıkıntı
+    g.beginPath();
+    g.arc(x, y, r, ang - Math.PI / 2, ang + Math.PI / 2);
+    g.closePath();
+    g.fill();
+  }
+  // Alt çene: başın altında uzun, ince ve açık renkli; ağız çizgisi koyu
+  {
+    const up = [];
+    const lo = [];
+    for (let j = 0; j <= 18; j++) {
+      const q = .05 + j / 18 * .27;
+      const jt = j == 0 ? .5 : Math.min(1.9, .9 + j * .18) * (j > 15 ? 1 - (j - 15) * .18 : 1);
+      up.push(bp(q, -thB(q) - .25));
+      lo.push(bp(q, -thB(q) - .25 - jt));
+    }
+    g.fillStyle = '#d5dde2';
+    g.strokeStyle = 'rgba(20,32,42,.6)';
+    g.lineWidth = .7;
+    g.beginPath();
+    g.moveTo(...up[0]);
+    for (const p of up)
+      g.lineTo(...p);
+    for (let j = lo.length - 1; j >= 0; j--)
+      g.lineTo(...lo[j]);
+    g.closePath();
+    g.fill();
+    g.stroke();
+    // Ağız çizgisi
+    g.strokeStyle = 'rgba(12,20,28,.75)';
+    g.lineWidth = .8;
+    g.beginPath();
+    for (let j = 0; j <= 18; j++) {
+      const [x, y] = bp(.04 + j / 18 * .29, -thB(.04 + j / 18 * .29) + .1);
+      j ? g.lineTo(x, y) : g.moveTo(x, y);
+    }
+    g.stroke();
+  }
+  // Göz: ağzın bittiği yerin hemen üstünde, küçük
+  {
+    const [ex, ey] = bp(.335, -thB(.335) + 2.1);
+    g.fillStyle = '#0f171d';
+    g.beginPath();
+    g.ellipse(ex, ey, 1.05, .8, 0, 0, 7);
+    g.fill();
+    g.fillStyle = 'rgba(255,255,255,.85)';
+    g.beginPath();
+    g.arc(ex + d * .35, ey - .3, .28, 0, 7);
+    g.fill();
+  }
+  // Göğüs yüzgeci: gözün arkasında, karından aşağı ve geriye doğru küçük kürek
+  {
+    const a = aH - .4 * B;
     const [px, py] = P(a);
     const [nx, ny] = Nn(a);
+    const bx = -d * Math.cos(a);
+    const by = -Math.sin(a);
+    const o = thB(.4) - .8;
+    const ax = px - nx * o;
+    const ay = py - ny * o;
+    g.fillStyle = '#34536a';
+    g.strokeStyle = 'rgba(15,26,36,.6)';
+    g.lineWidth = .7;
     g.beginPath();
-    g.arc(px + nx * (thT(q) - .4), py + ny * (thT(q) - .4), 1.5, 0, 7);
+    g.moveTo(ax - bx * .5, ay - by * .5);
+    g.quadraticCurveTo(ax + bx * .5 - nx * 4, ay + by * .5 - ny * 4, ax + bx * 3.2 - nx * 5.2, ay + by * 3.2 - ny * 5.2);
+    g.quadraticCurveTo(ax + bx * 3.6 - nx * 2.4, ay + by * 3.6 - ny * 2.4, ax + bx * 3, ay + by * 3);
+    g.closePath();
     g.fill();
+    g.stroke();
   }
   g.restore();
   // Su çizgisinde gövdenin kestiği yerlerde köpük
@@ -3854,38 +3922,6 @@ function drawWhale(e, u, s) {
     g.ellipse(e.x, wy + 1, 10 + q * 34, 3 + q * 8, 0, 0, 7);
     g.stroke();
     g.globalAlpha = 1;
-  }
-  // Nefes: baş tepedeyken, ileri doğru eğik ve iki kola ayrılan ince su zerreleri + sis
-  if (u > .21 && u < .6) {
-    const q = (u - .21) / .39;
-    const env = Math.sin(Math.min(1, q * 1.15) * Math.PI);
-    const [hx, hy] = P(aH - .06);
-    const [nx, ny] = Nn(aH - .06);
-    const bx = hx + nx * 6.5 + d * 2;
-    const by = hy + ny * 6.5;
-    for (let i = 0; i < 60; i++) {
-      const life = (q * 2.2 + hsh(i, 5, 3)) % 1;
-      const side = i % 2 ? 1 : -1;
-      const a = -Math.PI / 2 + d * .55 + side * (.16 + hsh(i, 3, 7) * .28);
-      const v = 12 + hsh(i, 9, 1) * 16;
-      const px = bx + Math.cos(a) * v * life;
-      const py = by + Math.sin(a) * v * life + life * life * 10;
-      g.globalAlpha = env * (1 - life) * .8;
-      g.fillStyle = i % 3 ? '#ffffff' : '#d6eeff';
-      g.beginPath();
-      g.arc(px, py, .7 + life * 1.2, 0, 7);
-      g.fill();
-    }
-    const mx = bx + d * 8;
-    const my = by - 15;
-    const mg = g.createRadialGradient(mx, my, 0, mx, my, 16);
-    mg.addColorStop(0, `rgba(255,255,255,${(.28 * env).toFixed(3)})`);
-    mg.addColorStop(1, 'rgba(255,255,255,0)');
-    g.globalAlpha = 1;
-    g.fillStyle = mg;
-    g.beginPath();
-    g.arc(mx, my, 16, 0, 7);
-    g.fill();
   }
 }
 // Harita dışında kalan açık deniz: ekran boyunda dalga çizgileri ve parıltılar (haritadakiyle aynı tarz).
