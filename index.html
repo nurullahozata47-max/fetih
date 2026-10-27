@@ -184,6 +184,23 @@ canvas {
 #pop.fixw span {
   max-width: none;
 }
+/* Haraç paneli: miktar ve süre çubukları */
+#pop .tr-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+#pop .tr-row > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+}
+#pop .tr-row input[type=range] {
+  width: 100%;
+  accent-color: #f2b134;
+  height: 26px;
+}
 /* Asker taşıma paneli */
 #pop .mv-lbl {
   font-size: 12.5px;
@@ -2163,36 +2180,43 @@ let mv = false;
 // SPC casus, UPC seviye yükseltme, SSC/SLC küçük/büyük gemi, LOOT deniz aşırı yağma, SEAR top menzili.
 let ov = new Int8Array(W * H).fill(-1);
 const BC = 40;
-const WC = l => (l > 0 ? 100 : 70);
+const WC = l => (l > 0 ? 150 : 50);
 // Seviye 2 surlu bölgeye en az WALLMIN askerle saldırılabilir.
 const WALLMIN = 15;
 // Seviye 1 surlu bölgeye en az WALLMIN1 askerle saldırılabilir.
 const WALLMIN1 = 10;
 // Mancınık: kışla sv3 gerekir, kışla başına en fazla CATMAX, 2 turda bir taş atar.
-const CTC = 70;
+const CTC = 50;
 const CATMAX = 2;
 const MI = 5;
-const AC = 20;
+const AC = 15;
 const TR = 20;
 const TT = 2;
 const DC = 30;
 let NI = 8;
 const NEU = 8;
-const CMC = 100;
-const DC2 = 40;
+const CMC = 50;
+const DC2 = 50;
 const DC3 = 50;
-const MNC = 40;
+const MNC = 20;
 const CAPS = 20;
-const INC = 20;
+// İsyan çıkarma: her devlet turda en fazla 3 isyan çıkarabilir; turun ilki 10, ikinci ve üçüncüsü 20 altın.
+const INCMAX = 3;
+const INC1 = 10;
+const INC2 = 20;
+let incN = [];
+let incR = [];
+const incUsed = p => incR[p] == rd ? incN[p] || 0 : 0;
+const INCc = p => incUsed(p) ? INC2 : INC1;
 const ALC = 0;
-const EXC = 20;
+const EXC = 0;
 const SUP = 15;
-const TWC = 40;
-const TW2 = 40;
+const TWC = 50;
+const TW2 = 50;
 const SPC = 10;
 const UPC = 30;
 const SSC = 20;
-const SLC = 40;
+const SLC = 50;
 const LOOT = 15;
 const SEAR = 85;
 const MC = n => Math.min(80, 40 + 5 * n);
@@ -2200,8 +2224,8 @@ const MC = n => Math.min(80, 40 + 5 * n);
 // Başkentte her zaman en az 1. seviye bir sandık bulunur. DPC sandık kurma, DPU[sv] yükseltme ücreti.
 // Sandıklı bölge fethedilirse içindeki altının yarısı yağmalanır.
 const DEPV = [0, 50, 70, 100];
-const DPC = 30;
-const DPU = [0, 25, 35];
+const DPC = 25;
+const DPU = [0, 30, 35];
 // Sandık yağmasında seviyeye göre ek ganimet.
 const LOOTB = [0, 10, 20, 35];
 // Gelir: bölgelerden gelen temel gelir en fazla INC0 olur; üstüne maden ve vergi eklenir.
@@ -7340,6 +7364,14 @@ function init(noDraft, seed) {
   hb = Z();
   hl = '';
   tcd = Z();
+  incN = Z();
+  incR = Z().map(() => -1);
+  trA = Z();
+  dmR = Z().map(() => -99);
+  grT = Z().map(() => -1);
+  grU = Z();
+  tbm = Array.from({ length: PM }, Z);
+  tba = Array.from({ length: PM }, Z);
   dk = Array(N).fill(0);
   inc = Array(N).fill(0);
   ib = Array(N).fill(0);
@@ -8364,7 +8396,7 @@ function autoMarch(p) {
     }
   }
 }
-// Başkenti 100 altına taşıma (oyunda bir kez).
+// Başkenti CMC altına taşıma (oyunda bir kez).
 function moveCap(p, t) {
   if (mvd[p] || gold[p] < CMC || own[t] != p || cap[p] == t)
     return false;
@@ -8754,7 +8786,145 @@ function via(p, a) {
   });
   return s;
 }
-const friend = (p, q) => p == q || (p == 0 ? ally[q] > 0 : q == 0 ? ally[p] > 0 : bp[p][q] > 0);
+const friend = (p, q) => p == q || (p == 0 ? ally[q] > 0 : q == 0 ? ally[p] > 0 : bp[p][q] > 0 || (tbm[p] && tbm[p][q] > 0));
+// ---- Haraç: miktar (TRMIN–TRMAX altın/tur) ve süre (TTMIN–TTMAX tur) ayarlanır ----
+const TRMIN = 10;
+const TRMAX = 50;
+const TTMIN = 2;
+const TTMAX = 5;
+// trA[q]: oyuncuyla q arasındaki haracın miktarı. tbm[a][b]: iki bot arasındaki haraç antlaşmasının kalan turu
+// (simetrik; bu sürede birbirlerine saldırmazlar). tba[ödeyen][alan]: tur başına haraç. dmR[q]: q'nun oyuncudan en son haraç istediği tur.
+let trA = [];
+let tbm = [];
+let tba = [];
+let dmR = [];
+// Kin: haracı reddeden ya da ödemeyen devlete karşı botun birkaç tur süren saldırı önceliği.
+let grT = [];
+let grU = [];
+const grudge = (q, r) => {
+  grT[q] = r;
+  grU[q] = rd + 6;
+};
+const pwr = p => cnt(p) + armyOf(p) / 8;
+const clamp01 = x => Math.max(0, Math.min(1, x));
+// Güçlünün zayıftan isteyeceği haraç: güç farkı büyüdükçe ve zayıfın toprağı azaldıkça miktar ve süre artar.
+function trDemand(strong, weak) {
+  const sk = clamp01((pwr(strong) / Math.max(1, pwr(weak)) - 1.2) / 1.8);
+  let a = Math.round((TRMIN + (TRMAX - TRMIN) * sk) / 5) * 5;
+  if (cnt(weak) <= 6)
+    a += 10;
+  a = Math.max(TRMIN, Math.min(TRMAX, a));
+  return [a, Math.max(TTMIN, Math.min(TTMAX, TTMIN + Math.round(3 * sk)))];
+}
+// Botun teklifi kabul etme ihtimali. 't': oyuncu haraç istiyor (bot öder), 'y': oyuncu haraç ödüyor.
+function trChance(q, k, a, T) {
+  const r = pwr(0) / Math.max(1, pwr(q));
+  const fa = (a - TRMIN) / (TRMAX - TRMIN);
+  const ft = (T - TTMIN) / (TTMAX - TTMIN);
+  if (k == 't')
+    return Math.max(.05, Math.min(.92, .3 + .6 * clamp01((r - .7) / 1.3) - .35 * fa - .1 * ft + (cnt(q) <= 2 ? .2 : 0)));
+  return Math.max(.1, Math.min(.92, .3 + .55 * fa - .15 * ft + (r < 1 ? .1 : 0)));
+}
+// Haraç paneli: altta iki çubukla miktar ve süre seçilir.
+function tribPanel(q, k) {
+  let a = 20;
+  let T = TTMIN;
+  pop.classList.add('fixw');
+  pop.innerHTML = `<b>${k == 't' ? `${PN[q]} krallığından haraç iste` : `${PN[q]} krallığına haraç öde`}</b>` +
+    `<span>${k == 't' ? `${PN[q]} her tur sana altın öder; bu sürede ona saldırmazsın. Çok istersen reddedebilir.` : `Her tur ${PN[q]} krallığına altın ödersin; o da bu sürede sana saldırmaz. Ne kadar çok verirsen kabul etmesi o kadar kolay.`}</span>` +
+    `<div class="tr-row"><div><span>Miktar</span><b id="trAv"></b></div><input type="range" id="trA" min="${TRMIN}" max="${TRMAX}" step="5" value="${a}"></div>` +
+    `<div class="tr-row"><div><span>Süre</span><b id="trTv"></b></div><input type="range" id="trT" min="${TTMIN}" max="${TTMAX}" step="1" value="${T}"></div>` +
+    `<span id="trP"></span><button data-k="go" id="trGo">${k == 't' ? 'Haraç iste' : 'Haraç teklif et'}</button><button data-k="no">Vazgeç</button>`;
+  const upd = () => {
+    a = +$('trA').value;
+    T = +$('trT').value;
+    $('trAv').textContent = `${a} altın/tur`;
+    $('trTv').textContent = `${T} tur`;
+    const c = trChance(q, k, a, T);
+    $('trP').innerHTML = `Toplam ${a * T} altın · Kabul ihtimali: <b style="color:${c >= .6 ? '#3fb98a' : c >= .35 ? '#e0b43a' : '#e5566d'}">${c >= .6 ? 'yüksek' : c >= .35 ? 'orta' : 'düşük'}</b>`;
+    $('trGo').disabled = k == 'y' && gold[0] < a;
+  };
+  $('trA').oninput = upd;
+  $('trT').oninput = upd;
+  upd();
+  pop.hidden = false;
+  pop.style.left = '50%';
+  pop.style.top = '22%';
+  pop.style.transform = 'translateX(-50%)';
+  pop.onclick = e => {
+    const kk = e.target.dataset && e.target.dataset.k;
+    if (!kk)
+      return;
+    if (kk == 'go')
+      treaty(q, k, a, T);
+    pop.hidden = true;
+    pop.style.transform = '';
+    pop.classList.remove('fixw');
+    ui();
+  };
+}
+// Botlar arası haraç: güçlü bot zayıf komşusundan haraç ister; reddedilirse ona yüklenir. Ödemeler her tur yapılır.
+function botTribute() {
+  for (let a = 1; a < P; a++)
+    for (let b = 1; b < P; b++) {
+      if (!(tba[b][a] > 0))
+        continue;
+      if (!(tbm[a][b] > 0) || cnt(a) == 0 || cnt(b) == 0) {
+        tba[b][a] = 0;
+        tbm[a][b] = tbm[b][a] = 0;
+        continue;
+      }
+      const m = tba[b][a];
+      if (gold[b] < m) {
+        tba[b][a] = 0;
+        tbm[a][b] = tbm[b][a] = 0;
+        grudge(a, b);
+        hl += ` ${PN[b]} haracı ödeyemedi, ${PN[a]} ona savaş açtı!`;
+        continue;
+      }
+      gold[b] -= m;
+      gold[a] += m;
+      clampGold(a);
+      tbm[a][b]--;
+      tbm[b][a] = tbm[a][b];
+      if (!tbm[a][b]) {
+        tba[b][a] = 0;
+        hl += ` ${PN[b]} ile ${PN[a]} arasındaki haraç antlaşması bitti.`;
+      }
+    }
+  if (ONLINE || Math.random() > .3)
+    return;
+  const bs = bots().filter(q => cnt(q) > 0).sort((x, y) => pwr(y) - pwr(x));
+  for (const q of bs) {
+    const ns = new Set();
+    for (let u = 0; u < N; u++)
+      if (own[u] == q)
+        adj[u].forEach(v => {
+          const r = own[v];
+          if (r > 0 && r < P && r != q && !friend(q, r))
+            ns.add(r);
+        });
+    const r = [...ns].filter(x => pwr(q) >= 1.8 * pwr(x)).sort((x, y) => pwr(x) - pwr(y))[0];
+    if (r == null)
+      continue;
+    let [m, T] = trDemand(q, r);
+    // Zayıfın hazinesi yetmiyorsa ödeyebileceği kadar ister; hiç yetmiyorsa istemez.
+    m = Math.min(m, Math.floor(gold[r] / 5) * 5);
+    if (m < TRMIN)
+      continue;
+    const acc = gold[r] >= m && Math.random() < .35 + .4 * clamp01((pwr(q) / Math.max(1, pwr(r)) - 1.8) / 2);
+    if (acc) {
+      tbm[q][r] = tbm[r][q] = T;
+      tba[r][q] = m;
+      hl += ` ${PN[r]}, ${PN[q]} krallığına ${T} tur boyunca ${m} altın haraç ödemeyi kabul etti.`;
+    }
+    else {
+      grudge(q, r);
+      hl += ` ${PN[r]}, ${PN[q]} krallığının haraç isteğini reddetti; ${PN[q]} ona yüklenecek.`;
+    }
+    return;
+  }
+}
 // Botların başkentini savunmak için asker toplaması.
 function defendCapital(p, ct) {
   const foe = u => own[u] != p && !friend(p, own[u]);
@@ -8801,14 +8971,18 @@ function treaties() {
       let br = false;
       if (tru[q] && cnt(q) > 0) {
         const payer = tru[q] > 0 ? 0 : q;
-        if (gold[payer] < TR) {
+        const m = trA[q] || TR;
+        if (gold[payer] < m) {
           br = true;
           hl += ` ${PN[q]} ile haraç antlaşması bozuldu: altın yetmedi.`;
+          if (payer == 0)
+            grudge(q, 0);
         }
         else {
-          gold[payer] -= TR;
-          gold[payer ? 0 : q] += TR;
-          hl += tru[q] > 0 ? ` Haraç: ${PN[q]} tarafına ${TR} altın verdin.` : ` Haraç: ${PN[q]} sana ${TR} altın ödedi.`;
+          gold[payer] -= m;
+          gold[payer ? 0 : q] += m;
+          clampGold(payer ? 0 : q);
+          hl += tru[q] > 0 ? ` Haraç: ${PN[q]} tarafına ${m} altın verdin.` : ` Haraç: ${PN[q]} sana ${m} altın ödedi.`;
         }
       }
       if (br)
@@ -8847,23 +9021,34 @@ function treaties() {
       hl += ` ${PN[q]} ve ${PN[r]} ittifak kurdu, ortak hedef: ${PN[tg]}.`;
     }
   }
-  const cd = bots().filter(q => cnt(q) > 0 && !ally[q] && hb[q] >= 2);
+  botTribute();
+  // Bot oyuncudan haraç ister: sana karşı savaş kazandıysa ya da senden çok güçlüyse ve sınırdaşsa
+  // (aynı bot en fazla 5 turda bir ister).
+  const nb0 = q => [...Array(N).keys()].some(u => own[u] == q && [...adj[u]].some(v => own[v] == 0));
+  const cd = bots().filter(q => cnt(q) > 0 && !ally[q] && rd - (dmR[q] ?? -99) >= 5 && (hb[q] >= 2 || (pwr(q) >= 1.6 * pwr(0) && nb0(q) && Math.random() < .35)));
   if (!ONLINE && cd.length && Math.random() < .7)
     setTimeout(() => showOffer(cd[0]), 600);
 }
-function treaty(q, k) {
+function treaty(q, k, a, T) {
   const lg = s => $('log').textContent = s;
+  a = a || TR;
+  T = T || TT;
   if (ally[q] > 0)
     return lg('Zaten bir antlaşma var.');
   if (k == 't') {
     if (tcd[q] == rd)
       return lg(`${PN[q]} bu tur zaten reddetti.`);
-    if (Math.random() < (cnt(q) <= 2 ? .7 : .5)) {
-      ally[q] = TT;
+    if (gold[q] < a) {
+      tcd[q] = rd;
+      lg(`${PN[q]} hazinesinde her tur ${a} altın ödeyecek kadar altın olmadığını söyleyip reddetti. Daha az iste.`);
+    }
+    else if (Math.random() < trChance(q, 't', a, T)) {
+      ally[q] = T;
       tru[q] = -1;
+      trA[q] = a;
       if (capVis(cap[q]))
         pulse(cap[q], '#ffd36b');
-      lg(`${PN[q]} haraç vermeyi kabul etti: ${TT} tur, her tur ${TR} altın.`);
+      lg(`${PN[q]} haraç vermeyi kabul etti: ${T} tur, her tur ${a} altın.`);
     }
     else {
       tcd[q] = rd;
@@ -8871,16 +9056,17 @@ function treaty(q, k) {
     }
   }
   else {
-    if (gold[0] < TR)
+    if (gold[0] < a)
       return lg('Yeterli altının yok.');
     if (tcd[q] == rd)
       return lg(`${PN[q]} bu tur zaten reddetti.`);
-    if (Math.random() < .5) {
-      ally[q] = TT;
+    if (Math.random() < trChance(q, 'y', a, T)) {
+      ally[q] = T;
       tru[q] = 1;
+      trA[q] = a;
       if (capVis(cap[q]))
         pulse(cap[q], '#ffd36b');
-      lg(`${PN[q]} haraç karşılığında ${TT} tur saldırmayacak.`);
+      lg(`${PN[q]} her tur ${a} altın haraç karşılığında ${T} tur saldırmayacak.`);
     }
     else {
       tcd[q] = rd;
@@ -8904,7 +9090,9 @@ function showOffer(q) {
   if (turn != 0 || busy || over || ally[q] > 0 || cnt(q) == 0)
     return;
   pop.classList.remove('fixw');
-  pop.innerHTML = `<b>${PN[q]} haraç istiyor</b><span>${TT} tur boyunca her tur ${TR} altın öde, o da sana saldırmasın.</span><button data-k="ok" ${gold[0] >= TR ? '' : 'disabled'}>Kabul et</button><button data-k="no">Reddet</button>`;
+  dmR[q] = rd;
+  const [m, T] = trDemand(q, 0);
+  pop.innerHTML = `<b>${PN[q]} haraç istiyor</b><span>${T} tur boyunca her tur ${m} altın (toplam ${m * T}) öde, o da sana saldırmasın. Reddedersen ${PN[q]} sana savaş açar.</span><button data-k="ok" ${gold[0] >= m ? '' : 'disabled'}>Kabul et</button><button data-k="no">Reddet</button>`;
   pop.hidden = false;
   pop.style.left = '50%';
   pop.style.top = '30%';
@@ -8913,10 +9101,16 @@ function showOffer(q) {
     const k = e.target.dataset && e.target.dataset.k;
     if (!k)
       return;
-    if (k == 'ok' && gold[0] >= TR) {
-      ally[q] = TT;
+    if (k == 'ok' && gold[0] >= m) {
+      ally[q] = T;
       tru[q] = 1;
-      $('log').textContent = `${PN[q]} ile haraç antlaşması: ${TT} tur.`;
+      trA[q] = m;
+      $('log').textContent = `${PN[q]} ile haraç antlaşması: ${T} tur, her tur ${m} altın.`;
+    }
+    else if (k == 'no') {
+      grudge(q, 0);
+      hp[q] = (hp[q] || 0) + 1;
+      $('log').textContent = `${PN[q]} haraç isteğini reddettin. ${PN[q]} sana yüklenecek!`;
     }
     pop.hidden = true;
     pop.style.transform = '';
@@ -8931,21 +9125,28 @@ const canInc2 = (p, t) => {
 function incite(p, t) {
   const q = own[t];
   const lg = s => $('log').textContent = s;
+  const c = INCc(p);
+  if (incUsed(p) >= INCMAX)
+    return p == 0 ? lg(`Bu tur zaten ${INCMAX} isyan çıkardın.`) : undefined;
+  if (gold[p] < c)
+    return p == 0 ? lg('Yeterli altının yok.') : undefined;
   if (p == 0) {
-    if (gold[0] < INC)
-      return lg('Yeterli altının yok.');
     if (!canInc3(0, t))
       return lg('Bu bölgede isyan çıkarılamaz.');
-    gold[0] -= INC;
+  }
+  gold[p] -= c;
+  incN[p] = incUsed(p) + 1;
+  incR[p] = rd;
+  if (p == 0) {
     rev[q] = 2;
     if (cap[q] == t) {
       kc.add(t);
       pulse(t, '#ffd36b');
-      return lg(`${NM[t]}: isyan çıkmadı, burası ${PN[q]} krallığının başkentiymiş! ${INC} altın boşa gitti.`);
+      return lg(`${NM[t]}: isyan çıkmadı, burası ${PN[q]} krallığının başkentiymiş! ${c} altın boşa gitti.`);
     }
     if (arm[t] < 1 || arm[t] > 3) {
       pulse(t, '#888888');
-      return lg(`${NM[t]}: isyan çıkmadı, bölgede çok fazla asker vardı. ${INC} altın boşa gitti.`);
+      return lg(`${NM[t]}: isyan çıkmadı, bölgede çok fazla asker vardı. ${c} altın boşa gitti.`);
     }
   }
   startRevolt(t, 1, null, `${PN[p]} krallığı para dağıtıp halkı kışkırttı.`);
@@ -9412,6 +9613,18 @@ function draftBegin() {
   $('log').textContent = 'Sırayla bölge seçiyoruz. İlk settiğin bölge başkentin olur.';
   ui();
 }
+// Müttefike kendi askerinden takviye: o bölgeye komşu, en kalabalık (en az 4 askerli) bölgen; komşu yoksa en yakını.
+function mySrc3(t) {
+  const ok = u => own[u] == 0 && arm[u] >= 4 && !inc[u];
+  const nb = [...adj[t]].filter(ok).sort((x, y) => arm[y] - arm[x]);
+  if (nb.length)
+    return nb[0];
+  let b = -1;
+  for (let u = 0; u < N; u++)
+    if (ok(u) && (b < 0 || HD[u][t] < HD[b][t] || (HD[u][t] == HD[b][t] && arm[u] > arm[b])))
+      b = u;
+  return b;
+}
 function leaveAlly(q) {
   const lg = s => $('log').textContent = s;
   if (!(ally[q] > 0) || tru[q])
@@ -9421,7 +9634,7 @@ function leaveAlly(q) {
   gold[0] -= EXC;
   ally[q] = 0;
   pulse(cap[q], '#e5566d');
-  lg(`${PN[q]} ile ittifaktan çıktın (${EXC} altın).`);
+  lg(`${PN[q]} ile ittifaktan çıktın${EXC ? ` (${EXC} altın)` : ''}.`);
 }
 // Başkent koruması (ilk CAPT tur) ve gizli başkent kuralları
 const CAPT = 5;
@@ -12730,7 +12943,7 @@ function openPop(cx, cy) {
   }
   else if (own[t] != 0 && own[t] != NEU) {
     const q = own[t];
-    info = ally[q] > 0 ? (tru[q] ? `Haraç antlaşması: ${ally[q]} tur kaldı` : (ally[q] == 1 ? `${PN[q]} ile ittifakın son turu: bir sonraki turda biter` : `${PN[q]} ile ittifak: ${ally[q]} tur kaldı`)) : `İttifak ücretsiz ama ${PN[q]} reddedebilir. Ona saldırdıysan kabul etmesi zorlaşır.`;
+    info = ally[q] > 0 ? (tru[q] ? `Haraç antlaşması (${tru[q] > 0 ? 'sen ödüyorsun' : 'o ödüyor'}, her tur ${trA[q] || TR} altın): ${ally[q]} tur kaldı` : (ally[q] == 1 ? `${PN[q]} ile ittifakın son turu: bir sonraki turda biter` : `${PN[q]} ile ittifak: ${ally[q]} tur kaldı`)) : `İttifak ücretsiz ama ${PN[q]} reddedebilir. Ona saldırdıysan kabul etmesi zorlaşır.`;
     const pq = pactsOf(q);
     info += pq.length ? ` <b>${PN[q]} şu an ${pq.map(r => PN[r]).join(' ve ')} ile müttefik.</b>${!ally[q] ? ' Seninle ittifak kurarsa bu ittifakları bozar.' : ''}` : ` ${PN[q]} şu an kimseyle müttefik değil.`;
     if (armyOf(q) < WEAK)
@@ -12738,7 +12951,7 @@ function openPop(cx, cy) {
     if (!ally[q]) {
       o.push(['a', tcd[q] == rd ? 'İttifak (bu tur reddetti)' : 'İttifak teklif et', tcd[q] != rd]);
       o.push(['t', 'Haraç iste', tcd[q] != rd]);
-      o.push(['y', 'Haraç öde', gold[0] >= TR && tcd[q] != rd]);
+      o.push(['y', 'Haraç öde', gold[0] >= TRMIN && tcd[q] != rd]);
     }
     if (ally[q] > 0 && !tru[q]) {
       const sq = aspy[q] && aspy[q].rd == rd ? aspy[q].n : 0;
@@ -12747,17 +12960,19 @@ function openPop(cx, cy) {
       o.push(['oa', ocd[q] == rd ? 'Saldırı emri (bu tur verildi)' : '⚔ Saldırı emri ver', ocd[q] != rd]);
       o.push(['ra', rqcd[q] == rd ? 'Asker istendi (bu tur)' : '🛡 Asker iste', rqcd[q] != rd]);
       o.push(['ka', rqcd2[q] == rd ? 'Okçu istendi (bu tur)' : '🏹 Okçu iste', rqcd2[q] != rd]);
-      o.push(['r', `Takviye gönder (+3 asker, ${SUP} altın)`, gold[0] >= SUP]);
+      const src3 = mySrc3(t);
+      o.push(['r3', src3 >= 0 ? `Kendi askerinden gönder (${NM[src3]} −3, ücretsiz)` : 'Kendi askerinden gönder (4+ askerli bölgen yok)', src3 >= 0 && !(inc[t] > 0)]);
+      o.push(['r', `Takviye satın al (+3 asker, ${SUP} altın)`, gold[0] >= SUP]);
       if (bar[t])
         o.push(['s', `Okçu ata (${AC} altın)`, arch[t] < 5 && gold[0] >= AC]);
       if (ord[q] >= 0 && cnt(ord[q]) > 0)
         info += ` Emrin: ${PN[q]}, ${PN[ord[q]]} topraklarına saldırıyor.`;
     }
     if (ally[q] > 0 && !tru[q])
-      o.push(['x', `İttifaktan çık (${EXC} altın)`, gold[0] >= EXC]);
+      o.push(['x', EXC ? `İttifaktan çık (${EXC} altın)` : 'İttifaktan çık (ücretsiz)', gold[0] >= EXC]);
     if (canInc3(0, t) && (!visSet().has(t) || canInc2(0, t))) {
-      o.push(['i', `İsyan çıkar (${INC} altın)`, gold[0] >= INC]);
-      info += ` ${NM[t]}: isyan çıkar. Rakip asker gönderirse bastırabilir; ne kadar çok gönderirse o kadar kolay. 2 tur içinde bastıramazsa bölge bağımsız küçük bir devlet olur.`;
+      o.push(['i', incUsed(0) >= INCMAX ? `İsyan çıkar (bu tur ${INCMAX}/${INCMAX})` : `İsyan çıkar (${INCc(0)} altın · ${incUsed(0)}/${INCMAX})`, incUsed(0) < INCMAX && gold[0] >= INCc(0)]);
+      info += ` ${NM[t]}: isyan çıkar (turda en fazla ${INCMAX}; ilki ${INC1}, sonrakiler ${INC2} altın). Rakip asker gönderirse bastırabilir; ne kadar çok gönderirse o kadar kolay. 2 tur içinde bastıramazsa bölge bağımsız küçük bir devlet olur.`;
     }
     if (ONLINE) {
       for (let i = o.length - 1; i >= 0; i--)
@@ -12835,6 +13050,21 @@ function openPop(cx, cy) {
       ui();
       openPop(cx, cy);
     };
+    if (k == 'r3') {
+      const q = own[t];
+      const a = mySrc3(t);
+      if (inc[t] > 0)
+        $('log').textContent = 'İsyanlı bölgeye takviye gönderilemez.';
+      else if (a >= 0) {
+        arm[a] -= 3;
+        arm[t] += 3;
+        nav.push({ k: 'march', x0: cen[a][0] * S, y0: cen[a][1] * S, x1: cen[t][0] * S, y1: cen[t][1] * S, n: 3, col: COL[0], t0: performance.now(), dur: 900 });
+        fl.push({ t, dx: 0, txt: '+3 asker', col: '#3fb98a', t0: performance.now() + 700 });
+        $('log').textContent = `${NM[a]} bölgenden 3 asker ${PN[q]} müttefiğinin ${NM[t]} bölgesine yürüdü.`;
+      }
+      re();
+      return;
+    }
     if (k == 'r' || k == 's') {
       const q = own[t];
       if (inc[t] > 0 && k == 'r')
@@ -13065,7 +13295,12 @@ function openPop(cx, cy) {
       return;
     }
     if (k == 't' || k == 'y') {
-      treaty(own[t], k);
+      if (ally[own[t]] > 0)
+        treaty(own[t], k);
+      else {
+        tribPanel(own[t], k);
+        return;
+      }
       pop.hidden = true;
       ui();
       return;
@@ -13911,7 +14146,7 @@ async function ai0(p) {
   }
   if (rev[p] > 0) {
     const cd = [...Array(N).keys()].filter(t => HUM.has(own[t]) && canInc3(p, t) && est(p, t) >= 1 && est(p, t) <= 3);
-    if (cd.length) {
+    if (cd.length && gold[p] >= INCc(p)) {
       incite(p, cd[Math.floor(Math.random() * cd.length)]);
       rev[p] = 0;
     }
@@ -13965,6 +14200,8 @@ async function ai0(p) {
             sc += 10 + (t == ordT[p] ? 4 : 0);
           if (own[t] == bt[p])
             sc += 3;
+          if (grT[p] == own[t] && rd <= grU[p])
+            sc += 4;
           if (sc > bsc) {
             bsc = sc;
             best = a;
@@ -14111,7 +14348,7 @@ async function ai0(p) {
         const pc = bp[p].some(v => v > 0);
         // Oyuncunun müttefiki olarak verilen saldırı emri: o devlete öncelik verir.
         const ob = ally[p] > 0 && !tru[p] && ord[p] >= 0 && own[t] == ord[p] ? 3 + (t == ordT[p] ? 2 : 0) : 0;
-        const b2 = (pc ? ((own[t] == bt[p] ? 2 : 0) + (foc.has(t) ? 2 : 0)) : 0) + ob;
+        const b2 = (pc ? ((own[t] == bt[p] ? 2 : 0) + (foc.has(t) ? 2 : 0)) : 0) + ob + (grT[p] == own[t] && rd <= grU[p] ? 2 : 0);
         const v2 = s + b2;
         const need = ob ? 0 : (b2 ? 1 : 2) + (DIF == 0 ? 1 : 0) - (DIF == 2 && !b2 ? 1 : 0) - (isAP ? 1 : 0);
         if (s >= need && v2 > bs) {
