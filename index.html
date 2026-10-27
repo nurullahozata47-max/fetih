@@ -3866,9 +3866,9 @@ function drawWhale(e, u, s) {
   g.globalAlpha = 1;
   // Göz: başın alt arkasında küçük, kanlanmış kırmızı göz (hafif kızıl parıltı ve damarlar)
   {
-    const [ex, ey] = bp(.31, -thB(.31) + 2.2);
+    const [ex, ey] = bp(.27, .6);
     const gl = g.createRadialGradient(ex, ey, 0, ex, ey, 3.4);
-    gl.addColorStop(0, 'rgba(210,20,24,.55)');
+    gl.addColorStop(0, 'rgba(210,20,24,.4)');
     gl.addColorStop(1, 'rgba(160,0,0,0)');
     g.fillStyle = gl;
     g.beginPath();
@@ -3883,6 +3883,19 @@ function drawWhale(e, u, s) {
       g.quadraticCurveTo(ex + Math.cos(a + .3) * 1.8, ey + Math.sin(a + .3) * 1.5, ex + Math.cos(a + .1) * 2.4, ey + Math.sin(a + .1) * 1.9);
       g.stroke();
     }
+    // Badem biçimli koyu göz yuvası ve üstte kalın göz kapağı: kan lekesi değil, göz olduğu belli olsun
+    g.fillStyle = '#0b1115';
+    g.beginPath();
+    g.moveTo(ex - 2.3, ey + .2);
+    g.quadraticCurveTo(ex, ey - 2.1, ex + 2.3, ey + .1);
+    g.quadraticCurveTo(ex, ey + 1.7, ex - 2.3, ey + .2);
+    g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.6)';
+    g.lineWidth = .55;
+    g.beginPath();
+    g.moveTo(ex - 2.6, ey - .2);
+    g.quadraticCurveTo(ex, ey - 2.6, ex + 2.6, ey - .4);
+    g.stroke();
     const ir = g.createRadialGradient(ex, ey, 0, ex, ey, 1.2);
     ir.addColorStop(0, '#ff3a2e');
     ir.addColorStop(.6, '#a80d12');
