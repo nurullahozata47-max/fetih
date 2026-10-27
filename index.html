@@ -13927,6 +13927,72 @@ cv.addEventListener('click', async (e) => {
     sel = null;
   ui();
 });
+// Takviye aşamasında "Turu bitir" düğmesi "Otomatik dağıt" olur: askerleri tek dokunuşla akıllıca dağıtır.
+const autoROK = () => turn == 0 && phase == 'r' && pool > 0 && !dr && !TUT && !busy && !over;
+function autoReinf() {
+  const ct = cap[0];
+  const my = [...Array(N).keys()].filter(t => own[t] == 0 && !inc[t]);
+  if (!my.length)
+    return;
+  const foe = u => own[u] != 0 && !friend(0, own[u]);
+  const enemy = u => foe(u) && own[u] != NEU;
+  const add = {};
+  const put = (t, k) => {
+    if (k <= 0)
+      return;
+    arm[t] += k;
+    pool -= k;
+    add[t] = (add[t] || 0) + k;
+  };
+  // Tahmini tehdit: görünmeyen düşman askerini kabaca tahmin eder (sis kalkmaz).
+  const thr = a => Math.max(0, ...[...adj[a]].filter(enemy).map(u => est(0, u)));
+  // 1) Başkent tehdit altındaysa önce o: tehdidin 3 fazlası, ama en fazla takviyenin yarısı.
+  if (ct >= 0 && own[ct] == 0 && !inc[ct]) {
+    const need = thr(ct) + 3 - arm[ct];
+    if (need > 0)
+      put(ct, Math.min(need, Math.ceil(pool / 2)));
+  }
+  const fr = my.filter(a => [...adj[a]].some(foe));
+  if (fr.length && pool > 0) {
+    // 2) Takviyenin yarısı saldırı için en iyi cepheye (zayıf komşusu olan, zaten kalabalık bölge).
+    let best = -1;
+    let bsc = -1e9;
+    for (const a of fr)
+      for (const t of adj[a]) {
+        if (!foe(t) || protK(t))
+          continue;
+        const sc = arm[a] * .6 - est(0, t) + (own[t] == NEU ? 2 : 0) - (wall[t] ? 4 : 0);
+        if (sc > bsc) {
+          bsc = sc;
+          best = a;
+        }
+      }
+    if (best >= 0)
+      put(best, Math.ceil(pool / 2));
+    // 3) Kalanı en çok tehdit altındaki sınırlara teker teker.
+    while (pool > 0) {
+      let tb = fr[0];
+      let tv = -1e9;
+      for (const a of fr) {
+        const v = thr(a) - arm[a];
+        if (v > tv) {
+          tv = v;
+          tb = a;
+        }
+      }
+      put(tb, 1);
+    }
+  }
+  // Sınır yoksa (ada vb.) en kalabalık bölgeye.
+  if (pool > 0)
+    put(my.sort((x, y) => arm[y] - arm[x])[0], pool);
+  for (const t in add)
+    fl.push({ t: +t, dx: 0, txt: `+${add[t]}`, col: '#3fb98a', t0: performance.now() });
+  const n = Object.keys(add).length;
+  phase = 'a';
+  $('log').textContent = `Takviye otomatik dağıtıldı: ${n} bölgeye ${Object.values(add).reduce((a, b) => a + b, 0)} asker (önce tehdit altındaki başkent ve sınırlar, yarısı saldırı cephesine).`;
+  ui();
+}
 $('end').onclick = () => {
   if (dr && !ONLINE && !TUT) {
     if (turn == 0 && !busy && !over) {
@@ -13938,6 +14004,10 @@ $('end').onclick = () => {
   }
   if (TUT && !tutOK('btn', 'end'))
     return;
+  if (autoROK()) {
+    autoReinf();
+    return;
+  }
   if (turn == 0 && phase == 'a' && !busy && !over) {
     sel = null;
     mv = false;
@@ -14525,11 +14595,12 @@ function ui(msg) {
   }
   setTxt('ttl', dr ? 'Fetih, bölge seçimi' : `Fetih, tur ${rd}` + (rd <= CAPT ? ` (başkentler ${CAPT + 1 - rd} tur daha dokunulmaz)` : ONLINE || TUT ? '' : ` · ⏳ ${Math.floor(playMs / 60000)} dk` + (lateOn ? ' (başkent = tam fetih)' : '')));
   setHTML('chips', PN.slice(0, P).map((n, p) => cnt(p) == 0 && !dr ? (p > 3 ? '' : `<span class="dead" style="--c:${COL[p]}">${n}</span>`) : `<span class="${p == turn && !over ? 'on' : ''}" style="--c:${COL[p]}">${n} ${cnt(p)}<em style="font-style:normal;font-size:.85em;margin-left:4px;color:${ref[p] < 20 ? '#d63a3a' : ref[p] < 50 ? '#e5566d' : ref[p] < 70 ? '#c98a12' : '#3a9a6c'}">${p == 0 ? '' : '%' + ref[p]}</em>${armyOf(p) < WEAK && !dr ? '<em style="font-style:normal;font-size:.8em;margin-left:4px;color:#e5566d">zayıf</em>' : ''}${p == 0 ? ` (${gold[0]}/${capOf(0)} altın)` : ally[p] > 0 ? (tru[p] ? ` (haraç: ${ally[p]} tur)` : ally[p] == 1 ? ' (ittifak: son tur)' : ` (ittifak: ${ally[p]} tur)`) : ''}${p > 0 && bp[p].some((v, q) => v > 0 && cnt(q) > 0) ? ` (+${bp[p].map((v, q) => v > 0 && cnt(q) > 0 ? PN[q] : '').filter(Boolean).join(', ')})` : ''}</span>`).join('') + (cnt(NEU) ? `<span style="--c:#9aa3a8">Boş ${cnt(NEU)}</span>` : ''));
-  setTxt('st', msg || (spySel != null && turn == 0 ? `${PN[spySel]} casusu için hedef seç: bir düşman bölgesine dokun.` : ctk && sel != null && turn == 0 ? `Mancınıklar hazır (${NM[sel]}). Komşu bir düşman bölgesine dokun.` : ordSel != null && turn == 0 ? `${PN[ordSel]} için hedef seç: ortak bir düşmanın bölgesine dokun.` : dr ? (turn == 0 && !busy ? `Bölge seç (${N - dnx} kaldı)` + (cap[0] < 0 ? ': ilk seçimin başkent olur.' : '.') : `${PN[turn]} seçiyor…`) : bd && turn == 0 ? ({ b: 'Kışla kurmak için kendi bölgene dokun.', m: 'Maden kurmak için kendi bölgene dokun.', a: 'İttifak için o krallığın herhangi bir bölgesine dokun.', w: 'Sur için başkentine (★) dokun.' }[bd]) : turn != 0 ? `${PN[turn]} oynuyor…` : gsk ? `⚔️ Gemi savaşı (${NM[sel]}): saldıracağın düşman gemisine ya da önünde durduğu kıyıya dokun.` : abk ? `💣 Bombardıman gemisi hazır (${NM[sel]}). Bombalanacak düşman kıyısına dokun.` : cn ? `Büyük gemiler hazır (${NM[sel]}). Kıyıdaki düşman bölgesine${foeShips(0, null).some(k => dseaOK(sel, blk[k].t)) ? ' ya da menzildeki düşman gemisine' : ''} dokun.` : sco ? `Keşif gemisi hazır (${NM[sel]}). Kıyıdaki bir bölgeye dokun.` : sp ? `Casus hazır (${NM[sel]}). Herhangi bir düşman bölgesine dokun; içerilere gittikçe yakalanma riski artar.` : ak ? `Okçular hazır (${NM[sel]}). menzildeki düşmana dokun (2 bölge).` : document.getElementById('txg') ? 'Vergi düzenini seç.' : phase == 'r' && !mv ? `Takviye: ${pool} birlik. Dokun: asker ekle. Basılı tut: inşa et.` : mv && bk ? (bk.src.size ? `Toplu taşıma: ${bk.src.size} bölgeden ${[...bk.src].reduce((a, u) => a + arm[u] - 1, 0)} asker seçildi. Şimdi hedef bölgeye basılı tut.` : 'Toplu taşıma: asker toplanacak bölgelere dokun, sonra hedefe basılı tut.') : mv ? (sel == null ? 'Taşımak için 2+ birlikli bölgeni seç. Basılı tut: toplu taşıma.' : `${NM[sel]} seçili. Hedef bölgene dokun, her dokunuş 1 birlik taşır.`) : sel == null ? `Saldırmak için 2+ birlikli bölgeni seç. (Fetih: ${won[0] + sup[0]}/${ext ? 5 : 3}, refah %${ref[0]})` : `${NM[sel]} seçili. Kendi bölgene dokun: asker taşı. Düşmana dokun: saldır.${shipCap(sel) > 0 ? ` Gemilerle ${shipCap(sel)} yerlik taşıma yapabilirsin (asker, okçu, mancınık): denizin ötesindeki bir kıyıya dokun.` : ''} Koyu renkli düşmana dokun; bağlantılı bölgelerinden de saldırabilirsin.`));
+  setTxt('st', msg || (spySel != null && turn == 0 ? `${PN[spySel]} casusu için hedef seç: bir düşman bölgesine dokun.` : ctk && sel != null && turn == 0 ? `Mancınıklar hazır (${NM[sel]}). Komşu bir düşman bölgesine dokun.` : ordSel != null && turn == 0 ? `${PN[ordSel]} için hedef seç: ortak bir düşmanın bölgesine dokun.` : dr ? (turn == 0 && !busy ? `Bölge seç (${N - dnx} kaldı)` + (cap[0] < 0 ? ': ilk seçimin başkent olur.' : '.') : `${PN[turn]} seçiyor…`) : bd && turn == 0 ? ({ b: 'Kışla kurmak için kendi bölgene dokun.', m: 'Maden kurmak için kendi bölgene dokun.', a: 'İttifak için o krallığın herhangi bir bölgesine dokun.', w: 'Sur için başkentine (★) dokun.' }[bd]) : turn != 0 ? `${PN[turn]} oynuyor…` : gsk ? `⚔️ Gemi savaşı (${NM[sel]}): saldıracağın düşman gemisine ya da önünde durduğu kıyıya dokun.` : abk ? `💣 Bombardıman gemisi hazır (${NM[sel]}). Bombalanacak düşman kıyısına dokun.` : cn ? `Büyük gemiler hazır (${NM[sel]}). Kıyıdaki düşman bölgesine${foeShips(0, null).some(k => dseaOK(sel, blk[k].t)) ? ' ya da menzildeki düşman gemisine' : ''} dokun.` : sco ? `Keşif gemisi hazır (${NM[sel]}). Kıyıdaki bir bölgeye dokun.` : sp ? `Casus hazır (${NM[sel]}). Herhangi bir düşman bölgesine dokun; içerilere gittikçe yakalanma riski artar.` : ak ? `Okçular hazır (${NM[sel]}). menzildeki düşmana dokun (2 bölge).` : document.getElementById('txg') ? 'Vergi düzenini seç.' : phase == 'r' && !mv ? `Takviye: ${pool} birlik. Dokun: asker ekle. Basılı tut: inşa et.${TUT ? '' : ' Tek seferde dağıtmak için: Otomatik dağıt.'}` : mv && bk ? (bk.src.size ? `Toplu taşıma: ${bk.src.size} bölgeden ${[...bk.src].reduce((a, u) => a + arm[u] - 1, 0)} asker seçildi. Şimdi hedef bölgeye basılı tut.` : 'Toplu taşıma: asker toplanacak bölgelere dokun, sonra hedefe basılı tut.') : mv ? (sel == null ? 'Taşımak için 2+ birlikli bölgeni seç. Basılı tut: toplu taşıma.' : `${NM[sel]} seçili. Hedef bölgene dokun, her dokunuş 1 birlik taşır.`) : sel == null ? `Saldırmak için 2+ birlikli bölgeni seç. (Fetih: ${won[0] + sup[0]}/${ext ? 5 : 3}, refah %${ref[0]})` : `${NM[sel]} seçili. Kendi bölgene dokun: asker taşı. Düşmana dokun: saldır.${shipCap(sel) > 0 ? ` Gemilerle ${shipCap(sel)} yerlik taşıma yapabilirsin (asker, okçu, mancınık): denizin ötesindeki bir kıyıya dokun.` : ''} Koyu renkli düşmana dokun; bağlantılı bölgelerinden de saldırabilirsin.`));
   const ok = turn == 0 && phase == 'a' && !busy && !over;
   const adr = dr && !ONLINE && !TUT;
-  $('end').disabled = adr ? !(turn == 0 && !busy && !over && !autoDr) : !ok;
-  $('end').textContent = adr ? (autoDr ? 'Seçiliyor…' : 'Otomatik seç') : 'Turu bitir';
+  const arr = autoROK();
+  $('end').disabled = adr ? !(turn == 0 && !busy && !over && !autoDr) : arr ? false : !ok;
+  $('end').textContent = adr ? (autoDr ? 'Seçiliyor…' : 'Otomatik seç') : arr ? `Otomatik dağıt (${pool})` : 'Turu bitir';
   $('mv').disabled = !(turn == 0 && !busy && !over && !dr);
   $('mv').className = mv ? 'on' : '';
   $('mv').textContent = mv ? 'Toplamayı bitir' : 'Toplu taşıma';
