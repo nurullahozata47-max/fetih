@@ -2326,6 +2326,8 @@ let awayL = [];
 // Bulunduğu bölge vergi ve maden geliri vermez, kışlası asker üretmez, limanından gemi çıkamaz.
 // Durdurmanın yolları: rotaya mayın döşemek, büyük gemiyle gemiye top atmak (%50 batırma), iskelesini almak.
 let blk = [];
+// Bu tur takviye konan bölgeler: rfMark.m[bölge] = eklenen asker.
+let rfMark = { rd: -1, m: {} };
 let abk = false;
 let lastSailEnd = null;
 const blkOK = u => { const b = blk[u]; return !!b && own[u] == b.p && shL[u] > 0; };
@@ -13813,6 +13815,7 @@ cv.addEventListener('click', async (e) => {
         $('log').textContent = 'İsyan çıkan bölgeye takviye konulamaz, başka bölgeden asker taşı.';
       else {
         arm[t]++;
+        rfAdd(t, 1);
         if (--pool == 0)
           phase = 'a';
       }
@@ -13928,6 +13931,11 @@ cv.addEventListener('click', async (e) => {
   ui();
 });
 // Takviye aşamasında "Turu bitir" düğmesi "Otomatik dağıt" olur: askerleri tek dokunuşla akıllıca dağıtır.
+const rfAdd = (t, k) => {
+  if (rfMark.rd != rd)
+    rfMark = { rd, m: {} };
+  rfMark.m[t] = (rfMark.m[t] || 0) + k;
+};
 const autoROK = () => turn == 0 && phase == 'r' && pool > 0 && !dr && !TUT && !busy && !over;
 function autoReinf() {
   const ct = cap[0];
@@ -13943,6 +13951,7 @@ function autoReinf() {
     arm[t] += k;
     pool -= k;
     add[t] = (add[t] || 0) + k;
+    rfAdd(t, k);
   };
   // Tahmini tehdit: görünmeyen düşman askerini kabaca tahmin eder (sis kalkmaz).
   const thr = a => Math.max(0, ...[...adj[a]].filter(enemy).map(u => est(0, u)));
@@ -13986,11 +13995,13 @@ function autoReinf() {
   // Sınır yoksa (ada vb.) en kalabalık bölgeye.
   if (pool > 0)
     put(my.sort((x, y) => arm[y] - arm[x])[0], pool);
-  for (const t in add)
-    fl.push({ t: +t, dx: 0, txt: `+${add[t]}`, col: '#3fb98a', t0: performance.now() });
-  const n = Object.keys(add).length;
+  const ks = Object.keys(add).map(Number).sort((x, y) => add[y] - add[x]);
+  ks.forEach((t, i) => {
+    fl.push({ t, dx: 0, txt: `+${add[t]}`, col: '#3fb98a', t0: performance.now() + i * 120 });
+    pulse(t, '#3fb98a');
+  });
   phase = 'a';
-  $('log').textContent = `Takviye otomatik dağıtıldı: ${n} bölgeye ${Object.values(add).reduce((a, b) => a + b, 0)} asker (önce tehdit altındaki başkent ve sınırlar, yarısı saldırı cephesine).`;
+  $('log').textContent = `Takviye dağıtıldı (${ks.reduce((a, t) => a + add[t], 0)} asker): ` + ks.map(t => `${NM[t]} +${add[t]}`).join(', ') + '. Yeşil rozetler bu tur nereye konduğunu gösterir.';
   ui();
 }
 $('end').onclick = () => {
@@ -14525,6 +14536,25 @@ function ui(msg) {
     c.stroke();
     c.fillStyle = '#fff';
     c.fillText(V.has(t) ? arm[t] : '?', x * S, y * S + 1);
+    // Bu tur gelen takviye: asker dairesinin sağ üstünde yeşil "+k" rozeti (tur bitene kadar kalır).
+    const rk = rfMark.rd == rd && turn == 0 && own[t] == 0 ? rfMark.m[t] : 0;
+    if (rk) {
+      const bx = x * S + 13;
+      const by = y * S - 12;
+      const tx = '+' + rk;
+      c.font = 'bold 11px sans-serif';
+      const w = Math.max(16, c.measureText(tx).width + 8);
+      c.fillStyle = '#2f9e6f';
+      c.beginPath();
+      c.roundRect ? c.roundRect(bx - w / 2, by - 8, w, 16, 8) : c.rect(bx - w / 2, by - 8, w, 16);
+      c.fill();
+      c.lineWidth = 1.5;
+      c.strokeStyle = '#ffffff';
+      c.stroke();
+      c.fillStyle = '#fff';
+      c.fillText(tx, bx, by + .5);
+      c.font = 'bold 15px sans-serif';
+    }
     if (inc[t] > 0)
       drawInc(x * S, y * S, inc[t], ik[t] == 2, V.has(t) ? ib[t] : null);
     if (capVis(t)) {
