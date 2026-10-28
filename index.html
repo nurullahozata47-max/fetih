@@ -16147,6 +16147,9 @@ const Mus = (() => {
   let warG = null;
   let sfxG = null;
   let rev = null;
+  // tone: parçaya göre bas ayarı (telefon hoparlöründe cızırtı yapan kalın sesleri kısar).
+  let tone = null;
+  let toneTrk = null;
   let on = true;
   let vol = .7;
   try {
@@ -16186,7 +16189,25 @@ const Mus = (() => {
     ac = ctx || new (window.AudioContext || window.webkitAudioContext)();
     master = ac.createGain();
     master.gain.value = on ? vol : 0;
-    master.connect(ac.destination);
+    // Çıkış: telefon hoparlörünün veremediği çok kalın sesler (40 Hz altı) süzülür, ardından sınırlayıcı
+    // tepeleri yumuşakça bastırır; ses hiçbir zaman kırpılıp cızırdamaz.
+    const hpf = ac.createBiquadFilter();
+    hpf.type = 'highpass';
+    hpf.frequency.value = 40;
+    hpf.Q.value = .7;
+    const lim = ac.createDynamicsCompressor();
+    lim.threshold.value = -4;
+    lim.knee.value = 4;
+    lim.ratio.value = 20;
+    lim.attack.value = .003;
+    lim.release.value = .25;
+    // Sınırlayıcının kendiliğinden eklediği ses artışı (~2.3 dB) geri alınır: genel ses düzeyi değişmez.
+    const mk = ac.createGain();
+    mk.gain.value = .77;
+    master.connect(hpf);
+    hpf.connect(lim);
+    lim.connect(mk);
+    mk.connect(ac.destination);
     // Oyun içi marş menüdekinden kısık çalar.
     // Basit yankı: iki gecikme hattı, salona benzer bir kuyruk.
     rev = ac.createGain();
@@ -16213,8 +16234,14 @@ const Mus = (() => {
     lp.connect(master);
     musG = ac.createGain();
     musG.gain.value = 1.2;
-    musG.connect(master);
-    musG.connect(rev);
+    tone = ac.createBiquadFilter();
+    tone.type = 'lowshelf';
+    tone.frequency.value = 170;
+    tone.gain.value = 0;
+    toneTrk = null;
+    musG.connect(tone);
+    tone.connect(master);
+    tone.connect(rev);
     warG = ac.createGain();
     warG.gain.value = 0;
     warG.connect(master);
@@ -16782,7 +16809,7 @@ const Mus = (() => {
       trk = mode;
   }
   catch (e) { }
-  const tGain = () => (theme == 'game' ? .7 : 1.2) * (trk == 'march' ? 1 : .72);
+  const tGain = () => (theme == 'game' ? .7 : 1.2) * (trk == 'march' ? 1 : trk == 'sefer' ? .86 : .72);
   // Sıradaki parçaya geç: ses kısılır, parça değişir, ses yeniden açılır.
   function autoNext() {
     if (swap || !ac || last)
@@ -16800,6 +16827,11 @@ const Mus = (() => {
   }
   const curSpb = () => trk == 'direnis' ? 60 / 138 / 4 : trk == 'sefer' ? 60 / 116 / 4 : trk == 'diyar' ? 60 / 100 / 4 : trk == 'kusatma' ? 60 / 132 / 4 : trk == 'hucum' ? 60 / 112 / 3 : trk == 'karanlik' ? 60 / 104 / 2 : 60 / TEMPO[theme == 'menu' ? 'menu' : 'game'] / 4;
   function scheduleStep(i, t) {
+    // Sefer'in yoğun bas ud partisi küçük hoparlörlerde cızırdıyordu: o parçada kalın sesler 8 dB kısılır.
+    if (tone && toneTrk != trk) {
+      toneTrk = trk;
+      tone.gain.setTargetAtTime(trk == 'sefer' ? -8 : 0, t, .2);
+    }
     if (trk == 'direnis')
       return stepDirenis(i, t, curSpb());
     if (trk == 'sefer')
@@ -17101,7 +17133,7 @@ const Mus = (() => {
       const tk0 = trk;
       if (tk)
         trk = tk;
-      const sv = [ac, master, musG, warG, sfxG, rev, theme, flavor, war, on];
+      const sv = [ac, master, musG, warG, sfxG, rev, theme, flavor, war, on, tone, toneTrk];
       const oc = new OfflineAudioContext(2, 44100 * secs, 44100);
       build(oc);
       master.gain.value = vol;
@@ -17118,7 +17150,7 @@ const Mus = (() => {
         for (let i = 0, t = .05; t < secs - 1; i++, t += spb)
           scheduleStep(i, t);
       const buf = await oc.startRendering();
-      [ac, master, musG, warG, sfxG, rev, theme, flavor, war, on] = sv;
+      [ac, master, musG, warG, sfxG, rev, theme, flavor, war, on, tone, toneTrk] = sv;
       trk = tk0;
       return buf;
     }
