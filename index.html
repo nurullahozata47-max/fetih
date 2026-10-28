@@ -2231,6 +2231,8 @@ const LOOTB = [0, 10, 20, 35];
 // Gelir: bölgelerden gelen temel gelir en fazla INC0 olur; üstüne maden ve vergi eklenir.
 // Vergi: her bölge 2 turda bir, seçilen miktarda (1 ya da 2) altın verir.
 const INC0 = 15;
+// Oyun başında her devletin (oyuncu ve botlar) hazinesi.
+const START_G = 40;
 // Devlet ve bölge bilgileri:
 // wall/bar/mn/arch/tw/spy/dk: bölgedeki sur, kışla, maden, okçu, kule, casus, iskele seviyeleri
 // gold: altın;  ally: oyuncuyla anlaşma süresi;  tru: haraç anlaşması (1 öder, -1 alır)
@@ -7343,7 +7345,7 @@ function init(noDraft, seed) {
   dfill = Array(N).fill(0);
   P = 4;
   const Z = () => Array(PM).fill(0);
-  gold = Array(PM).fill([10, 15, 25][DIF]);
+  gold = Array(PM).fill(0);
   gold[0] = [25, 20, 20][DIF];
   cap = Array(PM).fill(-1);
   ally = Z();
@@ -7473,14 +7475,19 @@ function start(p) {
   const gBase = Math.min(INC0, Math.floor((8 + cnt(p)) * 1.1));
   const gMine = mn.reduce((a, m, t) => a + (own[t] == p ? m * MI : 0), 0);
   // Vergi 2 turda bir (çift turlarda) toplanır.
-  const taxNow = (SW(p) == 0 && taxEvery == 1) || (SW(p) == 0 ? rd + 1 : rd) % 2 == 0;
+  // İlk tur: herkes (oyuncu ve botlar, her zorlukta) sabit START_G altınla başlar; vergi ayarı ya da
+  // zorluk başlangıç parasını değiştirmez. Vergi ve gelir ikinci turdan itibaren işler.
+  const first = (SW(p) == 0 ? rd : rd - 1) == 0;
+  const taxNow = !first && ((SW(p) == 0 && taxEvery == 1) || (SW(p) == 0 ? rd + 1 : rd) % 2 == 0);
   const gTax = taxNow ? taxOf(p) : 0;
   if (taxNow)
     taxCollect(p);
   if (taxNow && p == 0 && !ONLINE)
     durTick();
-  const g = Math.floor((gBase + gMine + gTax) * (pn ? .5 : 1) * (p > 0 ? [.75, 1, 1.3][DIF] : 1));
+  const g = first ? START_G : Math.floor((gBase + gMine + gTax) * (pn ? .5 : 1) * (p > 0 ? [.75, 1, 1.3][DIF] : 1));
   pen[p] = 0;
+  if (first)
+    gold[p] = 0;
   gold[p] += g;
   const lostG = clampGold(p);
   pool = Math.max(1, (p == 0 ? 3 : 2 + [-1, 0, 1][DIF]) + (cnt(p) >> 2));
@@ -7531,7 +7538,7 @@ function start(p) {
   turnSeq++;
   banner(p == 0 ? 'Senin sıran' : PN[p] + ' oynuyor', COL[p]);
   if (p == 0)
-    $('log').textContent = `Tur geliri: +${g} altın (temel ${gBase}${gTax ? `, vergi ${gTax}` : ', vergi gelecek tur'}${gMine ? `, maden ${gMine}` : ''})` + (pn ? ' (ceza: geçen tur bölge alamadın, gelir yarıya düştü)' : '') + (lostG ? ` Sandıklar dolu: ${lostG} altın sığmadı, yeni sandık kur ya da yükselt.` : '') + (hl ? ' ' + hl : '');
+    $('log').textContent = first ? `Başlangıç hazinesi: ${START_G} altın (herkes aynı parayla başlar). Vergi ve gelir gelecek turdan itibaren gelir.` + (hl ? ' ' + hl : '') : `Tur geliri: +${g} altın (temel ${gBase}${gTax ? `, vergi ${gTax}` : ', vergi gelecek tur'}${gMine ? `, maden ${gMine}` : ''})` + (pn ? ' (ceza: geçen tur bölge alamadın, gelir yarıya düştü)' : '') + (lostG ? ` Sandıklar dolu: ${lostG} altın sığmadı, yeni sandık kur ya da yükselt.` : '') + (hl ? ' ' + hl : '');
   if (p == 0) {
     busy = false;
     ui();
