@@ -8379,7 +8379,8 @@ function warnExt() {
   pop.style.top = '30%';
   pop.style.transform = 'translateX(-50%)';
   pop.onclick = e => {
-    const k = e.target.dataset && e.target.dataset.k;
+    const kb = e.target.closest && e.target.closest('[data-k]');
+    const k = kb && !kb.disabled && kb.dataset.k;
     if (!k)
       return;
     if (k == 'ok') {
@@ -9005,7 +9006,8 @@ function tribPanel(q, k) {
   pop.style.top = '22%';
   pop.style.transform = 'translateX(-50%)';
   pop.onclick = e => {
-    const kk = e.target.dataset && e.target.dataset.k;
+    const kb = e.target.closest && e.target.closest('[data-k]');
+    const kk = kb && kb.dataset.k;
     if (!kk)
       return;
     if (kk == 'go')
@@ -9243,7 +9245,8 @@ function showOffer(q) {
   pop.style.top = '30%';
   pop.style.transform = 'translateX(-50%)';
   pop.onclick = e => {
-    const k = e.target.dataset && e.target.dataset.k;
+    const kb = e.target.closest && e.target.closest('[data-k]');
+    const k = kb && !kb.disabled && kb.dataset.k;
     if (!k)
       return;
     if (k == 'ok') {
@@ -13212,7 +13215,8 @@ function openPop(cx, cy) {
       openPop(cx, cy);
       return;
     }
-    const k = e.target.dataset && e.target.dataset.k;
+    const kb = e.target.closest && e.target.closest('[data-k]');
+    const k = kb && !kb.disabled && kb.dataset.k;
     if (!k)
       return;
     if (TUT && !tutOK('k', k))
