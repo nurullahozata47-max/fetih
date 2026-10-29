@@ -8004,6 +8004,9 @@ async function battle(a, t, sea, F) {
   // Çarpışma işareti: senin savaşlarında hep, kamera takibi açıkken bütün savaşlarda.
   // Savaş animasyonu açıksa (deniz aşırı olmayan savaşlarda) bunun yerine zar atıldıktan sonra hücum sahnesi oynar.
   const showB = own[a] == 0 || own[t] == 0 || (camFollow && !ONLINE);
+  // Haritada görünen asker sayıları eşitse (örneğin 3'e 3) savaş "denk savaş" sahnesiyle gösterilir.
+  // Okçu atışlarından önceki sayılar esas alınır; seçerek asker gönderdiysen gönderdiğin sayı.
+  const eqB = (F != null ? F : arm[a]) == arm[t];
   const bfx = showB && bfxOn && !sea;
   if (showB && !bfx) {
     nav.push({ k: 'clash', t, t0: performance.now(), dur: 480, col: COL[own[a]] });
@@ -8020,8 +8023,7 @@ async function battle(a, t, sea, F) {
   }
   let A = F != null ? F : arm[a] - 1;
   let D = arm[t];
-  // Asker sayıları birebir eşitse savaş "denk savaş" sahnesiyle gösterilir.
-  const eqB = A == D;
+
   // Dayanıklılık (savaş zarları): Yüksek bölgenin askeri her kayıpta DURB ihtimalle kurtulur, Zayıf bölgeninki DURB ihtimalle bir asker fazla kaybeder.
   const dA = durCls(a);
   const dD = durCls(t);
