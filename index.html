@@ -2666,7 +2666,7 @@ function shipVolley(t, n) {
   return { k: arrowLoss(t, k), hits };
 }
 // Bombardıman gemisinin gizli dayanıklılığı: her düello ya da top isabeti 1 eksiltir, 0 olunca batar.
-const SHIPHP = 3;
+const SHIPHP = 2;
 // Bombardımanda gemi başına kıyıdaki bir yapıyı (kışla, maden, kule, sandık) yıkma ihtimali.
 const BLDHIT = .15;
 // Bir devletin (oyuncu ya da bot) en fazla 2 büyük savaş gemisi olabilir (bütün iskeleleri toplamı).
@@ -2819,7 +2819,7 @@ async function blkBomb(u) {
     arm[t] -= k;
     txt = k > 0 ? (visSet().has(t) ? `${k} asker vuruldu` : 'birlikler vuruldu') : 'gülleler isabet etti ama kıyıda vurulacak asker yoktu';
     if (k > 0)
-      fl.push({ t, dx: 0, txt: visSet().has(t) ? `-${k} top` : 'Top!', col: '#ff6b6b', t0: performance.now() });
+      fl.push({ t, dx: 0, txt: visSet().has(t) ? `-${k} vuruldu` : 'Vuruldu!', col: '#ff6b6b', t0: performance.now() });
   }
   // Gülleler kıyıdaki yapıları da vurur: surla korunmayan bölgede isabet ettiren her gemi %15 ihtimalle bir yapıyı yıkar
   // (kışla, maden, okçu kulesi ya da başkent dışındaki sandık).
@@ -2882,14 +2882,25 @@ async function blkPatrol(p) {
     }
     if (!b.route.length) {
       blk[u] = null;
-      awayL[u] = Math.max(0, awayL[u] - blkN(b));
+      awayL[u] = Math.max(0, awayL[u] - (b.home ? 0 : blkN(b)));
       if (p == 0)
         hl += ' Bombardıman rotasında düşman kıyısı kalmadı, büyük gemin iskeleye döndü.';
       continue;
     }
     const i0 = b.route.indexOf(b.t);
-    // Sıradaki kıyılardan vurulacak bir şey olanı (asker ya da sur) seç; hiçbiri yoksa sıradakine geç.
-    const worth = x => arm[x] > 1 || wall[x] > 0;
+    // Onarımdan dönen filo iskeleden yola çıkar.
+    if (b.home) {
+      b.home = false;
+      b.moving = false;
+      awayL[u] += blkN(b);
+      [b.x, b.y] = dockSea(u);
+      if (blkN(b) > 1)
+        [b.x2, b.y2] = [b.x, b.y];
+      if (p == 0)
+        hl += ` Onarılan bombardıman gemin ${NM[u]} iskelesinden yeniden yola çıktı.`;
+    }
+    // Sıradaki kıyılardan vurulacak bir şey olanı (asker, sur ya da yapı) seç; hiçbiri yoksa sıradakine geç.
+    const worth = x => arm[x] > 1 || wall[x] > 0 || bar[x] > 0 || mn[x] > 0 || tw[x] > 0 || (dep[x] > 0 && cap[own[x]] != x);
     let kk = ((i0 >= 0 ? i0 : -1) + 1) % b.route.length;
     for (let j = 0; j < b.route.length; j++) {
       const c = (((i0 >= 0 ? i0 : -1) + 1 + j) % b.route.length);
@@ -2898,14 +2909,33 @@ async function blkPatrol(p) {
         break;
       }
     }
-    b.k = kk;
-    const nx = b.route[b.k];
-    const sp = blkSpot(u, nx) || [b.x, b.y];
-    if (nx != b.t || Math.hypot(sp[0] - b.x, sp[1] - b.y) > 2) {
-      // Kıyılar arası geçiş deniz yolundan: burunları dolaşır, karadan geçmez.
-      const pts = seaRoute(b.x, b.y, sp[0], sp[1]);
-      if (!pts)
+    // Deniz yolu bulunamayan kıyı atlanır, sıradaki denenir (gemi takılıp hiç ateş etmeden beklemesin).
+    let pts = null;
+    let nx = b.t;
+    let sp = [b.x, b.y];
+    for (let j = 0; j < b.route.length; j++) {
+      const c = (kk + j) % b.route.length;
+      const x = b.route[c];
+      const s2 = blkSpot(u, x);
+      if (!s2)
         continue;
+      if (x == b.t && Math.hypot(s2[0] - b.x, s2[1] - b.y) <= 2) {
+        nx = x;
+        sp = s2;
+        pts = [];
+        b.k = c;
+        break;
+      }
+      const r2 = seaRoute(b.x, b.y, s2[0], s2[1]);
+      if (r2) {
+        nx = x;
+        sp = s2;
+        pts = r2;
+        b.k = c;
+        break;
+      }
+    }
+    if (pts && pts.length) {
       const vis = Vg.has(nx) || Vg.has(b.t) || p == 0;
       b.moving = true;
       if (vis)
@@ -2916,6 +2946,8 @@ async function blkPatrol(p) {
       if (blkN(b) > 1)
         [b.x2, b.y2] = pairSpot(b.x, b.y, nx);
     }
+    else if (blkN(b) > 1 && (b.x2 == null || Math.hypot(b.x2 - b.x, b.y2 - b.y) < 4))
+      [b.x2, b.y2] = pairSpot(b.x, b.y, nx);
     b.t = nx;
     if (minedBy(nx, p) >= 0) {
       const mm = minedBy(nx, p);
@@ -2925,10 +2957,12 @@ async function blkPatrol(p) {
       await sleep(1200);
       continue;
     }
-    if (arm[nx] > 1 || wall[nx] > 0) {
+    if (worth(nx)) {
       await blkBomb(u);
       await autoGuard(u);
     }
+    else if (p == 0)
+      hl += ` Bombardıman gemin ${NM[nx]} kıyısında vuracak bir şey bulamadı, sıradaki kıyıya geçecek.`;
   }
 }
 let gsk = false;
@@ -3061,6 +3095,9 @@ async function shipDuel(a, ub) {
     b.duel = false;
     dn.bGone = true;
     msg = 'İki gemi de ağır hasar aldı ama batmadı. Hasarlı gemi geri dönerken %35 ihtimalle su alıp batabilir.';
+    // 3. seviye iskelesi olan bombardıman filosu %35 ihtimalle kendiliğinden onarıma döner.
+    if (dk[ub] >= 3 && Math.random() < REPAIRP)
+      b.toRepair = true;
   }
   if (camOK) {
     $('log').textContent = msg;
@@ -3079,6 +3116,35 @@ async function shipDuel(a, ub) {
   dn.aGone = true;
   if (sink != 1)
     await shipHome(a, P0, sink == 0, COL[p], PN[p]);
+  if (blk[ub] && blk[ub].toRepair)
+    await blkRepairGo(ub);
+}
+// Hasarlı bombardıman filosu onarım için iskelesine döner (yolda batmaz); iskelede tamir olur ve
+// sahibinin bir sonraki turunda kendiliğinden kaldığı kıyıya geri gelip bombardımana devam eder.
+const REPAIRP = .35;
+async function blkRepairGo(u) {
+  const b = blk[u];
+  if (!b)
+    return;
+  b.toRepair = false;
+  const [dx0, dy0] = dockSea(u);
+  const pts = seaRoute(b.x, b.y, dx0, dy0);
+  b.moving = true;
+  b.home = true;
+  if (pts && (b.p == 0 || Vg.has(u) || Vg.has(b.t)))
+    await sleep(pathNav(pts, COL[b.p], true, 3200, blkN(b)));
+  awayL[u] = Math.max(0, awayL[u] - blkN(b));
+  b.hp = SHIPHP;
+  b.hp2 = SHIPHP;
+  b.dmg = false;
+  b.dmg2 = false;
+  const msg = b.p == 0 ? `Hasarlı bombardıman gemin onarım için ${NM[u]} iskelesine döndü. Gelecek tur onarılmış olarak ${NM[b.t]} kıyısına geri gidecek.` : `${PN[b.p]} hasarlı gemisi onarım için iskelesine çekildi; gelecek tur geri gelecek.`;
+  if (b.p == 0 || own[b.t] == 0) {
+    $('log').textContent = msg;
+    if (turn != 0)
+      hl += ' ' + msg;
+  }
+  ui();
 }
 // İskele koruması: düşman gemisi bir iskelenin koruma alanındaki (iskele + yanındaki 2 kıyı) bir bölgeyi
 // bombalarsa, o iskeledeki büyük gemi kendiliğinden gemi savaşına çıkar.
@@ -3109,6 +3175,13 @@ async function blkRecall(u) {
   const b = blk[u];
   if (!b)
     return;
+  // Onarımdaki filo zaten iskelede
+  if (b.home) {
+    blk[u] = null;
+    if (b.p == 0)
+      $('log').textContent = `Bombardıman bitti; gemin ${NM[u]} iskelesinde.`;
+    return;
+  }
   const sp = seaPath(u, b.t);
   blk[u] = null;
   const [dx0, dy0] = dockSea(u);
@@ -3296,7 +3369,7 @@ function blkClean() {
     if (blk[u] && !blkOK(u)) {
       const b = blk[u];
       blk[u] = null;
-      awayL[u] = Math.max(0, awayL[u] - blkN(b));
+      awayL[u] = Math.max(0, awayL[u] - (b.home ? 0 : blkN(b)));
       if (b.p == 0 && own[u] == 0)
         hl += ` ${NM[b.t]} bombardımanı bitti.`;
     }
@@ -3406,7 +3479,7 @@ async function escortFire(a, t) {
   if (!vol.hits)
     fl.push({ t, dx: 0, txt: 'Iskaladı', col: '#cfd8dc', t0: performance.now() });
   if (k > 0)
-    fl.push({ t, dx: 0, txt: visSet().has(t) ? `-${k} top` : 'Top!', col: '#ff6b6b', t0: performance.now() });
+    fl.push({ t, dx: 0, txt: visSet().has(t) ? `-${k} vuruldu` : 'Vuruldu!', col: '#ff6b6b', t0: performance.now() });
   ui();
   await sleep(dur * .5);
   return k;
@@ -7308,7 +7381,7 @@ async function navalStrike(u, t, sailOut) {
   arm[t] -= k;
   const vs = visSet().has(t);
   if (k > 0)
-    fl.push({ t, dx: 0, txt: vs ? `-${k}` : 'Top!', col: '#ff6b6b', t0: performance.now() });
+    fl.push({ t, dx: 0, txt: vs ? `-${k} vuruldu` : 'Vuruldu!', col: '#ff6b6b', t0: performance.now() });
   else if (!vol.hits)
     fl.push({ t, dx: 0, txt: 'Iskaladı', col: '#cfd8dc', t0: performance.now() });
   $('log').textContent = !vol.hits ? `${PN[owner]} gemilerinin gülleleri ${NM[t]} açıklarında denize düştü, ıskaladı.` : `${PN[owner]} gemileri ${NM[t]} bölgesini bombaladı${vs ? `: ${k} asker vuruldu` : ''}.`;
@@ -11421,60 +11494,194 @@ function mineAnim(X, Y, s, lv) {
   g.arc(cx + 2.2, 9.3, 1.4, 0, 7);
   g.fill();
   g.restore();
-  // Kazmacı: tepenin yanında kayayı kazar
-  const pp = (s * 1.4) % 1;
-  const swg = pp < .4 ? pp / .4 : 1 - (pp - .4) / .6;
-  const mx = -56;
-  g.strokeStyle = '#3a2c22';
-  g.lineWidth = 2.2;
-  g.beginPath();
-  g.moveTo(mx, 4);
-  g.lineTo(mx - 2, 10.5);
-  g.moveTo(mx, 4);
-  g.lineTo(mx + 2, 10.5);
-  g.stroke();
-  g.fillStyle = '#7a6a55';
-  g.fillRect(mx - 2.6, -3, 5.2, 7.5);
-  g.fillStyle = '#f1d3b0';
-  g.beginPath();
-  g.arc(mx, -5.6, 2.6, 0, 7);
-  g.fill();
-  g.fillStyle = '#f2b134';
-  g.beginPath();
-  g.arc(mx, -6.4, 2.9, Math.PI, 0);
-  g.fill();
-  g.fillStyle = '#fff3a0';
-  g.fillRect(mx + 1.6, -7.6, 1.6, 1.6);
-  const a = -1.9 + swg * 2.2;
-  const hx = mx + 1.5;
-  const hy = -1.5;
-  const ex = hx + Math.cos(a) * 9;
-  const ey = hy + Math.sin(a) * 9;
-  g.strokeStyle = '#a9744f';
-  g.lineWidth = 1.8;
-  g.beginPath();
-  g.moveTo(hx, hy);
-  g.lineTo(ex, ey);
-  g.stroke();
-  g.strokeStyle = '#cfd6da';
-  g.lineWidth = 2;
-  g.beginPath();
-  g.moveTo(ex - Math.sin(a) * 3.5, ey + Math.cos(a) * 3.5);
-  g.lineTo(ex + Math.sin(a) * 3.5, ey - Math.cos(a) * 3.5);
-  g.stroke();
-  if (pp > .38 && pp < .62) {
-    const k = (pp - .38) / .24;
-    g.globalAlpha = 1 - k;
-    for (let i = 0; i < 5; i++) {
-      const an = -1.2 + i * .6;
-      g.fillStyle = i % 2 ? '#ffd36b' : '#fff6d6';
-      g.fillRect(-49 + Math.cos(an) * k * 8, 4 + Math.sin(an) * k * 8 - k * 4, 1.8, 1.8);
+  // Kazmacı: gerçek oranlı, eklemli bir madenci. Kazmayı başının üstüne kaldırırken geriye yaslanır,
+  // hızlanarak indirir, darbe anında dizleri bükülür ve öne eğilir; sonra doğrulup yeniden kaldırır.
+  {
+    const per = (s * .8) % 1;
+    const sm = x => x * x * (3 - 2 * x);
+    // t: 0 = kazma tepede, 1 = kayaya vurmuş
+    let t;
+    if (per < .42)
+      t = 1 - sm(per / .42);
+    else if (per < .54)
+      t = 0;
+    else if (per < .66) {
+      const k = (per - .54) / .12;
+      t = k * k;
     }
-    g.fillStyle = 'rgba(200,190,170,.6)';
+    else if (per < .74)
+      t = 1 - Math.sin((per - .66) / .08 * Math.PI) * .05;
+    else
+      t = 1;
+    const imp = per >= .66 && per < .8 ? 1 - (per - .66) / .14 : 0;
+    const L = (a, b, u) => a + (b - a) * u;
+    const mx = -62;
+    const gy = 10.6;
+    const cr = t;
+    // Kalça, gövde eğimi, omuz, baş
+    const hip = [mx + .4 + cr * .9, 1.4 + cr * 1.3];
+    const tilt = L(-.15, .35, t);
+    const TL = 7.4;
+    const sh = [hip[0] + Math.sin(tilt) * TL, hip[1] - Math.cos(tilt) * TL];
+    const nk = [sh[0] + Math.sin(tilt) * 1.2, sh[1] - Math.cos(tilt) * 1.2];
+    const hd = [nk[0] + Math.sin(tilt * .7) * 2.4 + .3, nk[1] - Math.cos(tilt * .7) * 2.4];
+    // İki kemikli ters kinematik: kök, uç, uzunluklar ve dirseğin/dizin bükülme yönü
+    const ik = (r, e, l1, l2, dir) => {
+      let dx = e[0] - r[0];
+      let dy = e[1] - r[1];
+      let d = Math.hypot(dx, dy) || .001;
+      const dm = Math.min(d, l1 + l2 - .01);
+      const a0 = Math.atan2(dy, dx);
+      const c = Math.max(-1, Math.min(1, (l1 * l1 + dm * dm - l2 * l2) / (2 * l1 * dm)));
+      const a1 = a0 + dir * Math.acos(c);
+      return [r[0] + Math.cos(a1) * l1, r[1] + Math.sin(a1) * l1];
+    };
+    const limb = (pts, w, col) => {
+      g.strokeStyle = col;
+      g.lineWidth = w;
+      g.beginPath();
+      g.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++)
+        g.lineTo(pts[i][0], pts[i][1]);
+      g.stroke();
+    };
+    // Bacaklar: arkadaki düz, öndeki dizden bükülü (darbede daha çok)
+    const fB = [mx - 3.3, gy];
+    const fF = [mx + 3.6, gy];
+    const kB = ik(hip, [fB[0], fB[1] - .7], 4.9, 4.7, -1);
+    const kF = ik(hip, [fF[0], fF[1] - .7], 4.9, 4.7, -1);
+    limb([hip, kB, [fB[0], fB[1] - .7]], 2.1, '#2f2b28');
+    g.fillStyle = '#1e1813';
     g.beginPath();
-    g.arc(-49, 5, 2 + k * 5, 0, 7);
+    g.ellipse(fB[0] + .5, gy - .5, 1.6, .8, 0, 0, 7);
     g.fill();
-    g.globalAlpha = 1;
+    // Kazma: tutamak açısı ve ellerin konumu
+    const ang = L(-2.25, .45, t);
+    const hUp = [sh[0] - 1, sh[1] - 5];
+    const hDn = [sh[0] + 3.2, sh[1] + 4.2];
+    const arc = Math.sin(t * Math.PI) * 2.2;
+    const h1 = [L(hUp[0], hDn[0], t) + arc * .4, L(hUp[1], hDn[1], t) - arc];
+    const dvx = Math.cos(ang);
+    const dvy = Math.sin(ang);
+    const h2 = [h1[0] + dvx * 3.2, h1[1] + dvy * 3.2];
+    const HL = 9;
+    const tip = [h1[0] + dvx * HL, h1[1] + dvy * HL];
+    // Arka kol (gövdenin arkasında, daha koyu)
+    const eB = ik(sh, h1, 4.3, 4.1, 1);
+    limb([sh, eB, h1], 1.8, '#5e4530');
+    // Gövde: omuzda geniş, belde dar; yelek ve kemer
+    const nx = Math.cos(tilt);
+    const ny = Math.sin(tilt);
+    g.fillStyle = '#76583a';
+    g.beginPath();
+    g.moveTo(sh[0] - nx * 2.3, sh[1] - ny * 2.3);
+    g.lineTo(sh[0] + nx * 2.3, sh[1] + ny * 2.3);
+    g.lineTo(hip[0] + nx * 1.7, hip[1] + ny * 1.7);
+    g.lineTo(hip[0] - nx * 1.8, hip[1] - ny * 1.8);
+    g.closePath();
+    g.fill();
+    g.fillStyle = '#4e3a28';
+    g.beginPath();
+    g.moveTo(sh[0] - nx * 2.3, sh[1] - ny * 2.3);
+    g.lineTo(sh[0] - nx * .6, sh[1] - ny * .6);
+    g.lineTo(hip[0] - nx * .5, hip[1] - ny * .5);
+    g.lineTo(hip[0] - nx * 1.8, hip[1] - ny * 1.8);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = '#2a1d12';
+    g.lineWidth = 1.1;
+    g.beginPath();
+    g.moveTo(hip[0] - nx * 1.9 - ny * .9, hip[1] - ny * 1.9 + nx * .9 - .2);
+    g.lineTo(hip[0] + nx * 1.8 - ny * .9, hip[1] + ny * 1.8 + nx * .9 - .2);
+    g.stroke();
+    // Ön bacak gövdenin önünde
+    limb([hip, kF, [fF[0], fF[1] - .7]], 2.2, '#3a3531');
+    g.fillStyle = '#241c16';
+    g.beginPath();
+    g.ellipse(fF[0] + .7, gy - .5, 1.7, .85, 0, 0, 7);
+    g.fill();
+    // Boyun ve baş: yüz sağa bakar, burun ve çene çizgisi, sakal gölgesi
+    limb([sh, nk], 1.4, '#c99673');
+    g.fillStyle = '#d9a982';
+    g.beginPath();
+    g.ellipse(hd[0], hd[1], 2.05, 2.45, tilt * .5, 0, 7);
+    g.fill();
+    g.fillStyle = '#c4916c';
+    g.beginPath();
+    g.moveTo(hd[0] + 1.8, hd[1] - .1);
+    g.lineTo(hd[0] + 2.35, hd[1] + .45);
+    g.lineTo(hd[0] + 1.85, hd[1] + .6);
+    g.closePath();
+    g.fill();
+    g.fillStyle = 'rgba(70,48,32,.4)';
+    g.beginPath();
+    g.ellipse(hd[0] + .7, hd[1] + 1.55, 1.15, .6, tilt * .5, 0, 7);
+    g.fill();
+    g.fillStyle = '#20160f';
+    g.fillRect(hd[0] + 1, hd[1] - .5, .7, .6);
+    // Deri başlık, siperlik ve küçük kandil
+    g.fillStyle = '#8a6434';
+    g.beginPath();
+    g.ellipse(hd[0] - .1, hd[1] - 1.1, 2.35, 1.75, tilt * .5, Math.PI, 0);
+    g.fill();
+    g.strokeStyle = '#5e4220';
+    g.lineWidth = .9;
+    g.beginPath();
+    g.moveTo(hd[0] - 2.4, hd[1] - .9);
+    g.lineTo(hd[0] + 3, hd[1] - .9 + tilt * .9);
+    g.stroke();
+    if (lv >= 2) {
+      g.fillStyle = '#ffe28a';
+      g.beginPath();
+      g.arc(hd[0] + 1.6, hd[1] - 2.2, .75, 0, 7);
+      g.fill();
+    }
+    // Kazma: ahşap sap ve kavisli demir baş (iki sivri uç)
+    g.strokeStyle = '#8c6239';
+    g.lineWidth = 1.5;
+    g.beginPath();
+    g.moveTo(h1[0] - dvx * 1.2, h1[1] - dvy * 1.2);
+    g.lineTo(tip[0], tip[1]);
+    g.stroke();
+    const px = -dvy;
+    const py = dvx;
+    g.fillStyle = '#9aa3a8';
+    g.strokeStyle = '#4b5256';
+    g.lineWidth = .5;
+    g.beginPath();
+    g.moveTo(tip[0] + px * 3.6 - dvx * 1.6, tip[1] + py * 3.6 - dvy * 1.6);
+    g.quadraticCurveTo(tip[0] + px * 2 + dvx * 1.4, tip[1] + py * 2 + dvy * 1.4, tip[0] + dvx * .9, tip[1] + dvy * .9);
+    g.quadraticCurveTo(tip[0] - px * 2 + dvx * 1.4, tip[1] - py * 2 + dvy * 1.4, tip[0] - px * 3.6 - dvx * 1.6, tip[1] - py * 3.6 - dvy * 1.6);
+    g.quadraticCurveTo(tip[0] - px * 2 + dvx * .2, tip[1] - py * 2 + dvy * .2, tip[0] - dvx * .7, tip[1] - dvy * .7);
+    g.quadraticCurveTo(tip[0] + px * 2 + dvx * .2, tip[1] + py * 2 + dvy * .2, tip[0] + px * 3.6 - dvx * 1.6, tip[1] + py * 3.6 - dvy * 1.6);
+    g.closePath();
+    g.fill();
+    g.stroke();
+    // Ön kol (her şeyin önünde), eller sapı kavrar
+    const eF = ik(sh, h2, 4.3, 4.1, 1);
+    limb([sh, eF, h2], 1.9, '#7d5d3e');
+    g.fillStyle = '#d9a982';
+    g.beginPath();
+    g.arc(h1[0], h1[1], .95, 0, 7);
+    g.arc(h2[0], h2[1], .95, 0, 7);
+    g.fill();
+    // Darbe: kazmanın ucunda kıvılcım, altın kırıntısı ve toz
+    if (imp > 0) {
+      const k = 1 - imp;
+      const ix = tip[0] + px * 3.6 - dvx * 1.6;
+      const iy = tip[1] + py * 3.6 - dvy * 1.6;
+      g.globalAlpha = imp;
+      for (let i = 0; i < 6; i++) {
+        const an = -2.4 + i * .55;
+        g.fillStyle = i % 2 ? '#ffd36b' : '#fff6d6';
+        g.fillRect(ix + Math.cos(an) * k * 9, iy + Math.sin(an) * k * 9 + k * k * 5, 1.5, 1.5);
+      }
+      g.fillStyle = 'rgba(200,190,170,.55)';
+      g.beginPath();
+      g.arc(ix + 1, iy, 1.5 + k * 5, 0, 7);
+      g.fill();
+      g.globalAlpha = 1;
+    }
   }
   // Seviye 3: tepede vinç ve kova; madenden altınlar fırlar
   if (lv >= 3) {
@@ -13040,14 +13247,14 @@ function openPop(cx, cy) {
       if (shL[t] > 0)
         o.push(['sf', sfire[t] ? 'Toplar yorgun' : bigFree(t) ? `Top ateşi (${bigFree(t)} gemi)` : 'Büyük gemi ablukada', !sfire[t] && bigFree(t) > 0]);
       if (shL[t] > 0)
-        o.push(blk[t] ? ['abx', `💣 Bombardıman: ${NM[blk[t].t]} (${blk[t].route.indexOf(blk[t].t) + 1}/${blk[t].route.length})${blk[t].dmg ? ' · hasarlı' : ''} · geri çağır`, true] : ['ab', sfire[t] ? '💣 Kıyı bombardımanı (gemiler yorgun)' : '💣 Kıyı bombardımanı', !sfire[t] && bigFree(t) > 0]);
+        o.push(blk[t] ? ['abx', `💣 Bombardıman: ${NM[blk[t].t]} (${blk[t].route.indexOf(blk[t].t) + 1}/${blk[t].route.length})${blk[t].home ? ' · iskelede onarımda' : blk[t].dmg ? ' · hasarlı' : ''} · geri çağır`, true] : ['ab', sfire[t] ? '💣 Kıyı bombardımanı (gemiler yorgun)' : '💣 Kıyı bombardımanı', !sfire[t] && bigFree(t) > 0]);
       if (shL[t] > 0)
         o.push(['gs', foeShips(0, t).length ? '⚔️ Gemi savaşı: düşman gemisine saldır' : '⚔️ Gemi savaşı (denizde düşman gemisi yok)', !sfire[t] && bigFree(t) > 0 && foeShips(0, t).length > 0]);
       if (dk[t] >= 3)
         o.push(['mn', mine[t] ? 'Mayın tarlası döşeli' : `Mayın döşe (${MNC} altın)`, !mine[t] && gold[0] >= MNC]);
       if (shS[t] > 0)
         o.push(['sc', 'Keşif seferi', shUsed[t] < shS[t]]);
-      inf.d += ` İskele sv${dk[t]}.${dk[t] >= 3 ? ` Mayınlar bu bölgenin ve en yakın 2 komşu kıyı bölgenin açıklarını korur; çıkarma ya da bombardıman için gelen düşman gemileri batar. Mayın tarlası bir kez patlar.${mine[t] ? ' (Döşeli)' : ''}` : ''} Gemiler: ${shS[t]} küçük (her biri ${CAPS} yer: asker ve okçu 1, mancınık 5 yer), ${shL[t]} büyük. Büyük gemi (devlet başına en fazla 2): top atar; 💣 kıyı bombardımanı yapar (iki büyük gemin varsa ikisi yan yana gidip birlikte bombalar, diğer iskeledeki gemi de filoya katılır; seçtiğin düşman kıyısından başlayıp yanındaki 3 kıyıya kadar devriye gezer, her tur birini bombalar, surları döver; geri çağırana ya da batırılana kadar sürer; hasarlı gemi dönüş yolunda %35 ihtimalle batar); 🛡 iskelesini korur (iskele ve yanındaki 2 kıyıdan birini düşman gemisi bombalarsa kendiliğinden saldırır); ⚔️ gemi savaşı yapar (düşman gemisinin yanına gidip top düellosuna girer: %50 ihtimalle gemilerden biri batar, yoksa ikisi de hasar alır); çıkarmalarda küçük gemilere eşlik eder, mayınları temizler ve karaya çıkmadan önce top atar. Çıkarma: bu bölgeyi seçip herhangi bir kıyı bölgesine dokun (deniz aşırı fetihte +${LOOT} yağma); kendi kıyı bölgene dokunursan asker, okçu ve mancınık taşırsın.`;
+      inf.d += ` İskele sv${dk[t]}.${dk[t] >= 3 ? ` Mayınlar bu bölgenin ve en yakın 2 komşu kıyı bölgenin açıklarını korur; çıkarma ya da bombardıman için gelen düşman gemileri batar. Mayın tarlası bir kez patlar.${mine[t] ? ' (Döşeli)' : ''} Onarım: gemi savaşında hasar alan bombardıman gemin %35 ihtimalle kendiliğinden bu iskeleye dönüp tamir olur, sonraki tur kaldığı kıyıya geri gider.` : ''} Gemiler: ${shS[t]} küçük (her biri ${CAPS} yer: asker ve okçu 1, mancınık 5 yer), ${shL[t]} büyük. Büyük gemi (devlet başına en fazla 2): top atar; 💣 kıyı bombardımanı yapar (iki büyük gemin varsa ikisi yan yana gidip birlikte bombalar, diğer iskeledeki gemi de filoya katılır; seçtiğin düşman kıyısından başlayıp yanındaki 3 kıyıya kadar devriye gezer, her tur birini bombalar, surları döver; geri çağırana ya da batırılana kadar sürer; hasarlı gemi dönüş yolunda %35 ihtimalle batar); 🛡 iskelesini korur (iskele ve yanındaki 2 kıyıdan birini düşman gemisi bombalarsa kendiliğinden saldırır); ⚔️ gemi savaşı yapar (düşman gemisinin yanına gidip top düellosuna girer: %50 ihtimalle gemilerden biri batar, yoksa ikisi de hasar alır; bombardım gemisi en geç 2. düelloda batar); çıkarmalarda küçük gemilere eşlik eder, mayınları temizler ve karaya çıkmadan önce top atar. Çıkarma: bu bölgeyi seçip herhangi bir kıyı bölgesine dokun (deniz aşırı fetihte +${LOOT} yağma); kendi kıyı bölgene dokunursan asker, okçu ve mancınık taşırsın.`;
     }
     o.push(tw[t] ? ['uw', tw[t] >= 2 ? 'Okçu Kulesi seviye 2 (tam)' : `Kuleyi yükselt: Sv2 alevli oklar (${TW2} altın)`, tw[t] < 2 && gold[0] >= TW2] : ['u', `Okçu Kulesi (${TWC} altın)`, gold[0] >= TWC]);
     if (tw[t])
