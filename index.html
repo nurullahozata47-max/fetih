@@ -6160,6 +6160,10 @@ function drawNav(now) {
       drawCharge(e, Math.min(1, u), s);
       return;
     }
+    if (e.k == 'volley') {
+      drawArrowCharge(g, e, Math.min(1, u), s);
+      return;
+    }
     if (e.k == 'duel') {
       // Top düellosu: iki gemi yan yana, altı yaylım sırayla; her yaylımda üç top. Namlu alevi ışıldar,
       // duman bulutları süzülür, gülleler iz bırakır; isabette kıymık ve kıvılcım, ıskada su sütunu.
@@ -8029,10 +8033,13 @@ async function battle(a, t, sea, F) {
     // Hücum: saldıranlar koşar, sınırda savunanlarla çarpışır; kazanan taraf ayakta kalır.
     const A0 = F != null ? F : arm[a] - 1;
     const mine0 = own[a] == 0 || own[t] == 0;
-    const dur = mine0 ? 1500 : 950;
     const [ax, ay] = [cen[a][0] * S, cen[a][1] * S];
     const [tx, ty] = [cen[t][0] * S, cen[t][1] * S];
-    nav.push({ k: 'charge', ax, ay, tx, ty, win: w, na: Math.min(6, 3 + Math.floor(A0 / 8)), nd: Math.min(5, 2 + Math.floor(arm[t] / 8)), ca: COL[own[a]], cd: COL[own[t]] || '#9aa3a8', seed: 1 + Math.floor(Math.random() * 90), t0: performance.now(), dur });
+    // Saldırılan yerin yanındaki (saldıran) bölgede okçu varsa: ok yağmuru ve hücum; yoksa piyade hücumu.
+    const vol = arch[a] > 0;
+    const dur = vol ? (mine0 ? 1900 : 1200) : (mine0 ? 1500 : 950);
+    const nr = Math.min(3, arch[a] + 1);
+    nav.push({ k: vol ? 'volley' : 'charge', ax, ay, tx, ty, win: w, na: Math.min(vol ? 4 : 6, 3 + Math.floor(A0 / 8)), nd: Math.min(5, 2 + Math.floor(arm[t] / 8)), nr, nArrow: nr * 4, ca: COL[own[a]], cd: COL[own[t]] || '#9aa3a8', seed: 1 + Math.floor(Math.random() * 90), t0: performance.now(), dur });
     await sleep(dur - 120);
   }
   $('log').textContent = `${PN[own[a]]}: ${NM[a]} → ${NM[t]} ${w ? 'fethedildi' : 'savunuldu'}${k1 + k2 > 0 ? ` (okçu desteği: ${visSet().has(t) ? k1 : '?'} savunucu, ${k2} saldıran vuruldu)` : ''}`;
@@ -11521,6 +11528,148 @@ function drawCharge(e, u, s) {
       }
     }
     g.globalAlpha = 1;
+  }
+}
+// Okçu: yay gerer, bırakır. pull 0..1 (gerilme), f yön
+function drawArcher(g,x,y,f,col,pull,aim){
+  g.save();g.translate(x,y);g.scale(f,1);g.lineCap='round';
+  const D='rgba(15,18,20,.85)';
+  const leg=(x0,x1,w,c)=>{g.strokeStyle=c;g.lineWidth=w;g.beginPath();g.moveTo(0,-3.4);g.lineTo(x0,-1.6);g.lineTo(x1,0);g.stroke();};
+  leg(-1.2,-2.2,2.4,D);leg(1.4,2.4,2.4,D);leg(-1.2,-2.2,1.4,'#3b332c');leg(1.4,2.4,1.4,'#4a4038');
+  g.strokeStyle=D;g.lineWidth=3.6;g.beginPath();g.moveTo(0,-3.4);g.lineTo(-.3,-7.3);g.stroke();
+  g.strokeStyle=col;g.lineWidth=2.5;g.beginPath();g.moveTo(0,-3.4);g.lineTo(-.3,-7.3);g.stroke();
+  // ok kılıfı
+  g.strokeStyle='#6b4a2f';g.lineWidth=1.3;g.beginPath();g.moveTo(-1.4,-4.5);g.lineTo(-2.2,-8.2);g.stroke();
+  g.strokeStyle='#dfe6ea';g.lineWidth=.5;g.beginPath();g.moveTo(-2.1,-8.2);g.lineTo(-2.4,-9);g.moveTo(-1.7,-8.1);g.lineTo(-1.8,-9);g.stroke();
+  // yay: yukarı doğru nişan (aim açısı)
+  const a=-aim;const hx=-.1+Math.cos(a)*4,hy=-6.6+Math.sin(a)*4;
+  const nx=-Math.sin(a),ny=Math.cos(a);
+  g.strokeStyle='#e7c9a6';g.lineWidth=1.1;g.beginPath();g.moveTo(-.2,-6.8);g.lineTo(hx,hy);g.stroke();
+  const pb=pull*3.2;const bx=hx-Math.cos(a)*pb,by=hy-Math.sin(a)*pb;
+  g.strokeStyle='#e7c9a6';g.beginPath();g.moveTo(-.2,-6.8);g.lineTo(bx,by);g.stroke();
+  // yay kavisi
+  g.strokeStyle='#7a5230';g.lineWidth=1;g.beginPath();g.moveTo(hx+nx*3.6,hy+ny*3.6);g.quadraticCurveTo(hx+Math.cos(a)*2.2,hy+Math.sin(a)*2.2,hx-nx*3.6,hy-ny*3.6);g.stroke();
+  g.strokeStyle='rgba(240,240,230,.9)';g.lineWidth=.4;g.beginPath();g.moveTo(hx+nx*3.5,hy+ny*3.5);g.lineTo(bx,by);g.lineTo(hx-nx*3.5,hy-ny*3.5);g.stroke();
+  if(pull>.05){g.strokeStyle='#8c6239';g.lineWidth=.6;g.beginPath();g.moveTo(bx,by);g.lineTo(bx+Math.cos(a)*6.5,by+Math.sin(a)*6.5);g.stroke();}
+  g.fillStyle='#e7c9a6';g.beginPath();g.arc(.1,-9.2,1.45,0,7);g.fill();
+  g.fillStyle='#3c4a2e';g.beginPath();g.arc(.1,-9.5,1.55,Math.PI,0);g.fill();
+  g.restore();
+}
+// Kalkanını başının üstüne kaldırmış savunan (shUp 0..1)
+function drawShieldMan(g,x,y,f,col,shUp,fall,al,ph,swing){
+  if(shUp<=.02){drawSoldier(x,y,col,f,ph,swing,fall,al,true);return;}
+  if(al<=0)return;
+  g.save();g.globalAlpha=al;g.translate(x,y);g.scale(f,1);if(fall)g.rotate(-fall*1.45);g.lineCap='round';
+  const D='rgba(15,18,20,.85)';const kn=shUp*.9;
+  g.strokeStyle=D;g.lineWidth=2.4;g.beginPath();g.moveTo(-1.4,0);g.lineTo(-.9,-1.8+kn*.3);g.lineTo(0,-3.2+kn);g.moveTo(1.6,0);g.lineTo(1.6+kn,-1.8);g.lineTo(0,-3.2+kn);g.stroke();
+  g.strokeStyle='#3b332c';g.lineWidth=1.4;g.beginPath();g.moveTo(-1.4,0);g.lineTo(-.9,-1.8+kn*.3);g.lineTo(0,-3.2+kn);g.moveTo(1.6,0);g.lineTo(1.6+kn,-1.8);g.lineTo(0,-3.2+kn);g.stroke();
+  g.strokeStyle=D;g.lineWidth=3.6;g.beginPath();g.moveTo(0,-3.2+kn);g.lineTo(.6,-6.9+kn);g.stroke();
+  g.strokeStyle=col;g.lineWidth=2.5;g.beginPath();g.moveTo(0,-3.2+kn);g.lineTo(.6,-6.9+kn);g.stroke();
+  g.fillStyle='#e7c9a6';g.beginPath();g.arc(1,-8.6+kn,1.4,0,7);g.fill();
+  g.fillStyle='#4d5459';g.beginPath();g.arc(1,-8.9+kn,1.5,Math.PI,0);g.fill();
+  // kalkan: başın üstünde yatay oval
+  const sx=1.4,sy=-6.9+kn-2.6*shUp-1.2;
+  g.strokeStyle='#e7c9a6';g.lineWidth=1;g.beginPath();g.moveTo(.8,-6.2+kn);g.lineTo(sx,sy+.6);g.stroke();
+  g.fillStyle=D;g.beginPath();g.ellipse(sx,sy,3.4,1.25+1.2*(1-shUp),-.15*(1-shUp),0,7);g.fill();
+  g.fillStyle=col;g.beginPath();g.ellipse(sx,sy,2.8,.8+1.1*(1-shUp),-.15*(1-shUp),0,7);g.fill();
+  g.fillStyle='rgba(255,255,255,.25)';g.beginPath();g.arc(sx,sy,.6,0,7);g.fill();
+  g.restore();
+}
+// Ok yağmuru ve hücum: saldıran bölgede okçu varsa okçular önce yay gerip ok yağdırır, savunanlar kalkan kaldırır,
+// sonra kılıçlılar hücum eder.
+function drawArrowCharge(g,e,u,s){
+  const sm=x=>x*x*(3-2*x);const H=(i,j)=>hsh(i,j,e.seed);
+  const dx=e.tx-e.ax,dy=e.ty-e.ay,L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L,px=-uy,py=ux;
+  const mx=e.ax+dx*.52,my=e.ay+dy*.52;const fA=ux>=0?1:-1;
+  const tRel=.26,tLand=.44,tRun=.42,tMeet=.66;
+  const figs=[];
+  // savunanlar
+  const dpos=[];
+  for(let i=0;i<e.nd;i++){
+    const o=(i-(e.nd-1)/2)*7+(H(i,3)-.5)*2;const bk=(i%2)*5;
+    dpos.push([mx+ux*(5+bk)+px*o,my+uy*(5+bk)+py*o]);
+  }
+  const volleyHit=e.win?0:-1;
+  dpos.forEach(([x0,y0],i)=>{
+    let x=x0,y=y0;
+    const shUp=u<.12?0:u<tLand+.12?sm(Math.min(1,(u-.12)/.12)):u<tMeet-.06?1-sm((u-(tLand+.12))/.1):0;
+    const lose=e.win;
+    // biri oklarla düşer (kazanırsan), çatışmada kaybedenlerin çoğu
+    const arrowDie=e.win&&i==e.nd-1;
+    const dies=arrowDie||(lose?i<Math.ceil(e.nd*.7):false);
+    const tf=arrowDie?tLand+.03:tMeet+.04+H(i,5)*.15;
+    const fall=dies?sm(Math.max(0,Math.min(1,(u-tf)/.12))):0;
+    let al=dies?1-Math.max(0,(u-tf-.2)/.25):1;
+    const fight=u>tMeet&&u<.86&&!fall;
+    if(fight){x+=ux*-fA*Math.sin(s*14+i*2)*.7;}
+    if(!dies&&u>.84){if(e.win){al=1-sm((u-.84)/.16);}}
+    figs.push(['d',x,y,-fA,shUp*(arrowDie&&u>tLand?0:1),fall,al,fight?s*9+i:0,fight?(Math.sin(s*11+i*1.7)*.5+.5):.2]);
+  });
+  // okçular (arkada) ve kılıçlılar (önde)
+  for(let i=0;i<e.nr;i++){
+    const o=(i-(e.nr-1)/2)*7.5;
+    const x=e.ax-ux*4+px*o,y=e.ay-uy*4+py*o;
+    const pull=u<tRel?sm(Math.min(1,(u-.04)/.18)):Math.max(0,1-(u-tRel)/.05)*0;
+    const al=u>.8?1-sm((u-.8)/.2):1;
+    figs.push(['r',x,y,fA,pull*(u<tRel?1:0),.75,al]);
+  }
+  for(let i=0;i<e.na;i++){
+    const o=(i-(e.na-1)/2)*6.5+(H(i,7)-.5)*2;const bk=(i%2)*5;
+    const sx=e.ax+ux*8+px*o,sy=e.ay+uy*8+py*o;
+    const stx=mx-ux*(4+bk)+px*o*.8,sty=my-uy*(4+bk)+py*o*.8;
+    const k=sm(Math.max(0,Math.min(1,(u-tRun)/(tMeet-tRun))));
+    let x=sx+(stx-sx)*k,y=sy+(sty-sy)*k;
+    const fight=u>tMeet&&u<.86;
+    if(fight){x+=ux*fA*Math.sin(s*14+i*2)*.7;}
+    const lose=!e.win;const dies=lose?i<Math.ceil(e.na*.7):i==e.na-1&&e.na>2;
+    const tf=tMeet+.04+H(i,11)*.15;
+    const fall=dies?sm(Math.max(0,Math.min(1,(u-tf)/.12))):0;
+    let al=dies?1-Math.max(0,(u-tf-.2)/.25):1;
+    if(!dies&&u>.84){const q=sm((u-.84)/.16);const fw=e.win?1:-1;x+=ux*fw*q*14;y+=uy*fw*q*14;al=1-q*.9;}
+    const ph=u>tRun&&u<tMeet?u*40+i:fight?s*9+i:0;
+    const sw=fight&&!fall?(Math.sin(s*11+i*1.7)*.5+.5):.2;
+    figs.push(['a',x,y,fA,ph,sw,fall,al]);
+  }
+  // saplanmış oklar (yerde ve kalkanlarda) arkada kalsın diye önce
+  if(u>tLand){
+    for(let k=0;k<e.nArrow;k++){
+      const lx=mx+ux*(4+H(k,31)*12)+px*(H(k,32)-.5)*26,ly=my+uy*(4+H(k,31)*12)+py*(H(k,32)-.5)*26;
+      const al=u>.8?1-(u-.8)/.2:1;g.globalAlpha=al;
+      g.strokeStyle='#6b4a2f';g.lineWidth=.6;g.beginPath();g.moveTo(lx,ly);g.lineTo(lx-fA*1.8,ly-2.6);g.stroke();
+      g.strokeStyle='#e8e2d0';g.lineWidth=.8;g.beginPath();g.moveTo(lx-fA*1.5,ly-2.2);g.lineTo(lx-fA*1.9,ly-2.8);g.stroke();
+    }
+    g.globalAlpha=1;
+  }
+  figs.sort((a,b)=>a[2]-b[2]).forEach(F=>{
+    if(F[0]=='d')drawShieldMan(g,F[1],F[2],F[3],e.cd,F[4],F[5],F[6],F[7],F[8]);
+    else if(F[0]=='r'){g.save();g.globalAlpha=F[6];drawArcher(g,F[1],F[2],F[3],e.ca,F[4],F[5]);g.restore();}
+    else drawSoldier(F[1],F[2],e.ca,F[3],F[4],F[5],F[6],F[7],false);
+  });
+  // uçan oklar: yüksek yay çizerek düşer
+  if(u>tRel&&u<tLand+.02){
+    const q=Math.min(1,(u-tRel)/(tLand-tRel));
+    for(let k=0;k<e.nArrow;k++){
+      const r=k%e.nr;const o=(r-(e.nr-1)/2)*7.5;
+      const x0=e.ax-ux*4+px*o+ux*3,y0=e.ay-uy*4+py*o-8;
+      const x1=mx+ux*(4+H(k,31)*12)+px*(H(k,32)-.5)*26,y1=my+uy*(4+H(k,31)*12)+py*(H(k,32)-.5)*26;
+      const qq=Math.max(0,Math.min(1,q*1.15-H(k,33)*.15));
+      const hgt=34+H(k,34)*10;
+      const X=x0+(x1-x0)*qq,Y=y0+(y1-y0)*qq-Math.sin(qq*Math.PI)*hgt;
+      const vx=(x1-x0),vy=(y1-y0)-Math.cos(qq*Math.PI)*Math.PI*hgt;const vl=Math.hypot(vx,vy)||1;
+      g.strokeStyle='#5a3e26';g.lineWidth=.7;g.beginPath();g.moveTo(X,Y);g.lineTo(X-vx/vl*4.5,Y-vy/vl*4.5);g.stroke();
+      g.strokeStyle='#efe8d6';g.lineWidth=.9;g.beginPath();g.moveTo(X-vx/vl*3.6,Y-vy/vl*3.6);g.lineTo(X-vx/vl*4.6,Y-vy/vl*4.6);g.stroke();
+    }
+  }
+  // kalkanlara saplanma ışıltısı ve çatışma kıvılcımları
+  if(u>tMeet&&u<.86){
+    for(let k=0;k<4;k++){const q=(s*3+k/4)%1;if(q>.35)continue;const sx=mx+(H(k,21)-.5)*16,sy=my-7+(H(k,22)-.5)*8;
+      g.globalAlpha=1-q/.35;g.strokeStyle='#fff1b8';g.lineWidth=.8;
+      for(let j=0;j<3;j++){const an=j*2.1+k;g.beginPath();g.moveTo(sx,sy);g.lineTo(sx+Math.cos(an)*(2+q*6),sy+Math.sin(an)*(2+q*6));g.stroke();}}
+    g.globalAlpha=1;
+    const q=Math.min(1,(u-tMeet)/.3);
+    for(let k=0;k<5;k++){g.globalAlpha=.16*Math.sin(Math.min(1,(u-tMeet)/.34)*Math.PI);g.fillStyle=k%2?'#cbbfa6':'#a99d86';g.beginPath();
+      g.arc(mx+(H(k,1)-.5)*20,my+(H(k,4)-.5)*10-q*4,3+q*(6+H(k,3)*5),0,7);g.fill();}
+    g.globalAlpha=1;
   }
 }
 // ---- Maden: seviyeye göre kazmacı, fener, raylı vagon, vinç ve uçan altınlar ----
