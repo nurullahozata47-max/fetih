@@ -6164,6 +6164,10 @@ function drawNav(now) {
       drawArrowCharge(g, e, Math.min(1, u), s);
       return;
     }
+    if (e.k == 'equal') {
+      drawEqualFight(e, Math.min(1, u), s);
+      return;
+    }
     if (e.k == 'duel') {
       // Top düellosu: iki gemi yan yana, altı yaylım sırayla; her yaylımda üç top. Namlu alevi ışıldar,
       // duman bulutları süzülür, gülleler iz bırakır; isabette kıymık ve kıvılcım, ıskada su sütunu.
@@ -8016,6 +8020,8 @@ async function battle(a, t, sea, F) {
   }
   let A = F != null ? F : arm[a] - 1;
   let D = arm[t];
+  // Asker sayıları birebir eşitse savaş "denk savaş" sahnesiyle gösterilir.
+  const eqB = A == D;
   // Dayanıklılık (savaş zarları): Yüksek bölgenin askeri her kayıpta DURB ihtimalle kurtulur, Zayıf bölgeninki DURB ihtimalle bir asker fazla kaybeder.
   const dA = durCls(a);
   const dD = durCls(t);
@@ -8036,10 +8042,11 @@ async function battle(a, t, sea, F) {
     const [ax, ay] = [cen[a][0] * S, cen[a][1] * S];
     const [tx, ty] = [cen[t][0] * S, cen[t][1] * S];
     // Saldırılan yerin yanındaki (saldıran) bölgede okçu varsa: ok yağmuru ve hücum; yoksa piyade hücumu.
-    const vol = arch[a] > 0;
-    const dur = vol ? (mine0 ? 1900 : 1200) : (mine0 ? 1500 : 950);
+    const vol = arch[a] > 0 && !eqB;
+    const dur = eqB ? (mine0 ? 2600 : 1700) : vol ? (mine0 ? 1900 : 1200) : (mine0 ? 1500 : 950);
     const nr = Math.min(3, arch[a] + 1);
-    nav.push({ k: vol ? 'volley' : 'charge', ax, ay, tx, ty, win: w, na: Math.min(vol ? 4 : 6, 3 + Math.floor(A0 / 8)), nd: Math.min(5, 2 + Math.floor(arm[t] / 8)), nr, nArrow: nr * 4, ca: COL[own[a]], cd: COL[own[t]] || '#9aa3a8', seed: 1 + Math.floor(Math.random() * 90), t0: performance.now(), dur });
+    const [bx, by] = borderPt(a, t);
+    nav.push({ k: eqB ? 'equal' : vol ? 'volley' : 'charge', a, t, bx, by, n: Math.min(4, 2 + Math.floor(A0 / 8)), ax, ay, tx, ty, win: w, na: Math.min(vol ? 4 : 6, 3 + Math.floor(A0 / 8)), nd: Math.min(5, 2 + Math.floor(arm[t] / 8)), nr, nArrow: nr * 4, ca: COL[own[a]], cd: COL[own[t]] || '#9aa3a8', seed: 1 + Math.floor(Math.random() * 90), t0: performance.now(), dur });
     await sleep(dur - 120);
   }
   $('log').textContent = `${PN[own[a]]}: ${NM[a]} → ${NM[t]} ${w ? 'fethedildi' : 'savunuldu'}${k1 + k2 > 0 ? ` (okçu desteği: ${visSet().has(t) ? k1 : '?'} savunucu, ${k2} saldıran vuruldu)` : ''}`;
@@ -11671,6 +11678,177 @@ function drawArrowCharge(g,e,u,s){
       g.arc(mx+(H(k,1)-.5)*20,my+(H(k,4)-.5)*10-q*4,3+q*(6+H(k,3)*5),0,7);g.fill();}
     g.globalAlpha=1;
   }
+}
+// Denk savaş: iki ordu sınırda kilitlenir, cephe bir ileri bir geri gider; sonunda biri öbürünü iter.
+// front(u): cephenin sınırdan uzaklığı (+ = savunanın içine doğru), renk sınırı da onu izler.
+function eqFront(e,u){
+  const sm=x=>x*x*(3-2*x);
+  if(u<.18)return 0;
+  if(u<.78){const k=(u-.18)/.6;// 3 gidiş geliş, giderek sertleşen
+    const amp=5+k*4;return Math.sin(k*Math.PI*6+.4)*amp*(.7+.3*Math.sin(k*17))*(e.win?1:1);}
+  const k=sm(Math.min(1,(u-.78)/.14));const last=Math.sin(Math.PI*6+.4)*9;
+  return last+(e.win?1:-1)*k*20-last*k;
+}
+function drawEqualSoldiers(e,u,s){
+  const sm=x=>x*x*(3-2*x);const H=(i,j)=>hsh(i,j,e.seed);
+  const dx=e.tx-e.ax,dy=e.ty-e.ay,L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L,px=-uy,py=ux;
+  const bx=e.bx,by=e.by;const fA=ux>=0?1:-1;
+  const F=eqFront(e,u);
+  const fx=bx+ux*F,fy=by+uy*F;
+  const lock=u>.18&&u<.86;
+  const figs=[];
+  const n=e.n;
+  for(const A of [true,false]){
+    for(let i=0;i<n;i++){
+      const o=(i-(n-1)/2)*8.2+(H(i,A?3:4)-.5)*1.5;
+      const row=(i%2);const gap=3.4+row*6;
+      const dir=A?1:-1;
+      const sx=(A?e.ax:e.tx)+px*o,sy=(A?e.ay:e.ty)+py*o;
+      const tx=fx-ux*dir*gap+px*o*.85,ty=fy-uy*dir*gap+py*o*.85;
+      const k=sm(Math.min(1,u/.18));
+      let x=sx+(tx-sx)*k,y=sy+(ty-sy)*k;
+      // itişirken hafif sarsıntı
+      if(lock){const j=Math.sin(s*17+i*1.9)*.5;x+=ux*j;y+=uy*j;}
+      const lose=A?!e.win:e.win;
+      const dies=lose&&u>.8&&i<Math.ceil(n*.7);
+      const tf=.82+H(i,9)*.08;
+      const fall=dies?sm(Math.max(0,Math.min(1,(u-tf)/.08))):0;
+      let al=dies?1-Math.max(0,(u-tf-.12)/.12):1;
+      if(!dies&&u>.9){const q=sm((u-.9)/.1);if(!lose){x+=ux*dir*q*10;y+=uy*dir*q*10;}else{x-=ux*dir*q*10;y-=uy*dir*q*10;}al=1-q*.85;}
+      // ön sıra kılıçları kilitli (yarım kaldırılmış, karşıya dönük), arkadakiler bekler
+      const sw=lock?(row==0?.55+Math.sin(s*9+i)*.08:.25):u<.18?.2:(Math.sin(s*11+i)*.5+.5);
+      const ph=u<.18?u*50+i:lock?s*6+i:u*30;
+      figs.push([x,y,A?e.ca:e.cd,A?fA:-fA,ph,sw,fall,al,!A]);
+    }
+  }
+  figs.sort((a,b)=>a[1]-b[1]).forEach(f=>drawSoldier(...f));
+  // kilitlenen kılıçların kıvılcımları (cephe hattında)
+  if(lock){
+    for(let k=0;k<n;k++){const q=(s*2.2+H(k,5))%1;if(q>.3)continue;
+      const o=(k-(n-1)/2)*8.2;const cx=fx+px*o*.85,cy=fy+py*o*.85-6.5;
+      g.globalAlpha=1-q/.3;g.strokeStyle='#fff1b8';g.lineWidth=.7;
+      for(let j=0;j<4;j++){const an=j*1.6+k;g.beginPath();g.moveTo(cx,cy);g.lineTo(cx+Math.cos(an)*(1.5+q*5),cy+Math.sin(an)*(1.5+q*5));g.stroke();}}
+    g.globalAlpha=1;
+  }
+}
+
+// İki bölgenin ortak sınırında, merkezlerin ortasına en yakın nokta (cephe buradan başlar).
+function borderPt(a, t) {
+  const mx = (cen[a][0] + cen[t][0]) / 2;
+  const my = (cen[a][1] + cen[t][1]) / 2;
+  let best = null;
+  let bd = 1e9;
+  for (let i = 0; i < W * H; i++) {
+    if (cell[i] != t)
+      continue;
+    const x = i % W;
+    const y = (i / W) | 0;
+    if (!((x > 0 && cell[i - 1] == a) || (x < W - 1 && cell[i + 1] == a) || (y > 0 && cell[i - W] == a) || (y < H - 1 && cell[i + W] == a)))
+      continue;
+    const d = (x - mx) * (x - mx) + (y - my) * (y - my);
+    if (d < bd) {
+      bd = d;
+      best = [x, y];
+    }
+  }
+  return best ? [(best[0] + .5) * S, (best[1] + .5) * S] : [mx * S, my * S];
+}
+// Bölgenin beyaz maskesi (bir kez çizilir, saklanır).
+function regMask(t) {
+  if (durMK !== cell) {
+    durMK = cell;
+    durM = {};
+  }
+  let m = durM[t];
+  if (m)
+    return m;
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let i = 0; i < W * H; i++)
+    if (cell[i] == t) {
+      const x = i % W;
+      const y = (i / W) | 0;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+  if (x1 < 0)
+    return null;
+  const c = document.createElement('canvas');
+  c.width = (x1 - x0 + 1) * S;
+  c.height = (y1 - y0 + 1) * S;
+  const cg = c.getContext('2d');
+  cg.fillStyle = '#fff';
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++)
+      if (cell[y * W + x] == t)
+        cg.fillRect((x - x0) * S, (y - y0) * S, S, S);
+  m = durM[t] = { c, x: x0 * S, y: y0 * S, k: {} };
+  return m;
+}
+// Denk savaşta cephe kaydıkça renk de kayar: sınırla cephe arasındaki şerit, cepheyi tutan tarafın rengine boyanır.
+let eqTmp = null;
+function drawEqualFight(e, u, s) {
+  const dx = e.tx - e.ax;
+  const dy = e.ty - e.ay;
+  const L = Math.hypot(dx, dy) || 1;
+  const ux = dx / L;
+  const uy = dy / L;
+  const px = -uy;
+  const py = ux;
+  const F = eqFront(e, u);
+  if (Math.abs(F) > .5) {
+    // F > 0: saldıran savunanın bölgesine girdi; F < 0: savunan saldıranın bölgesine taştı
+    const reg = F > 0 ? e.t : e.a;
+    const col = F > 0 ? e.ca : e.cd;
+    const m = regMask(reg);
+    if (m) {
+      if (!eqTmp)
+        eqTmp = document.createElement('canvas');
+      if (eqTmp.width < m.c.width || eqTmp.height < m.c.height) {
+        eqTmp.width = Math.max(eqTmp.width, m.c.width);
+        eqTmp.height = Math.max(eqTmp.height, m.c.height);
+      }
+      const q = eqTmp.getContext('2d');
+      q.globalCompositeOperation = 'source-over';
+      q.clearRect(0, 0, eqTmp.width, eqTmp.height);
+      q.fillStyle = col;
+      // Asıl sınırdan cepheye kadar dalgalı şerit
+      const fx = e.bx + ux * F - m.x;
+      const fy = e.by + uy * F - m.y;
+      const bx = e.bx - ux * (F > 0 ? 40 : -40) - m.x;
+      const by = e.by - uy * (F > 0 ? 40 : -40) - m.y;
+      q.beginPath();
+      const R0 = 120;
+      for (let k = -12; k <= 12; k++) {
+        const w = Math.sin(k * .9 + u * 9) * 1.6;
+        const X = fx + px * k * R0 / 12 + ux * w;
+        const Y = fy + py * k * R0 / 12 + uy * w;
+        k == -12 ? q.moveTo(X, Y) : q.lineTo(X, Y);
+      }
+      q.lineTo(bx + px * R0, by + py * R0);
+      q.lineTo(bx - px * R0, by - py * R0);
+      q.closePath();
+      q.fill();
+      q.globalCompositeOperation = 'destination-in';
+      q.drawImage(m.c, 0, 0);
+      g.globalAlpha = .9;
+      g.drawImage(eqTmp, 0, 0, m.c.width, m.c.height, m.x, m.y, m.c.width, m.c.height);
+      g.globalAlpha = 1;
+    }
+  }
+  // Cephe hattında ince parlak çizgi
+  if (u > .18 && u < .95) {
+    const fx = e.bx + ux * F;
+    const fy = e.by + uy * F;
+    g.strokeStyle = 'rgba(255,255,255,.4)';
+    g.lineWidth = 1.2;
+    g.beginPath();
+    g.moveTo(fx - px * 16, fy - py * 16);
+    g.lineTo(fx + px * 16, fy + py * 16);
+    g.stroke();
+  }
+  drawEqualSoldiers(e, u, s);
 }
 // ---- Maden: seviyeye göre kazmacı, fener, raylı vagon, vinç ve uçan altınlar ----
 function mineAnim(X, Y, s, lv) {
