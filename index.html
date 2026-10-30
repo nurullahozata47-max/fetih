@@ -11869,7 +11869,7 @@ function drawEqualFight(e, u, s) {
       g.drawImage(eqTmp, 0, 0, m.c.width, m.c.height, m.x, m.y, m.c.width, m.c.height);
     }
   }
-  // Asıl sınır: soluk kesik çizgi; cephe hattı: parlayan çizgi
+  // Asıl sınır: soluk kesik çizgi
   if (u > .1 && u < .97) {
     g.save();
     g.setLineDash([3, 3]);
@@ -11880,18 +11880,6 @@ function drawEqualFight(e, u, s) {
     g.lineTo(e.bx + px * 22, e.by + py * 22);
     g.stroke();
     g.restore();
-    const fx = e.bx + ux * F;
-    const fy = e.by + uy * F;
-    g.strokeStyle = 'rgba(255,248,220,.75)';
-    g.lineWidth = 1.6;
-    g.beginPath();
-    for (let k = -8; k <= 8; k++) {
-      const w = Math.sin(k * .9 + u * 9) * 1.6;
-      const X = fx + px * k * 3 + ux * w;
-      const Y = fy + py * k * 3 + uy * w;
-      k == -8 ? g.moveTo(X, Y) : g.lineTo(X, Y);
-    }
-    g.stroke();
   }
   drawEqualSoldiers(e, u, s);
 }
