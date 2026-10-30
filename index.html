@@ -6164,6 +6164,10 @@ function drawNav(now) {
       drawArrowCharge(g, e, Math.min(1, u), s);
       return;
     }
+    if (e.k == 'epic') {
+      drawEpic(e, Math.min(1, u), s);
+      return;
+    }
     if (e.k == 'equal') {
       drawEqualFight(e, Math.min(1, u), s);
       return;
@@ -8007,6 +8011,10 @@ async function battle(a, t, sea, F) {
   // Haritada görünen asker sayıları eşitse (örneğin 3'e 3) savaş "denk savaş" sahnesiyle gösterilir.
   // Okçu atışlarından önceki sayılar esas alınır; seçerek asker gönderdiysen gönderdiğin sayı.
   const eqB = (F != null ? F : arm[a]) == arm[t];
+  // Destansı zafer: rakibin en az iki katı askerine karşı kazanırsan (haritada görünen sayılar).
+  const nA0 = F != null ? F : arm[a];
+  const nD0 = arm[t];
+  const epic = own[a] == 0 && !ONLINE && nA0 > 0 && nD0 >= 2 * nA0;
   const bfx = showB && bfxOn && !sea;
   if (showB && !bfx) {
     nav.push({ k: 'clash', t, t0: performance.now(), dur: 480, col: COL[own[a]] });
@@ -8137,6 +8145,15 @@ async function battle(a, t, sea, F) {
         }
       });
     await conquerFx(a, t, old);
+    if (epic) {
+      // Kamera bölgeyi ortalar; sahne ekranda her yakınlıkta aynı büyüklükte görünür
+      focusOn(t);
+      await sleep(250);
+      const rr = cv.getBoundingClientRect();
+      const dur = 4500;
+      nav.push({ k: 'epic', x: cen[t][0] * S, y: cen[t][1] * S, r: 62 / (rr.width / (W * S) || 1), col: COL[me], na: nA0, nd: nD0, t0: performance.now(), dur });
+      await sleep(dur - 200);
+    }
     if (old < P && cap[old] == t)
       await capLost(old, me, t);
   }
@@ -11882,6 +11899,236 @@ function drawEqualFight(e, u, s) {
     g.restore();
   }
   drawEqualSoldiers(e, u, s);
+}
+// Destansı zafer: rakibin en az iki katı askerine karşı kazanınca fethedilen bölgede ~4.5 sn süren kutlama.
+function drawEpic(e, u, s) {
+  const sm = x => x * x * (3 - 2 * x);
+  const cl = x => Math.max(0, Math.min(1, x));
+  const x = e.x, y = e.y;
+  const R = e.r || 40;
+  const fade = u > .86 ? 1 - sm((u - .86) / .14) : 1;
+  g.save();
+  // 1) Zaman donar: bölge dışı hafifçe kararır, bölgenin üstüne sıcak ışık düşer
+  {
+    const a = sm(cl(u / .1)) * fade * .42;
+    const gr = g.createRadialGradient(x, y, R * .6, x, y, R * 4.5);
+    gr.addColorStop(0, 'rgba(10,8,4,0)');
+    gr.addColorStop(1, `rgba(10,8,4,${a.toFixed(3)})`);
+    g.fillStyle = gr;
+    g.fillRect(0, 0, W * S, H * S);
+  }
+  // İlk an: beyaz parlama
+  if (u < .1) {
+    const q = u / .1;
+    const gr = g.createRadialGradient(x, y, 0, x, y, R * (1 + q * 2));
+    gr.addColorStop(0, `rgba(255,252,235,${(.95 * (1 - q)).toFixed(3)})`);
+    gr.addColorStop(1, 'rgba(255,240,200,0)');
+    g.fillStyle = gr;
+    g.beginPath();
+    g.arc(x, y, R * (1 + q * 2), 0, 7);
+    g.fill();
+  }
+  // 2) Dönen altın ışınlar
+  {
+    const a = sm(cl((u - .05) / .15)) * fade;
+    if (a > 0) {
+      g.save();
+      g.translate(x, y - R * .25);
+      g.rotate(s * .25);
+      g.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 14; i++) {
+        const an = i / 14 * Math.PI * 2;
+        const len = R * (1.9 + .35 * Math.sin(s * 2 + i * 1.7));
+        const w = .09 + .03 * Math.sin(s * 3 + i);
+        const gr = g.createLinearGradient(0, 0, Math.cos(an) * len, Math.sin(an) * len);
+        gr.addColorStop(0, `rgba(255,214,110,${(.55 * a).toFixed(3)})`);
+        gr.addColorStop(1, 'rgba(255,190,70,0)');
+        g.fillStyle = gr;
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.lineTo(Math.cos(an - w) * len, Math.sin(an - w) * len);
+        g.lineTo(Math.cos(an + w) * len, Math.sin(an + w) * len);
+        g.closePath();
+        g.fill();
+      }
+      g.restore();
+    }
+  }
+  // 3) Altın şok dalgaları
+  for (let k = 0; k < 3; k++) {
+    const q = cl((u - .04 - k * .09) / .4);
+    if (q <= 0 || q >= 1)
+      continue;
+    g.globalAlpha = (1 - q) * .9 * fade;
+    g.strokeStyle = k % 2 ? '#fff2b3' : '#f3c34a';
+    g.lineWidth = 3.2 * (1 - q) + .6;
+    g.beginPath();
+    g.ellipse(x, y + R * .15, R * (.3 + q * 2.4), R * (.15 + q * 1.2), 0, 0, 7);
+    g.stroke();
+  }
+  g.globalAlpha = 1;
+  // 4) Sancak yükselir: altın tepelikli direk, rüzgârda dalgalanan bayrak
+  const rise = sm(cl((u - .12) / .22));
+  const by = y + R * .35;
+  const HP = R * 1.25;
+  const top = by - HP * rise;
+  g.globalAlpha = fade;
+  g.strokeStyle = '#3a2a1a';
+  g.lineWidth = 2.6;
+  g.beginPath();
+  g.moveTo(x, by);
+  g.lineTo(x, top);
+  g.stroke();
+  g.strokeStyle = '#7a5532';
+  g.lineWidth = 1.4;
+  g.beginPath();
+  g.moveTo(x - .4, by);
+  g.lineTo(x - .4, top);
+  g.stroke();
+  if (rise > .02) {
+    const fw = R * .95 * Math.min(1, rise * 1.4);
+    const fh = R * .55;
+    g.fillStyle = e.col;
+    g.strokeStyle = 'rgba(20,14,8,.85)';
+    g.lineWidth = 1.2;
+    g.beginPath();
+    g.moveTo(x, top + 2);
+    for (let i = 0; i <= 12; i++) {
+      const t = i / 12;
+      g.lineTo(x + fw * t, top + 2 + Math.sin(t * 5 - s * 6) * 2.4 * t);
+    }
+    // kırlangıç kuyruğu uç
+    g.lineTo(x + fw * .82, top + 2 + fh * .5 + Math.sin(5 - s * 6) * 2.4);
+    for (let i = 12; i >= 0; i--) {
+      const t = i / 12;
+      g.lineTo(x + fw * t, top + 2 + fh + Math.sin(t * 5 - s * 6 + .6) * 2.4 * t);
+    }
+    g.closePath();
+    g.fill();
+    g.stroke();
+    // bayrakta parıltı ve yıldız
+    g.fillStyle = 'rgba(255,255,255,.18)';
+    g.beginPath();
+    g.ellipse(x + fw * .35, top + 2 + fh * .35, fw * .25, fh * .14, 0, 0, 7);
+    g.fill();
+    g.fillStyle = '#ffe08a';
+    const sx = x + fw * .38, sy = top + 2 + fh * .5;
+    g.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? fh * .12 : fh * .28;
+      const an = -Math.PI / 2 + i * Math.PI / 5;
+      i ? g.lineTo(sx + Math.cos(an) * r, sy + Math.sin(an) * r) : g.moveTo(sx + Math.cos(an) * r, sy + Math.sin(an) * r);
+    }
+    g.closePath();
+    g.fill();
+    // altın tepelik
+    const gr = g.createRadialGradient(x - 1, top - 3, 0, x, top - 2, 4);
+    gr.addColorStop(0, '#fff6c8');
+    gr.addColorStop(1, '#c8901e');
+    g.fillStyle = gr;
+    g.beginPath();
+    g.arc(x, top - 2, 3.2, 0, 7);
+    g.fill();
+  }
+  // 5) Defne çelengi: yapraklar tek tek açılır
+  {
+    const q = cl((u - .28) / .25);
+    const nL = Math.floor(q * 9);
+    for (const sd of [-1, 1]) {
+      for (let i = 0; i < nL; i++) {
+        const an = Math.PI / 2 + sd * (.35 + i * .27);
+        const rx = R * .78, ry = R * .62;
+        const lx = x + Math.cos(an) * rx;
+        const ly = y + R * .1 + Math.sin(an) * ry;
+        g.save();
+        g.translate(lx, ly);
+        g.rotate(an + sd * 1.2);
+        const gr = g.createLinearGradient(0, -3, 0, 3);
+        gr.addColorStop(0, '#fff0a0');
+        gr.addColorStop(1, '#c9921d');
+        g.fillStyle = gr;
+        g.beginPath();
+        g.ellipse(0, 0, 4.2, 1.7, 0, 0, 7);
+        g.fill();
+        g.restore();
+      }
+    }
+  }
+  // 6) Yükselen altın kıvılcımlar
+  for (let i = 0; i < 26; i++) {
+    const st = .15 + hsh(i, 1, 7) * .5;
+    const q = (u - st) / .35;
+    if (q <= 0 || q >= 1)
+      continue;
+    const px = x + (hsh(i, 2, 7) - .5) * R * 2.4 + Math.sin(q * 6 + i) * 3;
+    const py = y + R * .4 - q * R * (1.4 + hsh(i, 3, 7));
+    g.globalAlpha = Math.sin(q * Math.PI) * fade;
+    g.fillStyle = i % 3 ? '#ffd76a' : '#fff6d0';
+    const r = .8 + hsh(i, 4, 7) * 1.4;
+    g.beginPath();
+    g.moveTo(px, py - r * 2);
+    g.lineTo(px + r * .6, py);
+    g.lineTo(px, py + r * 2);
+    g.lineTo(px - r * .6, py);
+    g.closePath();
+    g.fill();
+  }
+  g.globalAlpha = 1;
+  // 7) Yazı: DESTANSI ZAFER (altın, koyu kenarlı, üstünden ışık geçer) ve oran
+  {
+    const q = cl((u - .3) / .12);
+    if (q > 0) {
+      const pop = q < 1 ? 1 + Math.sin(q * Math.PI) * .25 : 1;
+      const ty = top - R * .55;
+      const fs = R * .42;
+      g.save();
+      g.translate(x, ty);
+      g.scale(pop * sm(q), pop * sm(q));
+      g.globalAlpha = fade;
+      g.font = `900 ${fs.toFixed(1)}px Georgia, 'Times New Roman', serif`;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      const tx = 'DESTANSI ZAFER';
+      g.lineJoin = 'round';
+      g.lineWidth = fs * .22;
+      g.strokeStyle = 'rgba(40,22,6,.92)';
+      g.strokeText(tx, 0, 0);
+      const tw = g.measureText(tx).width;
+      const gr = g.createLinearGradient(0, -fs * .5, 0, fs * .5);
+      gr.addColorStop(0, '#fff7cf');
+      gr.addColorStop(.45, '#ffd45a');
+      gr.addColorStop(1, '#c4831a');
+      g.fillStyle = gr;
+      g.fillText(tx, 0, 0);
+      // ışık süpürmesi
+      const sw = cl((u - .45) / .22);
+      if (sw > 0 && sw < 1) {
+        g.save();
+        g.globalCompositeOperation = 'source-atop';
+        const sx = -tw / 2 - fs + sw * (tw + fs * 2);
+        const g2 = g.createLinearGradient(sx - fs, 0, sx + fs, 0);
+        g2.addColorStop(0, 'rgba(255,255,255,0)');
+        g2.addColorStop(.5, 'rgba(255,255,255,.85)');
+        g2.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = g2;
+        g.fillText(tx, 0, 0);
+        g.restore();
+      }
+      // oran
+      const q2 = cl((u - .42) / .1);
+      if (q2 > 0) {
+        g.globalAlpha = fade * q2;
+        g.font = `700 ${(fs * .55).toFixed(1)}px Georgia, serif`;
+        const st = `${e.na} askerle ${e.nd} askere karşı`;
+        g.lineWidth = fs * .14;
+        g.strokeText(st, 0, fs * .82);
+        g.fillStyle = '#fff3c4';
+        g.fillText(st, 0, fs * .82);
+      }
+      g.restore();
+    }
+  }
+  g.restore();
 }
 // ---- Maden: seviyeye göre kazmacı, fener, raylı vagon, vinç ve uçan altınlar ----
 function mineAnim(X, Y, s, lv) {
