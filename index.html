@@ -8061,7 +8061,7 @@ async function battle(a, t, sea, F) {
     const [tx, ty] = [cen[t][0] * S, cen[t][1] * S];
     // Saldırılan yerin yanındaki (saldıran) bölgede okçu varsa: ok yağmuru ve hücum; yoksa piyade hücumu.
     const vol = arch[a] > 0 && !eqB;
-    const dur = eqB ? (mine0 ? 5600 : 3000) : vol ? (mine0 ? 1900 : 1200) : (mine0 ? 1500 : 950);
+    const dur = eqB ? (mine0 ? 4600 : 2500) : vol ? (mine0 ? 1900 : 1200) : (mine0 ? 1500 : 950);
     const nr = Math.min(3, arch[a] + 1);
     const [bx, by] = borderPt(fr, t);
     const amp = Math.max(9, Math.min(22, Math.hypot(cen[t][0] - cen[fr][0], cen[t][1] - cen[fr][1]) * S * .22));
