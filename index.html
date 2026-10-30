@@ -8041,15 +8041,23 @@ async function battle(a, t, sea, F) {
     // Hücum: saldıranlar koşar, sınırda savunanlarla çarpışır; kazanan taraf ayakta kalır.
     const A0 = F != null ? F : arm[a] - 1;
     const mine0 = own[a] == 0 || own[t] == 0;
-    const [ax, ay] = [cen[a][0] * S, cen[a][1] * S];
+    // Savaş her zaman hedefin sınırında olur: saldırı uzaktaki bir bölgeden başlasa bile sahne,
+    // hedefe komşu olan kendi (ya da müttefik) bölgenle hedefin ortak sınırında oynar.
+    let fr = a;
+    if (!adj[t].has(a)) {
+      const cand = [...adj[t]].filter(u => own[u] == own[a] || allied(own[a], own[u]));
+      if (cand.length)
+        fr = cand.sort((x, y) => (HD[a][x] - HD[a][y]) || (arm[y] - arm[x]))[0];
+    }
+    const [ax, ay] = [cen[fr][0] * S, cen[fr][1] * S];
     const [tx, ty] = [cen[t][0] * S, cen[t][1] * S];
     // Saldırılan yerin yanındaki (saldıran) bölgede okçu varsa: ok yağmuru ve hücum; yoksa piyade hücumu.
     const vol = arch[a] > 0 && !eqB;
-    const dur = eqB ? (mine0 ? 3600 : 2200) : vol ? (mine0 ? 1900 : 1200) : (mine0 ? 1500 : 950);
+    const dur = eqB ? (mine0 ? 5600 : 3000) : vol ? (mine0 ? 1900 : 1200) : (mine0 ? 1500 : 950);
     const nr = Math.min(3, arch[a] + 1);
-    const [bx, by] = borderPt(a, t);
-    const amp = Math.max(9, Math.min(22, Math.hypot(cen[t][0] - cen[a][0], cen[t][1] - cen[a][1]) * S * .22));
-    nav.push({ k: eqB ? 'equal' : vol ? 'volley' : 'charge', a, t, bx, by, amp, n: Math.min(4, 2 + Math.floor(A0 / 8)), ax, ay, tx, ty, win: w, na: Math.min(vol ? 4 : 6, 3 + Math.floor(A0 / 8)), nd: Math.min(5, 2 + Math.floor(arm[t] / 8)), nr, nArrow: nr * 4, ca: COL[own[a]], cd: COL[own[t]] || '#9aa3a8', seed: 1 + Math.floor(Math.random() * 90), t0: performance.now(), dur });
+    const [bx, by] = borderPt(fr, t);
+    const amp = Math.max(9, Math.min(22, Math.hypot(cen[t][0] - cen[fr][0], cen[t][1] - cen[fr][1]) * S * .22));
+    nav.push({ k: eqB ? 'equal' : vol ? 'volley' : 'charge', a: fr, t, bx, by, amp, n: Math.min(4, 2 + Math.floor(A0 / 8)), ax, ay, tx, ty, win: w, na: Math.min(vol ? 4 : 6, 3 + Math.floor(A0 / 8)), nd: Math.min(5, 2 + Math.floor(arm[t] / 8)), nr, nArrow: nr * 4, ca: COL[own[a]], cd: COL[own[t]] || '#9aa3a8', seed: 1 + Math.floor(Math.random() * 90), t0: performance.now(), dur });
     await sleep(dur - 120);
   }
   $('log').textContent = `${PN[own[a]]}: ${NM[a]} → ${NM[t]} ${w ? 'fethedildi' : 'savunuldu'}${k1 + k2 > 0 ? ` (okçu desteği: ${visSet().has(t) ? k1 : '?'} savunucu, ${k2} saldıran vuruldu)` : ''}`;
@@ -11456,9 +11464,9 @@ function drawCharge(e, u, s) {
   const uy = dy / L;
   const px = -uy;
   const py = ux;
-  // Buluşma noktası: iki bölge merkezinin arası (sınıra yakın)
-  const mx = e.ax + dx * .52;
-  const my = e.ay + dy * .52;
+  // Buluşma noktası: iki bölgenin ortak sınırı
+  const mx = e.bx != null ? e.bx : e.ax + dx * .52;
+  const my = e.by != null ? e.by : e.ay + dy * .52;
   const fA = ux >= 0 ? 1 : -1;
   const run = sm(Math.min(1, u / .4));
   const fight = u > .36 && u < .84 ? 1 : 0;
@@ -11590,7 +11598,7 @@ function drawShieldMan(g,x,y,f,col,shUp,fall,al,ph,swing){
 function drawArrowCharge(g,e,u,s){
   const sm=x=>x*x*(3-2*x);const H=(i,j)=>hsh(i,j,e.seed);
   const dx=e.tx-e.ax,dy=e.ty-e.ay,L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L,px=-uy,py=ux;
-  const mx=e.ax+dx*.52,my=e.ay+dy*.52;const fA=ux>=0?1:-1;
+  const mx=e.bx!=null?e.bx:e.ax+dx*.52,my=e.by!=null?e.by:e.ay+dy*.52;const fA=ux>=0?1:-1;
   const tRel=.26,tLand=.44,tRun=.42,tMeet=.66;
   const figs=[];
   // savunanlar
@@ -11685,24 +11693,24 @@ function drawArrowCharge(g,e,u,s){
 // Denk savaş: iki ordu sınırda kilitlenir, cephe bir ileri bir geri gider; sonunda biri öbürünü iter.
 // front(u): cephenin sınırdan uzaklığı (+ = savunanın içine doğru), renk sınırı da onu izler.
 function eqFront(e, u) {
-  // İtişme: cephe ani hamlelerle bir ileri bir geri gider, her hamleden sonra zorlanarak titrer;
-  // sonda kazanan taraf karşıyı sertçe iter. A: hamle genişliği (iki bölge merkezi arasının yaklaşık beşte biri).
+  // İtişme: cephe yavaşça, zorlanarak bir ileri bir geri gider; her hamle yumuşak başlar, yumuşak durur,
+  // durduğu yerde hafifçe titrer. Sonda kazanan taraf karşıyı geri iter. A: hamle genişliği.
   const A = e.amp || 12;
-  const sm = x => x * x * (3 - 2 * x);
-  const T0 = .12, T1 = .8;
-  const tg = [0, .6, -.5, .85, -.8, .55, -.4];
+  const sq = x => x * x * x * (x * (x * 6 - 15) + 10);
+  const T0 = .1, T1 = .82;
+  const tg = [0, .55, -.45, .8, -.75, .5, -.35];
   if (u < T0)
     return 0;
   if (u < T1) {
     const k = (u - T0) / (T1 - T0) * (tg.length - 1);
     const i = Math.min(tg.length - 2, Math.floor(k));
     const f = k - i;
-    const surge = sm(Math.min(1, f / .45));
-    const tremble = f > .45 ? Math.sin(u * 260) * .07 + Math.sin(u * 97) * .05 : 0;
+    const surge = sq(Math.min(1, f / .78));
+    const tremble = (Math.sin(u * 130) * .035 + Math.sin(u * 53) * .025) * (f > .78 ? 1 : f / .78);
     return (tg[i] + (tg[i + 1] - tg[i]) * surge + tremble) * A;
   }
   const last = tg[tg.length - 1] * A;
-  const k = sm(Math.min(1, (u - T1) / .1));
+  const k = sq(Math.min(1, (u - T1) / .13));
   return last + ((e.win ? 1.9 : -1.9) * A - last) * k;
 }
 function drawEqualSoldiers(e,u,s){
@@ -11711,7 +11719,7 @@ function drawEqualSoldiers(e,u,s){
   const bx=e.bx,by=e.by;const fA=ux>=0?1:-1;
   const F=eqFront(e,u);
   const fx=bx+ux*F,fy=by+uy*F;
-  const lock=u>.12&&u<.86;
+  const lock=u>.1&&u<.86;
   const figs=[];
   const n=e.n;
   for(const A of [true,false]){
@@ -11721,7 +11729,7 @@ function drawEqualSoldiers(e,u,s){
       const dir=A?1:-1;
       const sx=(A?e.ax:e.tx)+px*o,sy=(A?e.ay:e.ty)+py*o;
       const tx=fx-ux*dir*gap+px*o*.85,ty=fy-uy*dir*gap+py*o*.85;
-      const k=sm(Math.min(1,u/.12));
+      const k=sm(Math.min(1,u/.1));
       let x=sx+(tx-sx)*k,y=sy+(ty-sy)*k;
       // itişirken hafif sarsıntı
       if(lock){const j=Math.sin(s*17+i*1.9)*.5;x+=ux*j;y+=uy*j;}
@@ -11732,18 +11740,27 @@ function drawEqualSoldiers(e,u,s){
       let al=dies?1-Math.max(0,(u-tf-.12)/.12):1;
       if(!dies&&u>.9){const q=sm((u-.9)/.1);if(!lose){x+=ux*dir*q*10;y+=uy*dir*q*10;}else{x-=ux*dir*q*10;y-=uy*dir*q*10;}al=1-q*.85;}
       // ön sıra kılıçları kilitli (yarım kaldırılmış, karşıya dönük), arkadakiler bekler
-      const sw=lock?(row==0?.55+Math.sin(s*9+i)*.08:.25):u<.12?.2:(Math.sin(s*11+i)*.5+.5);
+      // Ön sıra karşılıklı kılıç sallar (biri vururken öbürü karşılar); arka sıra kalkanla bekler
+      const sp=s*5.2+i*1.3+(A?0:Math.PI);
+      const sw=lock?(row==0?.5+Math.sin(sp)*.5:.3+Math.sin(sp*.5)*.1):u<.1?.2:(Math.sin(s*11+i)*.5+.5);
       const ph=u<.12?u*50+i:lock?s*6+i:u*30;
       figs.push([x,y,A?e.ca:e.cd,A?fA:-fA,ph,sw,fall,al,!A]);
     }
   }
   figs.sort((a,b)=>a[1]-b[1]).forEach(f=>drawSoldier(...f));
   // kilitlenen kılıçların kıvılcımları (cephe hattında)
+  // Kılıçların çarpıştığı an (iki kılıç ortada kesiştiğinde) kıvılcım ve kısa parlama
   if(lock){
-    for(let k=0;k<n;k++){const q=(s*2.2+H(k,5))%1;if(q>.3)continue;
-      const o=(k-(n-1)/2)*8.2;const cx=fx+px*o*.85,cy=fy+py*o*.85-6.5;
-      g.globalAlpha=1-q/.3;g.strokeStyle='#fff1b8';g.lineWidth=.7;
-      for(let j=0;j<4;j++){const an=j*1.6+k;g.beginPath();g.moveTo(cx,cy);g.lineTo(cx+Math.cos(an)*(1.5+q*5),cy+Math.sin(an)*(1.5+q*5));g.stroke();}}
+    for(let k=0;k<n;k+=2){
+      const sp=s*5.2+k*1.3;const hit=Math.max(0,1-Math.abs(Math.sin(sp))*3.2);
+      if(hit<=0)continue;
+      const o=(k-(n-1)/2)*8.2;const cx=fx+px*o*.85,cy=fy+py*o*.85-7;
+      g.globalAlpha=hit;
+      const gr=g.createRadialGradient(cx,cy,0,cx,cy,4.5);gr.addColorStop(0,'rgba(255,248,210,.9)');gr.addColorStop(1,'rgba(255,220,120,0)');
+      g.fillStyle=gr;g.beginPath();g.arc(cx,cy,4.5,0,7);g.fill();
+      g.strokeStyle='#fff1b8';g.lineWidth=.7;
+      for(let j=0;j<5;j++){const an=j*1.26+k+Math.floor(sp/Math.PI);const r=2+(1-hit)*5;g.beginPath();g.moveTo(cx,cy);g.lineTo(cx+Math.cos(an)*r,cy+Math.sin(an)*r);g.stroke();}
+    }
     g.globalAlpha=1;
   }
 }
