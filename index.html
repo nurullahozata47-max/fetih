@@ -2312,6 +2312,8 @@ const CVLOOT0 = 5;
 const CVLOOT = 20;
 // Süvari kaybı: saldırıya (ya da karşı saldırıya) katılan süvari %40 ihtimalle ölür.
 const CVDIE = .4;
+// Sürpriz hücum: süvarili saldırıda savunanın zarı ilk SURP atışta 1 düşer.
+const SURP = 2;
 const SPC = 10;
 const UPC = 30;
 const SSC = 20;
@@ -8031,7 +8033,7 @@ async function battle(a, t, sea, F) {
   const epic = own[a] == 0 && !ONLINE && nA0 > 0 && nD0 >= 2 * nA0;
   const bfx = showB && bfxOn && !sea;
   // Süvari saldırıya katılır: saldıran bölgede bu tur saldırmamış süvari varsa (surlu bölgelere ve denizden değil)
-  // savaş süvari hücumu sahnesiyle oynar ve bölge alınırsa şansa bağlı yağma yapılır.
+  // sürpriz hücum yapar (ilk 2 zarda savunanın zarı -1), savaş süvari hücumu sahnesiyle oynar ve bölge alınırsa şansa bağlı yağma yapılır.
   const cvB = !sea && cav && cav[a] > 0 && !wall[t] && (cvU[a] || 0) < cav[a];
   if (cvB)
     cvU[a]++;
@@ -8055,9 +8057,13 @@ async function battle(a, t, sea, F) {
   const dA = durCls(a);
   const dD = durCls(t);
   const hit = c => c == 2 ? (Math.random() < DURB ? 0 : 1) : c == 0 ? (Math.random() < DURB ? 2 : 1) : 1;
+  // Sürpriz hücum: süvari saldırıya katıldıysa ilk 2 zarda savunanın zarı 1 düşer.
+  let rn = 0;
+  if (cvB && showB)
+    fl.push({ t, dx: 0, dy: -18, txt: '🐎 Sürpriz hücum!', col: '#ffe08a', t0: performance.now() });
   while (A > 0 && D > 0) {
     const x = Math.ceil(Math.random() * 6);
-    const y = Math.ceil(Math.random() * 6) + wall[t];
+    const y = Math.ceil(Math.random() * 6) + wall[t] - (cvB && rn++ < SURP ? 1 : 0);
     if (HUM.has(own[a]) && DIF < 2 ? x >= y : x > y)
       D = Math.max(0, D - hit(dD));
     else
@@ -14820,7 +14826,7 @@ function openPop(cx, cy) {
     if (bar[t])
       o.push(bar[t] < 3 ? ['sv', 'Süvari (Sv3 kışla gerekir)', false] : ['sv', cav[t] >= CAVMAX ? `Süvari (${CAVMAX}/${CAVMAX})` : `Süvari yetiştir (${CVC} altın · ${cav[t]}/${CAVMAX})`, cav[t] < CAVMAX && gold[0] >= CVC]);
     if (cav[t] > 0)
-      inf.o += ` 🐎 Süvari (${cav[t]}): savunmada asker sayılmaz. Bu bölgeye yapılan saldırı başarısız olursa süvari karşı saldırıya geçer ve saldıranın sınırdaki bölgesini işgal eder (surlu bölge ve başkent hariç; 2 süvari varsa biri yerinde kalır). Bu bölgeden yapılan saldırıyla bir bölge alınırsa şansa bağlı ${CVLOOT0}-${CVLOOT} altın yağma (her süvari turda bir; surlu bölgelerde ve denizden olmaz). Saldırıya ve karşı saldırıya katılan süvari %${Math.round(CVDIE * 100)} ihtimalle ölür. Süvariler her tur başında kendiliğinden en yakın düşman sınırına ilerler.${cvU[t] ? ` Bu tur ${cvU[t]} süvari yağmaya katıldı.` : ''}`;
+      inf.o += ` 🐎 Süvari (${cav[t]}): sürpriz hücum: bu bölgeden yapılan saldırıda savaşın ilk ${SURP} zarında savunanın zarı 1 düşer (her süvari turda bir saldırı; surlu bölgelerde ve denizden olmaz). Savunmada asker sayılmaz. Bu bölgeye yapılan saldırı başarısız olursa süvari karşı saldırıya geçer ve saldıranın sınırdaki bölgesini işgal eder (surlu bölge ve başkent hariç; 2 süvari varsa biri yerinde kalır). Bu bölgeden yapılan saldırıyla bir bölge alınırsa şansa bağlı ${CVLOOT0}-${CVLOOT} altın yağma (her süvari turda bir; surlu bölgelerde ve denizden olmaz). Saldırıya ve karşı saldırıya katılan süvari %${Math.round(CVDIE * 100)} ihtimalle ölür. Süvariler her tur başında kendiliğinden en yakın düşman sınırına ilerler.${cvU[t] ? ` Bu tur ${cvU[t]} süvari saldırıya katıldı.` : ''}`;
     if (bar[t])
       o.push(bar[t] < 3 ? ['ct', 'Mancınık (Sv3 kışla gerekir)', false] : ['ct', cat[t] >= CATMAX ? `Mancınık (${CATMAX}/${CATMAX})` : `Mancınık yap (${CTC} altın)`, cat[t] < CATMAX && gold[0] >= CTC]);
     if (cat[t] > 0) {
@@ -16566,7 +16572,7 @@ async function ai0(p) {
         if (wall[t] > 0 && F < (wall[t] >= 2 ? WALLMIN : WALLMIN1))
           return;
         // Süvarili bölgeye başarısız saldırı karşı saldırıyla bölge kaybettirir: daha büyük üstünlük ister.
-        const s = F - est(p, t) - (visTo(p, t) && cav[t] > 0 ? 2 : 0);
+        const s = F - est(p, t) - (visTo(p, t) && cav[t] > 0 ? 2 : 0) + (va.has(t) && cav[a] > (cvU[a] || 0) && !wall[t] ? 1 : 0);
         const pc = bp[p].some(v => v > 0);
         // Oyuncunun müttefiki olarak verilen saldırı emri: o devlete öncelik verir.
         const ob = ally[p] > 0 && !tru[p] && ord[p] >= 0 && own[t] == ord[p] ? 3 + (t == ordT[p] ? 2 : 0) : 0;
