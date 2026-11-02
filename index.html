@@ -10911,8 +10911,18 @@ function drawArch(x, y, n, col, vet) {
   c.fillText(n, x + 9, y - 9);
   c.font = 'bold 15px sans-serif';
 }
-// Gerçekçi at başı (yan profil, doru at, sahibinin renginde dizgin): koordinatlar -50..50 kutusunda, k ile ölçeklenir.
-function horseHead(c, k, col, style) {
+// At donları: 0 doru (kahverengi, beyaz akıtma), 1 yağız (siyah, alında yıldız), 2 kır (benekli gri),
+// 3 al (kızıl, ince akıtma, açık yele), 4 kula (altın sarısı, krem yele). Her bölgenin süvarisi bunlardan birini rastgele alır.
+const HORSE = [
+  { g: ['#e2ab6e', '#b57a43', '#7c4d28'], mane: '#2a1a0e', mark: 'blaze', line: 'rgba(40,22,10,.55)' },
+  { g: ['#8a8078', '#4a423c', '#26211d'], mane: '#0d0a08', mark: 'star', line: 'rgba(255,255,255,.28)', rim: 'rgba(220,210,200,.75)' },
+  { g: ['#ffffff', '#d9d6cf', '#9f9b93'], mane: '#6b6e70', mark: 'dapple', line: 'rgba(16,34,43,.42)' },
+  { g: ['#f0985a', '#c4602c', '#8a3b17'], mane: '#f1c48a', mark: 'stripe', line: 'rgba(70,25,8,.5)' },
+  { g: ['#f8dc98', '#d9a858', '#a7772f'], mane: '#fbf1d8', mark: 'snip', line: 'rgba(90,60,20,.5)' }
+];
+// Gerçekçi at başı (yan profil, sahibinin renginde dizgin): koordinatlar -50..50 kutusunda, k ile ölçeklenir. v: HORSE sırası.
+function horseHead(c, k, col, v) {
+  const H0 = HORSE[v] || HORSE[0];
   c.save();
   c.scale(k, k);
   c.lineJoin = 'round';
@@ -10920,39 +10930,47 @@ function horseHead(c, k, col, style) {
   const head = () => {
     c.beginPath();
     c.moveTo(-44, 50);
-    c.bezierCurveTo(-44, 20, -36, -14, -20, -30);   // boyun sırtı
+    c.bezierCurveTo(-44, 20, -36, -14, -20, -30);
     c.lineTo(-19, -34);
-    c.lineTo(-17, -50);                               // arka kulak ucu
+    c.lineTo(-17, -50);
     c.lineTo(-10, -37);
-    c.lineTo(-5, -52);                                // ön kulak ucu
+    c.lineTo(-5, -52);
     c.lineTo(1, -35);
-    c.bezierCurveTo(10, -30, 16, -20, 24, -6);         // alın ve burun sırtı
-    c.bezierCurveTo(30, 4, 38, 10, 41, 17);            // burun
-    c.bezierCurveTo(43, 23, 38, 28, 31, 27);           // ağız
-    c.bezierCurveTo(27, 27, 25, 30, 20, 30);           // çene
-    c.bezierCurveTo(12, 30, 6, 24, 0, 20);             // alt çene
-    c.bezierCurveTo(-8, 16, -12, 22, -12, 30);         // gırtlak
-    c.bezierCurveTo(-12, 38, -8, 44, -4, 50);          // boyun önü
+    c.bezierCurveTo(10, -30, 16, -20, 24, -6);
+    c.bezierCurveTo(30, 4, 38, 10, 41, 17);
+    c.bezierCurveTo(43, 23, 38, 28, 31, 27);
+    c.bezierCurveTo(27, 27, 25, 30, 20, 30);
+    c.bezierCurveTo(12, 30, 6, 24, 0, 20);
+    c.bezierCurveTo(-8, 16, -12, 22, -12, 30);
+    c.bezierCurveTo(-12, 38, -8, 44, -4, 50);
     c.closePath();
   };
-  // gövde
   head();
-  if (style == 'b') {
-    const gr = c.createLinearGradient(-30, -40, 30, 40);
-    gr.addColorStop(0, '#e2ab6e');
-    gr.addColorStop(.55, '#b57a43');
-    gr.addColorStop(1, '#7c4d28');
-    c.fillStyle = gr;
-  } else {
-    const gr = c.createLinearGradient(-30, -40, 30, 40);
-    gr.addColorStop(0, '#ffffff');
-    gr.addColorStop(.6, '#e6e1d6');
-    gr.addColorStop(1, '#b9b3a6');
-    c.fillStyle = gr;
-  }
+  const gr = c.createLinearGradient(-30, -40, 30, 40);
+  gr.addColorStop(0, H0.g[0]);
+  gr.addColorStop(.55, H0.g[1]);
+  gr.addColorStop(1, H0.g[2]);
+  c.fillStyle = gr;
   c.fill();
-  // yele: sırttan dalgalanan koyu tutamlar
-  c.fillStyle = style == 'b' ? '#2a1a0e' : '#5d6870';
+  // kır at: kalçadan boyna dağılmış açık-koyu benekler
+  if (H0.mark == 'dapple') {
+    c.save();
+    head();
+    c.clip();
+    [[-30, 22, 7], [-18, 36, 6], [-34, 40, 6], [-22, 8, 5], [-8, 42, 5], [-32, 0, 4], [-4, 26, 4], [-26, 32, 3]].forEach(([x, y, r]) => {
+      const rg = c.createRadialGradient(x, y, r * .2, x, y, r);
+      rg.addColorStop(0, 'rgba(255,255,255,.55)');
+      rg.addColorStop(.6, 'rgba(150,146,138,.28)');
+      rg.addColorStop(1, 'rgba(150,146,138,0)');
+      c.fillStyle = rg;
+      c.beginPath();
+      c.arc(x, y, r, 0, 7);
+      c.fill();
+    });
+    c.restore();
+  }
+  // yele
+  c.fillStyle = H0.mane;
   c.beginPath();
   c.moveTo(-17, -40);
   c.bezierCurveTo(-30, -26, -40, -6, -46, 22);
@@ -10974,9 +10992,9 @@ function horseHead(c, k, col, style) {
   c.quadraticCurveTo(-4, -30, -12, -32);
   c.closePath();
   c.fill();
-  // alında beyaz akıtma (yüzü küçükken de belli eder)
-  if (style == 'b') {
-    c.fillStyle = '#f6efe2';
+  // yüz lekeleri
+  c.fillStyle = '#f6efe2';
+  if (H0.mark == 'blaze') {
     c.beginPath();
     c.moveTo(-1, -30);
     c.quadraticCurveTo(6, -28, 8, -22);
@@ -10986,14 +11004,49 @@ function horseHead(c, k, col, style) {
     c.closePath();
     c.fill();
   }
+  else if (H0.mark == 'star') {
+    c.beginPath();
+    c.moveTo(6, -30);
+    c.lineTo(9, -25);
+    c.lineTo(14, -24);
+    c.lineTo(10, -20);
+    c.lineTo(11, -15);
+    c.lineTo(7, -18);
+    c.lineTo(3, -16);
+    c.lineTo(4, -21);
+    c.lineTo(0, -25);
+    c.lineTo(5, -25);
+    c.closePath();
+    c.fill();
+  }
+  else if (H0.mark == 'stripe') {
+    c.beginPath();
+    c.moveTo(6, -26);
+    c.bezierCurveTo(14, -12, 22, 0, 31, 14);
+    c.quadraticCurveTo(28, 13, 26, 10);
+    c.bezierCurveTo(18, -2, 10, -12, 3, -24);
+    c.closePath();
+    c.fill();
+  }
+  else if (H0.mark == 'snip') {
+    c.beginPath();
+    c.ellipse(34, 18, 5, 3, .7, 0, 7);
+    c.fill();
+  }
   // yanak kası
-  c.strokeStyle = style == 'b' ? 'rgba(40,22,10,.55)' : 'rgba(16,34,43,.45)';
+  c.strokeStyle = H0.line;
   c.lineWidth = 2.6;
   c.beginPath();
   c.moveTo(-10, -12);
   c.bezierCurveTo(-2, -12, 8, 2, 4, 16);
   c.stroke();
   // göz
+  if (H0.rim) {
+    c.fillStyle = 'rgba(235,225,212,.85)';
+    c.beginPath();
+    c.ellipse(4, -16, 5.4, 3.6, .5, 0, 7);
+    c.fill();
+  }
   c.fillStyle = '#10222b';
   c.beginPath();
   c.ellipse(4, -16, 4.2, 2.6, .5, 0, 7);
@@ -11018,26 +11071,26 @@ function horseHead(c, k, col, style) {
   c.lineWidth = 4.2;
   c.beginPath();
   c.moveTo(-8, -34);
-  c.lineTo(10, 12);                // yanak kayışı
+  c.lineTo(10, 12);
   c.moveTo(18, -8);
   c.lineTo(10, 12);
-  c.lineTo(24, 28);                // burun kayışı
+  c.lineTo(24, 28);
   c.moveTo(0, -30);
-  c.lineTo(-8, -34);               // alın kayışı
+  c.lineTo(-8, -34);
   c.stroke();
   c.fillStyle = '#ffd36b';
   c.beginPath();
   c.arc(10, 12, 3.4, 0, 7);
   c.fill();
-  // dış çizgi
+  // dış çizgi (yağız atta koyu zeminde seçilsin diye açık renkli)
   head();
-  c.strokeStyle = 'rgba(8,16,20,.9)';
-  c.lineWidth = 2.2;
+  c.strokeStyle = H0.rim || 'rgba(8,16,20,.9)';
+  c.lineWidth = H0.rim ? 2.6 : 2.2;
   c.stroke();
   c.restore();
 }
 // Süvari rozeti: koyu daire, sahibinin renginde çerçeve, içinde at başı; sağ üstte sayı. Bu tur hepsi hücum ettiyse soluk.
-function drawCavBadge(x, y, n, col, tired) {
+function drawCavBadge(x, y, n, col, tired, v) {
   c.save();
   c.globalAlpha = tired ? .55 : 1;
   c.beginPath();
@@ -11051,7 +11104,7 @@ function drawCavBadge(x, y, n, col, tired) {
   c.arc(x, y, 9, 0, 7);
   c.clip();
   c.translate(x + .8, y + .6);
-  horseHead(c, .145, col, 'b');
+  horseHead(c, .145, col, v);
   c.restore();
   c.fillStyle = '#ffd36b';
   c.font = 'bold 11px sans-serif';
@@ -16538,7 +16591,7 @@ function ui(msg) {
       atSlot(c, t, 's', () => drawSpy(0, 0, spy[t], COL[own[t]], own[t] == 0 ? spyXp : 0));
     // Süvariler: okçu simgesi gibi yuvarlak rozet, içinde at başı ve sayı (bu tur hücuma kalkmamış süvari sayısı kadar parlak).
     if (V.has(t) && cav[t] > 0)
-      atSlot(c, t, 'cv', () => drawCavBadge(0, 0, cav[t], COL[own[t]], (cvU[t] || 0) >= cav[t]));
+      atSlot(c, t, 'cv', () => drawCavBadge(0, 0, cav[t], COL[own[t]], (cvU[t] || 0) >= cav[t], Math.floor(hsh(t, 3.7, 11) * HORSE.length) % HORSE.length));
   });
   for (let t = 0; t < N; t++)
     if (dk[t] && dock[t] && V.has(t))
