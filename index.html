@@ -2301,7 +2301,7 @@ const BLDMAX = 4;
 const bldN = t => (bar[t] ? 1 : 0) + (mn[t] ? 1 : 0) + (dep[t] ? 1 : 0) + (tw[t] ? 1 : 0) + (dk[t] ? 1 : 0) + (gz && gz[t] ? 1 : 0);
 const bldOK = t => bldN(t) < BLDMAX;
 // Gözetleme kulesi: 2 bölge içindeki asker sayılarını gösterir.
-const GZC = 25;
+const GZC = 30;
 const GZR = 2;
 // Süvari: sv3 kışla gerekir, bölge başına en fazla 2. Saldırıda ilk zar kendiliğinden kazanılır; surlara karşı işe yaramaz.
 const CVC = 25;
