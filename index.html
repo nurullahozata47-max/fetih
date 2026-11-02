@@ -10306,7 +10306,7 @@ function drawVolley(e, now) {
 // ---- Yapı yerleşimi: her yapının bölge merkezine göre yeri ve bölgeye sığacak ölçeği ----
 // b kışla, m maden, a okçu, s casus, d depo: merkezdeki asker sayısı dairesine göre yön ve ölçek 1'deki uzaklık.
 // Yapılar küçülünce merkeze yaklaşır ama asker sayısının altında kalmaz.
-const SLOT = { b: [17, 14, 10], m: [-17, 14, 10], a: [-17, -14, 9], s: [17, -14, 9], d: [0, 33, 20], gz: [32, 6, 9], cv: [30, -26, 9] };
+const SLOT = { b: [17, 14, 10], m: [-17, 14, 10], a: [-17, -14, 9], s: [17, -14, 9], d: [0, 33, 20], gz: [32, 6, 9], cv: [-31, -4, 9] };
 function slotOff(k, sc) {
   const [x, y, r] = SLOT[k];
   const d0 = Math.hypot(x, y);
@@ -10324,7 +10324,7 @@ const FOOT = {
   c: [[-21, -19, 21, 9]],
   tw: [[-7, -23, 7, 3]],
   gz: [[-8, -28, 8, 3]],
-  cv: [[-10, -15, 12, 2]]
+  cv: [[-11, -14, 14, 11]]
 };
 // Yerleşim sırası: büyük sahneli yapılar önce yer seçer.
 const FORD = ['b', 'm', 'd', 'c', 'tw', 'gz', 'a', 's', 'cv'];
@@ -10906,6 +10906,54 @@ function drawArch(x, y, n, col, vet) {
   c.moveTo(x - 5, y);
   c.lineTo(x + 6, y);
   c.stroke();
+  c.fillStyle = '#ffd36b';
+  c.font = 'bold 11px sans-serif';
+  c.fillText(n, x + 9, y - 9);
+  c.font = 'bold 15px sans-serif';
+}
+// Süvari rozeti: koyu daire, sahibinin renginde çerçeve, beyaz at başı; sağ üstte sayı. Bu tur hepsi hücum ettiyse soluk.
+function drawCavBadge(x, y, n, col, tired) {
+  c.save();
+  c.globalAlpha = tired ? .55 : 1;
+  c.beginPath();
+  c.arc(x, y, 10, 0, 7);
+  c.fillStyle = '#10222b';
+  c.fill();
+  c.lineWidth = 2;
+  c.strokeStyle = col;
+  c.stroke();
+  c.translate(x, y);
+  c.fillStyle = '#fff';
+  c.beginPath();
+  c.moveTo(-4.2, 7);
+  c.lineTo(-5, 1.5);
+  c.quadraticCurveTo(-4.6, -3.2, -2.4, -4.6);
+  c.lineTo(-2.2, -7.6);
+  c.lineTo(-.4, -5);
+  c.quadraticCurveTo(2.6, -4.6, 4.8, -1.2);
+  c.quadraticCurveTo(6.6, .8, 5.6, 2.4);
+  c.quadraticCurveTo(4.4, 3.4, 2.4, 2);
+  c.quadraticCurveTo(1, 1.6, .8, 3.2);
+  c.quadraticCurveTo(1.6, 5.4, 2.4, 7);
+  c.closePath();
+  c.fill();
+  // yele
+  c.strokeStyle = col;
+  c.lineWidth = 1.3;
+  c.lineCap = 'round';
+  c.beginPath();
+  c.moveTo(-2.6, -4);
+  c.quadraticCurveTo(-4.4, -1, -4.2, 4.6);
+  c.stroke();
+  // göz ve burun
+  c.fillStyle = '#10222b';
+  c.beginPath();
+  c.arc(1.2, -2.6, .85, 0, 7);
+  c.fill();
+  c.beginPath();
+  c.arc(4.6, .6, .55, 0, 7);
+  c.fill();
+  c.restore();
   c.fillStyle = '#ffd36b';
   c.font = 'bold 11px sans-serif';
   c.fillText(n, x + 9, y - 9);
@@ -16389,20 +16437,9 @@ function ui(msg) {
       atSlot(c, t, 'a', () => drawArch(0, 0, arch[t], COL[own[t]], archVet(t)));
     if (V.has(t) && spy[t])
       atSlot(c, t, 's', () => drawSpy(0, 0, spy[t], COL[own[t]], own[t] == 0 ? spyXp : 0));
-    // Süvariler: bölgedeki süvari sayısı kadar atlı (bu tur hücum etmiş olanlar soluk).
+    // Süvariler: okçu simgesi gibi yuvarlak rozet, içinde at başı ve sayı (bu tur hücuma kalkmamış süvari sayısı kadar parlak).
     if (V.has(t) && cav[t] > 0)
-      atSlot(c, t, 'cv', () => {
-        c.save();
-        c.scale(.72, .72);
-        for (let i = cav[t] - 1; i >= 0; i--) {
-          const x = i * 7 - (cav[t] - 1) * 3.5;
-          const y = i * 3;
-          const al = i < (cvU[t] || 0) ? .5 : 1;
-          drawHorse(c, x, y, 1, 1.2 + i, ['#6b4a2f', '#3d2a1c'][i % 2], 0, al, 0);
-          drawRider(c, x, y, 1, 1.2 + i, COL[own[t]], 0, al, 0, true, false);
-        }
-        c.restore();
-      });
+      atSlot(c, t, 'cv', () => drawCavBadge(0, 0, cav[t], COL[own[t]], (cvU[t] || 0) >= cav[t]));
   });
   for (let t = 0; t < N; t++)
     if (dk[t] && dock[t] && V.has(t))
