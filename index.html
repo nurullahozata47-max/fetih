@@ -2306,6 +2306,8 @@ const GZR = 2;
 // Süvari: sv3 kışla gerekir, bölge başına en fazla 2. Saldırıda ilk zar kendiliğinden kazanılır; surlara karşı işe yaramaz.
 const CVC = 25;
 const CAVMAX = 2;
+// Süvari yağması: süvarili saldırıyla fethedilen bölgeden ek ganimet.
+const CVLOOT = 5;
 const SPC = 10;
 const UPC = 30;
 const SSC = 20;
@@ -7748,6 +7750,7 @@ function start(p) {
       arm[t] += 2 * b;
   });
   autoMarch(p);
+  unitDeploy(p);
   ak = false;
   sp = false;
   cn = false;
@@ -8052,6 +8055,15 @@ async function battle(a, t, sea, F) {
     if (showB)
       fl.push({ t, dx: 0, dy: -18, txt: '🐎 Süvari hücumu!', col: '#ffe08a', t0: performance.now() });
   }
+  // Karşı hücum: savunan bölgedeki her süvari saldırandan baştan 1 asker düşürür.
+  const cvD = cav && own[t] < P && cav[t] > 0 ? cav[t] : 0;
+  let kCv = 0;
+  if (cvD && A > 0 && D > 0) {
+    kCv = Math.min(A, cvD);
+    A -= kCv;
+    if (showB)
+      fl.push({ t: a, dx: 0, dy: -18, txt: `🐎 Karşı hücum: -${kCv}`, col: '#ffb08a', t0: performance.now() + 150 });
+  }
   while (A > 0 && D > 0) {
     const x = Math.ceil(Math.random() * 6);
     const y = Math.ceil(Math.random() * 6) + wall[t];
@@ -8084,7 +8096,7 @@ async function battle(a, t, sea, F) {
     nav.push({ k: cvB ? 'cavc' : eqB ? 'equal' : vol ? 'volley' : 'charge', a: fr, t, bx, by, amp, n: Math.min(4, 2 + Math.floor(A0 / 8)), ax, ay, tx, ty, win: w, na: cvB ? 2 + cav[a] : Math.min(vol ? 4 : 6, 3 + Math.floor(A0 / 8)), nd: cvB ? Math.min(4, 2 + Math.floor(arm[t] / 8)) : Math.min(5, 2 + Math.floor(arm[t] / 8)), nr, nArrow: nr * 4, ca: COL[own[a]], cd: COL[own[t]] || '#9aa3a8', seed: 1 + Math.floor(Math.random() * 90), t0: performance.now(), dur });
     await sleep(dur - 120);
   }
-  $('log').textContent = `${PN[own[a]]}: ${NM[a]} → ${NM[t]} ${w ? 'fethedildi' : 'savunuldu'}${k1 + k2 > 0 ? ` (okçu desteği: ${visSet().has(t) ? k1 : '?'} savunucu, ${k2} saldıran vuruldu)` : ''}`;
+  $('log').textContent = `${PN[own[a]]}: ${NM[a]} → ${NM[t]} ${w ? 'fethedildi' : 'savunuldu'}${kCv ? ` (süvari karşı hücumu: ${kCv} saldıran düştü)` : ''}${k1 + k2 > 0 ? ` (okçu desteği: ${visSet().has(t) ? k1 : '?'} savunucu, ${k2} saldıran vuruldu)` : ''}`;
   if (w) {
     const old = own[t];
     const me = own[a];
@@ -8138,6 +8150,14 @@ async function battle(a, t, sea, F) {
     if (sea) {
       gold[me] += LOOT;
       fl.push({ t, dx: 0, txt: `+${LOOT} yağma`, col: '#ffd36b', t0: performance.now() + 300 });
+    }
+    // Süvari yağması
+    if (cvB) {
+      gold[me] += CVLOOT;
+      clampGold(me);
+      fl.push({ t, dx: 0, dy: 16, txt: `🐎 +${CVLOOT} yağma`, col: '#ffd36b', t0: performance.now() + 500 });
+      if (me == 0)
+        $('log').textContent += ` Süvarilerin ${NM[t]} bölgesini yağmaladı: +${CVLOOT} altın.`;
     }
     arm[t] = A;
     if (F == null)
@@ -8670,6 +8690,68 @@ async function marchFront(p, ct) {
     ui();
     await sleep(500);
   }
+}
+// Okçu ve süvari konuşlanması (oyuncu ve botlar, her tur başında): sınırda olmayan bir bölgede 2 okçu ya da 2 süvari
+// varsa biri orada kalır, diğeri kendi toprakların üzerinden en yakın düşman sınırına gidip yerleşir.
+function unitDeploy(p) {
+  if (TUT)
+    return;
+  const foe = v => own[v] != p && own[v] != NEU && own[v] < P && !friend(p, own[v]);
+  const T = [...Array(N).keys()].filter(u => own[u] == p && !inc[u]);
+  const front = new Set(T.filter(u => [...adj[u]].some(foe)));
+  if (!front.size)
+    return;
+  const now = performance.now();
+  let d = 0;
+  const go = (A, MX, what, nm) => {
+    for (const u of T) {
+      if (A[u] < 2 || front.has(u))
+        continue;
+      // Kendi toprakların üzerinden en yakın, yeri olan sınır bölgesi (eşitlikte birliği olmayan ve düşman komşusu çok olan)
+      const dist = new Map([[u, 0]]);
+      const q = [u];
+      let best = -1;
+      let bd = 99;
+      let bs = -1e9;
+      for (let k = 0; k < q.length; k++) {
+        const x = q[k];
+        const dx = dist.get(x);
+        if (dx > bd)
+          break;
+        if (front.has(x) && A[x] < MX) {
+          const sc = (A[x] ? 0 : 10) + [...adj[x]].filter(foe).length;
+          if (dx < bd || sc > bs) {
+            bd = dx;
+            bs = sc;
+            best = x;
+          }
+        }
+        adj[x].forEach(y => {
+          if (own[y] == p && !inc[y] && !dist.has(y)) {
+            dist.set(y, dx + 1);
+            q.push(y);
+          }
+        });
+      }
+      if (best < 0)
+        continue;
+      A[u]--;
+      A[best]++;
+      if (what == 'arch') {
+        archV[best] = Math.max(archV[best], archV[u]);
+      }
+      if (p == 0 || Vg.has(u) || Vg.has(best)) {
+        const dur = 900 + Math.min(600, bd * 120);
+        nav.push({ k: 'carry', what, x0: cen[u][0] * S, y0: cen[u][1] * S, x1: cen[best][0] * S, y1: cen[best][1] * S, n: 1, col: COL[p], t0: now + d * 250, dur });
+        fl.push({ t: best, dx: 0, txt: `+1 ${nm}`, col: '#fff', t0: now + d * 250 + dur });
+        d++;
+      }
+      if (p == 0)
+        hl += ` 1 ${nm} ${NM[u]} bölgesinden ${NM[best]} sınırına konuşlandı.`;
+    }
+  };
+  go(arch, ARCHMAX, 'arch', 'okçu');
+  go(cav, CAVMAX, 'cav', 'süvari');
 }
 // 3. seviye kışla: 10+ asker birikince sınırda değilse en yakın sınıra gider.
 function autoMarch(p) {
@@ -14647,7 +14729,7 @@ function openPop(cx, cy) {
     if (bar[t])
       o.push(bar[t] < 3 ? ['sv', 'Süvari (Sv3 kışla gerekir)', false] : ['sv', cav[t] >= CAVMAX ? `Süvari (${CAVMAX}/${CAVMAX})` : `Süvari yetiştir (${CVC} altın · ${cav[t]}/${CAVMAX})`, cav[t] < CAVMAX && gold[0] >= CVC]);
     if (cav[t] > 0)
-      inf.o += ` 🐎 Süvari (${cav[t]}): bu bölgeden yapılan saldırıda ilk zar kendiliğinden kazanılır (her süvari turda bir hücum). Surlu bölgelere karşı işe yaramaz.${cvU[t] ? ` Bu tur ${cvU[t]} süvari hücum etti.` : ''}`;
+      inf.o += ` 🐎 Süvari (${cav[t]}): bu bölgeden yapılan saldırıda ilk zar kendiliğinden kazanılır (her süvari turda bir hücum, surlu bölgelere karşı işe yaramaz); böyle bir saldırıyla bölge alınırsa +${CVLOOT} altın yağma. Savunmada karşı hücum: bu bölgeye saldıran düşman her süvari için baştan 1 asker kaybeder.${cvU[t] ? ` Bu tur ${cvU[t]} süvari hücum etti.` : ''}`;
     if (bar[t])
       o.push(bar[t] < 3 ? ['ct', 'Mancınık (Sv3 kışla gerekir)', false] : ['ct', cat[t] >= CATMAX ? `Mancınık (${CATMAX}/${CATMAX})` : `Mancınık yap (${CTC} altın)`, cat[t] < CATMAX && gold[0] >= CTC]);
     if (cat[t] > 0) {
@@ -15919,8 +16001,8 @@ function botSpies(p) {
   gold[p] -= SPC;
   bsp.push({ p, t, rd0: rd });
 }
-// Bot birliklerini cepheye kaydırır: mancınıklar surlu düşman komşusu olan sınıra, iki okçulu bölgede biri kalır
-// diğeri sınıra doğru bir adım ilerler, süvariler de cepheye gider.
+// Bot mancınıklarını cepheye kaydırır: surlu düşman komşusu olan sınıra (yoksa herhangi bir cepheye).
+// Okçu ve süvari konuşlanması tur başında unitDeploy ile yapılır.
 function botShift(p) {
   const foe = v => own[v] != p && own[v] != NEU && !friend(p, own[v]);
   const T = [...Array(N).keys()].filter(u => own[u] == p && !inc[u]);
@@ -15950,37 +16032,6 @@ function botShift(p) {
     if (!cat[u])
       catXp[u] = 0;
     show(u, dst, 'cat', n);
-  }
-  // Okçu: iki okçulu iç bölgede biri kalır, diğeri her tur sınıra doğru bir bölge ilerler.
-  const dF = ownDist(p, front);
-  for (const u of T) {
-    if (arch[u] < 2 || !dF.has(u))
-      continue;
-    const du = dF.get(u);
-    let v = -1;
-    if (du > 0)
-      v = [...adj[u]].filter(x => own[x] == p && !inc[x] && dF.get(x) == du - 1 && arch[x] < ARCHMAX).sort((x, y) => arch[x] - arch[y])[0] ?? -1;
-    else if (Math.random() < .5)
-      // Zaten sınırdaysa: okçusu olmayan komşu sınır bölgesine
-      v = [...adj[u]].filter(x => own[x] == p && !inc[x] && dF.get(x) == 0 && !arch[x]).sort((x, y) => [...adj[y]].filter(foe).length - [...adj[x]].filter(foe).length)[0] ?? -1;
-    if (v < 0)
-      continue;
-    arch[u]--;
-    arch[v]++;
-    archV[v] = Math.max(archV[v], archV[u]);
-    show(u, v, 'arch', 1);
-  }
-  // Süvari: cepheye geçer.
-  for (const u of T) {
-    if (!(cav[u] > 0) || front.includes(u) || !dF.has(u))
-      continue;
-    const dst = front.filter(v => cav[v] < CAVMAX && !wall[v]).sort((x, y) => HD[u][x] - HD[u][y] || [...adj[y]].filter(foe).length - [...adj[x]].filter(foe).length)[0];
-    if (dst == null)
-      continue;
-    const n = Math.min(cav[u], CAVMAX - cav[dst]);
-    cav[u] -= n;
-    cav[dst] += n;
-    show(u, dst, 'cav', n);
   }
 }
 // Deniz çıkarması planı: normal ve zor modda bot bazen iskelesinde büyük bir ordu toplar (normal 12-20, zor 20-30)
@@ -16019,8 +16070,28 @@ async function ai0(p) {
   // Vergi: refah düşükse indirir, zor botlar refah yüksekken artırır.
   for (const t of mine())
     tax[t] = ref[p] < 50 || isBorder(t) ? 1 : 2;
+  // Başkent suru: kolay ve normal botlar başkentine 1. seviye, zor botlar 2. seviye sur çeker.
+  // Paraları yetmiyorsa sur için biriktirir (o tur başka şeye harcamaz).
+  let svW = false;
+  {
+    const c0 = cap[p];
+    const wWant = [1, 1, 2][DIF];
+    if (c0 >= 0 && own[c0] == p && !inc[c0] && wall[c0] < wWant && rd >= [6, 3, 2][DIF]) {
+      const cw = WC(wall[c0]);
+      if (gold[p] >= cw) {
+        gold[p] -= cw;
+        wall[c0]++;
+        wallStart(c0);
+        pulse(c0, '#cfe3ea');
+        if (Vg.has(c0))
+          hl += ` ${PN[p]} başkentine ${wall[c0] > 1 ? 'okçulu sur' : 'sur'} çekti.`;
+      }
+      else if (DIF >= 1 && capOf(p) >= cw)
+        svW = true;
+    }
+  }
   // Hazinesi dolmak üzere olan bot depo kurar ya da yükseltir (en güvenli bölgeye).
-  if (gold[p] >= capOf(p) * .85 && capOf(p) < 300) {
+  if (!svW && gold[p] >= capOf(p) * .85 && capOf(p) < 300) {
     const ds = mine().filter(t => dep[t] && dep[t] < 3 && !inc[t]);
     if (ds.length && gold[p] >= DPU[dep[ds[0]]]) {
       gold[p] -= DPU[dep[ds[0]]];
@@ -16044,7 +16115,9 @@ async function ai0(p) {
     const bs = mine().filter(t => bar[t] && !inc[t]);
     const bmax = Math.max(0, ...bs.map(t => bar[t]));
     const want = [1, 2, 3][DIF];
-    if (!bs.length && gold[p] >= BC && rd >= 2 && Math.random() < [.2, .5, .7][DIF]) {
+    if (svW) {
+    }
+    else if (!bs.length && gold[p] >= BC && rd >= 2 && Math.random() < [.2, .5, .7][DIF]) {
       // Kışlası olmayan bot önce başkentine (ya da yakınına) bir kışla kurar
       const o = [ct, ...near2(ct)].filter(t => own[t] == p && !inc[t] && !bar[t] && bldOK(t));
       if (o.length) {
@@ -16060,10 +16133,11 @@ async function ai0(p) {
     }
   }
   // Donanma: iskele, büyük ve küçük gemiler (inşaattan önce, yoksa altın hep binalara gider).
-  botNavy(p);
+  if (!svW)
+    botNavy(p);
   invPlan(p);
   // İnşa: hazine doluysa tur başına birden çok yapı alır. Yapılacak yeri olmayan seçenek listeye girmez (tur boşa gitmez).
-  const nb = gold[p] >= capOf(p) * .8 ? 3 : gold[p] >= capOf(p) * .5 ? 2 : 1;
+  const nb = svW ? 0 : gold[p] >= capOf(p) * .8 ? 3 : gold[p] >= capOf(p) * .5 ? 2 : 1;
   // Sv3 kışla: zorda serbest; normalde nadiren (oyunun ilerleyen turlarında, turda %4 ihtimalle).
   const allow3 = DIF == 2 || (DIF == 1 ? rd >= 25 && Math.random() < .04 : Math.random() < .2);
   for (let k = 0; k < nb; k++) {
@@ -16076,7 +16150,7 @@ async function ai0(p) {
     const gzC = rd >= 3 ? o1.filter(t => !gz[t] && isFront(p, t) && ![...Array(N).keys()].some(u => gz[u] && own[u] == p && HD[u][t] <= 2)) : [];
     const nGz = gz.filter((v, t) => v && own[t] == p).length;
     const opts = [];
-    if (wall[ct] < 2 && gold[p] >= WC(wall[ct]))
+    if (wall[ct] < [1, 1, 2][DIF] && gold[p] >= WC(wall[ct]))
       opts.push(['wc', 9]);
     if (gold[p] >= MC(nMn) && o1.some(t => !mn[t]))
       opts.push(['m', 2.5]);
@@ -16179,7 +16253,7 @@ async function ai0(p) {
       await sleep(400);
     }
   }
-  if (rev[p] > 0) {
+  if (rev[p] > 0 && !svW) {
     const cd = [...Array(N).keys()].filter(t => HUM.has(own[t]) && canInc3(p, t) && est(p, t) >= 1 && est(p, t) <= 3);
     if (cd.length && gold[p] >= INCc(p)) {
       incite(p, cd[Math.floor(Math.random() * cd.length)]);
@@ -16199,7 +16273,7 @@ async function ai0(p) {
       }
     }
   });
-  for (let k = 0, na = gold[p] >= capOf(p) * .6 ? 3 : 1; k < na; k++) {
+  for (let k = 0, na = gold[p] >= capOf(p) * .6 ? 3 : 1; k < na && !svW; k++) {
     if (!(gold[p] >= AC && Math.random() < (na > 1 ? .8 : .35)))
       break;
     const b0 = mine().filter(t => bar[t] && arch[t] < ARCHMAX && !inc[t]);
@@ -16348,7 +16422,7 @@ async function ai0(p) {
     }
   }
   // Mancınık: surlu düşman komşusu olan sv3 kışlalarda yapılır, hazırsa önce surlu hedeflere atılır.
-  if (gold[p] >= CTC && Math.random() < .5) {
+  if (!svW && gold[p] >= CTC && Math.random() < .5) {
     const cc = mine().filter(a => bar[a] >= 3 && cat[a] < CATMAX && !inc[a] && [...adj[a]].some(t => own[t] != p && own[t] != NEU && !friend(p, own[t]) && wall[t] > 0));
     if (cc.length) {
       cat[cc[0]]++;
@@ -16357,7 +16431,7 @@ async function ai0(p) {
     }
   }
   // Süvari: sv3 kışlası olan bot, cephedeki kışlalarında süvari yetiştirir.
-  for (let k = 0; k < 2; k++) {
+  for (let k = 0; k < 2 && !svW; k++) {
     if (gold[p] < CVC + 10 || Math.random() >= [.15, .35, .55][DIF])
       break;
     const cv = mine().filter(a => bar[a] >= 3 && cav[a] < CAVMAX && !inc[a]).sort((x, y) => (isFront(p, y) ? 1 : 0) - (isFront(p, x) ? 1 : 0));
@@ -16400,7 +16474,7 @@ async function ai0(p) {
         const F = va.has(t) ? arm[a] - 1 : Math.min(arm[a] - 1, shipCap(a));
         if (wall[t] > 0 && F < (wall[t] >= 2 ? WALLMIN : WALLMIN1))
           return;
-        const s = F - est(p, t);
+        const s = F - est(p, t) - (visTo(p, t) ? cav[t] || 0 : 0);
         const pc = bp[p].some(v => v > 0);
         // Oyuncunun müttefiki olarak verilen saldırı emri: o devlete öncelik verir.
         const ob = ally[p] > 0 && !tru[p] && ord[p] >= 0 && own[t] == ord[p] ? 3 + (t == ordT[p] ? 2 : 0) : 0;
