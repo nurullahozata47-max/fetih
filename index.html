@@ -10911,7 +10911,7 @@ function drawArch(x, y, n, col, vet) {
   c.fillText(n, x + 9, y - 9);
   c.font = 'bold 15px sans-serif';
 }
-// At donları: 0 doru (kahverengi, beyaz akıtma), 1 yağız (siyah, alında yıldız), 2 kır (benekli gri),
+// At donları: 0 doru (kahverengi, beyaz akıtma), 1 yağız (siyah, alında yuvarlak beyaz leke), 2 kır (benekli gri),
 // 3 al (kızıl, ince akıtma, açık yele), 4 kula (altın sarısı, krem yele). Her bölgenin süvarisi bunlardan birini rastgele alır.
 const HORSE = [
   { g: ['#e2ab6e', '#b57a43', '#7c4d28'], mane: '#2a1a0e', mark: 'blaze', line: 'rgba(40,22,10,.55)' },
@@ -11005,19 +11005,16 @@ function horseHead(c, k, col, v) {
     c.fill();
   }
   else if (H0.mark == 'star') {
+    // alında yuvarlak beyaz leke (kenarı hafif yumuşak)
+    const sg = c.createRadialGradient(8, -24, 0, 8, -24, 6.4);
+    sg.addColorStop(0, '#f6efe2');
+    sg.addColorStop(.7, '#f6efe2');
+    sg.addColorStop(1, 'rgba(246,239,226,0)');
+    c.fillStyle = sg;
     c.beginPath();
-    c.moveTo(6, -30);
-    c.lineTo(9, -25);
-    c.lineTo(14, -24);
-    c.lineTo(10, -20);
-    c.lineTo(11, -15);
-    c.lineTo(7, -18);
-    c.lineTo(3, -16);
-    c.lineTo(4, -21);
-    c.lineTo(0, -25);
-    c.lineTo(5, -25);
-    c.closePath();
+    c.ellipse(8, -24, 6.4, 5.4, .5, 0, 7);
     c.fill();
+    c.fillStyle = '#f6efe2';
   }
   else if (H0.mark == 'stripe') {
     c.beginPath();
