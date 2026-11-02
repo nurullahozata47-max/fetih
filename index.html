@@ -2307,8 +2307,11 @@ const GZR = 2;
 // başarısız olursa karşı saldırıya geçip saldıranın sınırdaki bölgesini işgal eder. Süvarili saldırıyla fetihte şansa bağlı yağma.
 const CVC = 25;
 const CAVMAX = 2;
-// Süvari yağması: süvarili saldırıyla fethedilen bölgeden şansa bağlı 1-20 altın.
+// Süvari yağması: süvarili saldırıyla fethedilen bölgeden şansa bağlı 5-20 altın.
+const CVLOOT0 = 5;
 const CVLOOT = 20;
+// Süvari kaybı: saldırıya (ya da karşı saldırıya) katılan süvari %40 ihtimalle ölür.
+const CVDIE = .4;
 const SPC = 10;
 const UPC = 30;
 const SSC = 20;
@@ -8084,7 +8087,16 @@ async function battle(a, t, sea, F) {
     nav.push({ k: cvB ? 'cavc' : eqB ? 'equal' : vol ? 'volley' : 'charge', a: fr, t, bx, by, amp, n: Math.min(4, 2 + Math.floor(A0 / 8)), ax, ay, tx, ty, win: w, na: cvB ? 2 + cav[a] : Math.min(vol ? 4 : 6, 3 + Math.floor(A0 / 8)), nd: cvB ? Math.min(4, 2 + Math.floor(arm[t] / 8)) : Math.min(5, 2 + Math.floor(arm[t] / 8)), nr, nArrow: nr * 4, ca: COL[own[a]], cd: COL[own[t]] || '#9aa3a8', seed: 1 + Math.floor(Math.random() * 90), t0: performance.now(), dur });
     await sleep(dur - 120);
   }
-  $('log').textContent = `${PN[own[a]]}: ${NM[a]} → ${NM[t]} ${w ? 'fethedildi' : 'savunuldu'}${k1 + k2 > 0 ? ` (okçu desteği: ${visSet().has(t) ? k1 : '?'} savunucu, ${k2} saldıran vuruldu)` : ''}`;
+  // Saldırıya katılan süvari %40 ihtimalle savaşta düşer.
+  let cvDead = false;
+  if (cvB && cav[a] > 0 && Math.random() < CVDIE) {
+    cav[a]--;
+    cvU[a] = Math.min(cvU[a], cav[a]);
+    cvDead = true;
+    if (showB)
+      fl.push({ t: a, dx: 0, dy: -18, txt: '🐎 Süvari düştü', col: '#ff8a8a', t0: performance.now() });
+  }
+  $('log').textContent = `${PN[own[a]]}: ${NM[a]} → ${NM[t]} ${w ? 'fethedildi' : 'savunuldu'}${cvDead && (own[a] == 0 || own[t] == 0) ? ' (1 süvari savaşta düştü)' : ''}${k1 + k2 > 0 ? ` (okçu desteği: ${visSet().has(t) ? k1 : '?'} savunucu, ${k2} saldıran vuruldu)` : ''}`;
   if (w) {
     const old = own[t];
     const me = own[a];
@@ -8139,9 +8151,9 @@ async function battle(a, t, sea, F) {
       gold[me] += LOOT;
       fl.push({ t, dx: 0, txt: `+${LOOT} yağma`, col: '#ffd36b', t0: performance.now() + 300 });
     }
-    // Süvari yağması: şansa bağlı 1-20 altın
+    // Süvari yağması: şansa bağlı 5-20 altın
     if (cvB) {
-      const yg = 1 + Math.floor(Math.random() * CVLOOT);
+      const yg = CVLOOT0 + Math.floor(Math.random() * (CVLOOT - CVLOOT0 + 1));
       gold[me] += yg;
       clampGold(me);
       fl.push({ t, dx: 0, dy: 16, txt: `🐎 +${yg} yağma`, col: '#ffd36b', t0: performance.now() + 500 });
@@ -8248,17 +8260,21 @@ async function cavCounter(a, t) {
   shS[fr] = 0;
   shL[fr] = 0;
   mine[fr] = null;
-  // Süvari işgal ettiği bölgeye geçer (2 süvari varsa biri yerinde kalır)
+  // Süvari işgal ettiği bölgeye geçer (2 süvari varsa biri yerinde kalır); %40 ihtimalle çatışmada düşer.
   cav[t]--;
-  cav[fr] = 1;
+  cvU[t] = Math.min(cvU[t], cav[t]);
+  const died = Math.random() < CVDIE;
+  cav[fr] = died ? 0 : 1;
   cvU[fr] = 0;
   pulse(fr, COL[q]);
   fl.push({ t: fr, dx: 0, txt: '🐎 İşgal edildi!', col: '#fff', t0: performance.now() });
+  if (died)
+    fl.push({ t: fr, dx: 0, dy: 18, txt: 'Süvari düştü', col: '#ff8a8a', t0: performance.now() + 500 });
   if (sel == fr)
     sel = null;
   if (q == 0) {
     banner(`🐎 Süvarilerin karşı saldırıyla ${NM[fr]} bölgesini işgal etti!`, COL[0]);
-    $('log').textContent += ` Süvarilerin karşı saldırıya geçti ve ${PN[o]} ülkesinin ${NM[fr]} bölgesini işgal etti!`;
+    $('log').textContent += ` Süvarilerin karşı saldırıya geçti ve ${PN[o]} ülkesinin ${NM[fr]} bölgesini işgal etti!${died ? ' Süvarin çatışmada düştü.' : ''}`;
   }
   else if (o == 0) {
     banner(`🐎 ${PN[q]} süvarileri ${NM[fr]} bölgeni işgal etti!`, COL[q]);
@@ -8772,10 +8788,9 @@ function unitDeploy(p) {
     return;
   const now = performance.now();
   let d = 0;
-  const go = (A, MX, what, nm) => {
+  const go = (A, MX, what, nm, mn0) => {
     for (const u of T) {
-      if (A[u] < 2 || front.has(u))
-        continue;
+      while (A[u] >= mn0 && !front.has(u)) {
       // Kendi toprakların üzerinden en yakın, yeri olan sınır bölgesi (eşitlikte birliği olmayan ve düşman komşusu çok olan)
       const dist = new Map([[u, 0]]);
       const q = [u];
@@ -8803,11 +8818,16 @@ function unitDeploy(p) {
         });
       }
       if (best < 0)
-        continue;
+        break;
       A[u]--;
       A[best]++;
       if (what == 'arch') {
         archV[best] = Math.max(archV[best], archV[u]);
+      }
+      else {
+        const k2 = Math.min(cvU[u], 1);
+        cvU[u] -= k2;
+        cvU[best] += k2;
       }
       if (p == 0 || Vg.has(u) || Vg.has(best)) {
         const dur = 900 + Math.min(600, bd * 120);
@@ -8816,11 +8836,13 @@ function unitDeploy(p) {
         d++;
       }
       if (p == 0)
-        hl += ` 1 ${nm} ${NM[u]} bölgesinden ${NM[best]} sınırına konuşlandı.`;
+        hl += ` 1 ${nm} ${NM[u]} bölgesinden ${NM[best]} sınırına ${what == 'cav' ? 'ilerledi' : 'konuşlandı'}.`;
+      }
     }
   };
-  go(arch, ARCHMAX, 'arch', 'okçu');
-  go(cav, CAVMAX, 'cav', 'süvari');
+  // Okçu: 2 okçudan biri kalır, diğeri sınıra gider. Süvari: hepsi her zaman sınıra ilerler.
+  go(arch, ARCHMAX, 'arch', 'okçu', 2);
+  go(cav, CAVMAX, 'cav', 'süvari', 1);
 }
 // 3. seviye kışla: 10+ asker birikince sınırda değilse en yakın sınıra gider.
 function autoMarch(p) {
@@ -14798,7 +14820,7 @@ function openPop(cx, cy) {
     if (bar[t])
       o.push(bar[t] < 3 ? ['sv', 'Süvari (Sv3 kışla gerekir)', false] : ['sv', cav[t] >= CAVMAX ? `Süvari (${CAVMAX}/${CAVMAX})` : `Süvari yetiştir (${CVC} altın · ${cav[t]}/${CAVMAX})`, cav[t] < CAVMAX && gold[0] >= CVC]);
     if (cav[t] > 0)
-      inf.o += ` 🐎 Süvari (${cav[t]}): savunmada asker sayılmaz. Bu bölgeye yapılan saldırı başarısız olursa süvari karşı saldırıya geçer ve saldıranın sınırdaki bölgesini işgal eder (surlu bölge ve başkent hariç; 2 süvari varsa biri yerinde kalır). Bu bölgeden yapılan saldırıyla bir bölge alınırsa şansa bağlı 1-${CVLOOT} altın yağma (her süvari turda bir; surlu bölgelerde ve denizden olmaz).${cvU[t] ? ` Bu tur ${cvU[t]} süvari yağmaya katıldı.` : ''}`;
+      inf.o += ` 🐎 Süvari (${cav[t]}): savunmada asker sayılmaz. Bu bölgeye yapılan saldırı başarısız olursa süvari karşı saldırıya geçer ve saldıranın sınırdaki bölgesini işgal eder (surlu bölge ve başkent hariç; 2 süvari varsa biri yerinde kalır). Bu bölgeden yapılan saldırıyla bir bölge alınırsa şansa bağlı ${CVLOOT0}-${CVLOOT} altın yağma (her süvari turda bir; surlu bölgelerde ve denizden olmaz). Saldırıya ve karşı saldırıya katılan süvari %${Math.round(CVDIE * 100)} ihtimalle ölür. Süvariler her tur başında kendiliğinden en yakın düşman sınırına ilerler.${cvU[t] ? ` Bu tur ${cvU[t]} süvari yağmaya katıldı.` : ''}`;
     if (bar[t])
       o.push(bar[t] < 3 ? ['ct', 'Mancınık (Sv3 kışla gerekir)', false] : ['ct', cat[t] >= CATMAX ? `Mancınık (${CATMAX}/${CATMAX})` : `Mancınık yap (${CTC} altın)`, cat[t] < CATMAX && gold[0] >= CTC]);
     if (cat[t] > 0) {
