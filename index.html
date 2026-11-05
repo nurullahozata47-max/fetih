@@ -2848,9 +2848,9 @@ const KD = [
   { ic: '⛏️', nm: 'Madencilik', ef: 'Her maden seviyesi 2 altın fazla verir (sv1 +7, sv2 +14, sv3 +21).' },
   { ic: '🪙', nm: 'Büyük hazine', ef: 'Her altın sandığının kapasitesi 20 artar.' },
   { ic: '🐪', nm: 'Ticaret yolları', ef: 'Bölgelerinden gelen temel gelirin sınırı 15\'ten 25 altına çıkar.' },
-  { ic: '⚖️', nm: 'Adalet', ef: 'Sınır bölgelerinden 2 altın vergi alınca isyan çıkmaz.' },
+  { ic: '🌾', nm: 'Gönüllüler', ef: 'Refahın %85 ve üstündeyse her tur başkentine 2 gönüllü asker katılır.' },
   { ic: '🤝', nm: 'Sadakat', ef: 'Refah düşüşleri yarıya iner: başarısız saldırı −2, fazladan fetih −5.' },
-  { ic: '🏰', nm: 'Köklü devlet', ef: 'Rakiplerin isyan çıkarma girişimleri yarı yarıya boşa gider; kötü huylu isyanlar yayılmaz.' }
+  { ic: '✊', nm: 'Sadık halk', ef: 'Bir bölgeni rakip fethederse %40 ihtimalle oradaki halk işgalciye karşı ayaklanır (%90 iyi huylu, %10 kötü huylu). İşgalcinin askerleri çekilmez; isyan bastırılamazsa bölge sana geri döner. Başkentin düşüp bütün ülke işgal edilirse çalışmaz.' }
 ];
 const kh = (p, i) => !!(kd && kd[p] && kd[p][i]);
 const kdN = p => kd && kd[p] ? kd[p].reduce((a, b) => a + b, 0) : 0;
@@ -2982,6 +2982,8 @@ let cav;
 let cvU;
 let kd;
 let kyol;
+// sdk[t]: Sadık halk isyanı: bastırılamazsa bölgenin döneceği eski sahibi (-1 yok).
+let sdk;
 // Bot casusları (oyuncunun başkentini arar): bsp görevler, bkn[p] botun bildiği başkent, bse["p_t"] görünürlük sonu (tur).
 let bsp = [];
 let bkn = {};
@@ -4343,7 +4345,7 @@ function taxCollect(p) {
   ref[p] = Math.max(0, Math.min(100, o + d));
   let rv0 = 0;
   for (const t of hot)
-    if (cap[p] != t && !inc[t] && !kh(p, 6) && Math.random() < rk) {
+    if (cap[p] != t && !inc[t] && Math.random() < rk) {
       startRevolt(t, Math.random() < .25 ? 2 : 1, null, 'Sınır bölgesinden 2 altın vergi istendi, halk ağır vergiye ayaklandı.');
       rv0++;
     }
@@ -8241,6 +8243,7 @@ function init(noDraft, seed) {
   cvU = Array(N).fill(0);
   kd = Array.from({ length: PM }, () => Array(9).fill(0));
   kyol = Array(PM).fill(-1);
+  sdk = Array(N).fill(-1);
   bsp = [];
   bkn = {};
   bse = {};
@@ -8326,6 +8329,12 @@ function start(p) {
     if (b && own[t] == p && !inc[t])
       arm[t] += 2 * b + (kh(p, 0) ? 1 : 0);
   });
+  // Gönüllüler (Halk yolu): refah %85 ve üstündeyse başkente 2 gönüllü asker katılır.
+  if (kh(p, 6) && ref[p] >= 85 && cap[p] >= 0 && own[cap[p]] == p && !inc[cap[p]]) {
+    arm[cap[p]] += 2;
+    if (p == 0)
+      fl.push({ t: cap[0], dx: -17, dy: -10, txt: '🌾 +2 gönüllü', col: '#d9f2c4', t0: performance.now() + 300 });
+  }
   autoMarch(p);
   unitDeploy(p);
   ak = false;
@@ -8764,6 +8773,9 @@ async function battle(a, t, sea, F) {
         }
       });
     await conquerFx(a, t, old);
+    sdk[t] = -1;
+    if (!(old < P && cap[old] == t))
+      loyalRise(t, old);
     if (epic) {
       // Kamera bölgeyi ortalar; sahne ekranda her yakınlıkta aynı büyüklükte görünür
       focusOn(t);
@@ -8865,6 +8877,8 @@ async function cavCounter(a, t) {
     hl += ` ${PN[q]} süvarileri karşı saldırıyla ${PN[o]} ülkesinin ${NM[fr]} bölgesini işgal etti.`;
   ui();
   await conquerFx(t, fr, o);
+  sdk[fr] = -1;
+  loyalRise(fr, o);
   ui();
 }
 // Bir hücrenin 4 komşusu (harita kenarında olmayanlar). Performans: tek dizi, filtre yok.
@@ -9164,10 +9178,12 @@ function revoltFocus() {
   }, 1200);
 }
 // İsyan başlat. kind 1: iyi huylu (yerinde kalır), 2: kötü huylu (yayılır). org: kötü huylu isyanın kaynağı.
-function startRevolt(t, kind, org, why) {
+function startRevolt(t, kind, org, why, stay) {
   const p = own[t];
   if (p < 0 || p >= P || inc[t])
     return;
+  if (sdk)
+    sdk[t] = -1;
   ik[t] = kind;
   rwhy[t] = why || '';
   if (p == 0)
@@ -9186,7 +9202,9 @@ function startRevolt(t, kind, org, why) {
     inc[t] = 2;
     ib[t] = 2 + Math.floor(Math.random() * 3);
   }
-  retreat(t);
+  // Sadık halk isyanında işgalcinin askerleri çekilmez.
+  if (!stay)
+    retreat(t);
   const now = performance.now();
   fl.push({ t, dx: 0, txt: kind == 2 ? 'Kötü huylu isyan!' : 'Ayaklanma!', col: kind == 2 ? '#ff4d4d' : '#ff7a3d', t0: now });
   pulse(t, kind == 2 ? '#ff3030' : '#ff7a3d');
@@ -10238,15 +10256,6 @@ function incite(p, t) {
       return lg(`${NM[t]}: isyan çıkmadı, bölgede çok fazla asker vardı. ${c} altın boşa gitti.`);
     }
   }
-  // Köklü devlet: kışkırtma yarı yarıya boşa gider.
-  if (kh(q, 8) && Math.random() < .5) {
-    pulse(t, '#cfd8dc');
-    if (p == 0)
-      lg(`${NM[t]}: isyan çıkmadı, ${PN[q]} köklü bir devlet; halk kışkırtmaya kapılmadı. ${c} altın boşa gitti.`);
-    else if (q == 0)
-      hl += ` ${PN[p]} ${NM[t]} bölgende isyan çıkarmaya çalıştı ama halkın kışkırtmaya kapılmadı.`;
-    return;
-  }
   startRevolt(t, 1, null, `${PN[p]} krallığı para dağıtıp halkı kışkırttı.`);
   if (p == 0)
     lg(`${NM[t]} bölgesinde isyan çıktı. ${PN[q]} 2 tur içinde bastıramazsa bölge bağımsız bir devlet olur.`);
@@ -10264,6 +10273,7 @@ function incTick(p) {
       inc[t] = 0;
       ik[t] = 0;
       rcl[t] = -1;
+      sdk[t] = -1;
       fl.push({ t, dx: 0, txt: 'İsyan bastırıldı', col: '#3fb98a', t0: performance.now() });
       hl += p == 0 ? ` ${NM[t]} bölgendeki isyan bastırıldı.` : '';
       continue;
@@ -10285,7 +10295,7 @@ function incTick(p) {
   // Kötü huylu isyanlar yayılır: her isyan kaynağı tur başına bir komşu bölgeye sıçrar.
   const done = new Set();
   for (let t = 0; t < N; t++) {
-    if (own[t] != p || !(inc[t] > 0) || ik[t] != 2 || done.has(rcl[t]) || kh(p, 8))
+    if (own[t] != p || !(inc[t] > 0) || ik[t] != 2 || done.has(rcl[t]))
       continue;
     const o = rcl[t];
     done.add(o);
@@ -10309,8 +10319,57 @@ function incTick(p) {
     if (p == 0)
       hl += ` İsyan ${NM[u]} bölgene sıçradı!`;
   }
-  if (sec.length)
-    secede(p, sec);
+  // Sadık halk: bastırılamayan isyan bölgeyi eski sahibine geri verir (eski devlet hâlâ ayaktaysa).
+  const back = sec.filter(t => sdk[t] >= 0 && sdk[t] != p && sdk[t] < P && cnt(sdk[t]) > 0);
+  back.forEach(t => loyalBack(t));
+  const sec2 = sec.filter(t => !back.includes(t));
+  if (sec2.length)
+    secede(p, sec2);
+}
+// Sadık halk isyanı başardı: bölge eski sahibine döner, isyancılar onun askeri olur.
+function loyalBack(t) {
+  const q = sdk[t];
+  const o = own[t];
+  own[t] = q;
+  arm[t] = Math.max(1, ib[t]);
+  inc[t] = 0;
+  ik[t] = 0;
+  rcl[t] = -1;
+  sdk[t] = -1;
+  tax[t] = 1;
+  arch[t] = 0;
+  archV[t] = 0;
+  cat[t] = 0;
+  catXp[t] = 0;
+  spy[t] = 0;
+  tw[t] = 0;
+  cav[t] = 0;
+  shS[t] = 0;
+  shL[t] = 0;
+  mine[t] = null;
+  fadeTo(t, o);
+  pulse(t, COL[q]);
+  nav.push({ k: 'burst', t, col: COL[q], t0: performance.now(), dur: 1100 });
+  fl.push({ t, dx: 0, txt: '✊ Halk geri döndü!', col: '#fff', t0: performance.now() });
+  if (q == 0) {
+    hl += ` ✊ ${NM[t]} halkı ${PN[o]} işgaline karşı isyanı kazandı: bölge yeniden senin!`;
+    setTimeout(() => banner(`✊ ${NM[t]} halkı sana geri döndü!`, COL[0]), 600);
+  }
+  else if (o == 0)
+    hl += ` ${NM[t]} bölgesindeki isyanı bastıramadın: halk eski devleti ${PN[q]} tarafına geçti.`;
+  else if (Vg.has(t))
+    hl += ` ${NM[t]} halkı ayaklanıp ${PN[q]} devletine geri döndü.`;
+}
+// Sadık halk (Halk yolu 3): fethedilen bölgede %40 ihtimalle eski devlete sadık halk ayaklanır.
+function loyalRise(t, old) {
+  if (!(old >= 0 && old < P && old != NEU) || own[t] == old || !kh(old, 8) || cnt(old) == 0 || Math.random() >= .4)
+    return;
+  const kind = Math.random() < .9 ? 1 : 2;
+  startRevolt(t, kind, null, `Halk eski devletine (${PN[old]}) sadık kaldı ve işgale karşı ayaklandı.`, true);
+  if (inc[t] > 0)
+    sdk[t] = old;
+  if (old == 0)
+    hl += ` ✊ ${NM[t]} bölgendeki halk ${PN[own[t]]} işgaline karşı ayaklandı! İsyan bastırılamazsa bölge sana döner.`;
 }
 // Süresi dolan isyanlı bölgeler bağımsızlığını ilan eder. Aynı isyandan çıkanlar tek devlet olur.
 function secede(p, list) {
@@ -17981,7 +18040,7 @@ const SAVE_KEY = 'fetih_save';
 const SAVE_VARS = ['P', 'turn', 'phase', 'pool', 'rd', 'dr', 'dnx', 'over', 'NI', 'spyXp', 'spyMade', 'taxEvery', 'taxAuto', 'taxTip', 'taxMode', 'durL', 'durLP', 'durLN', 'playMs', 'lateOn', 'ext', 'mvCount', 'allyAsked', 'lastRef', 'lastCq',
   'own', 'arm', 'cap', 'wall', 'bar', 'dep', 'tax', 'gold', 'ally', 'mn', 'att', 'won', 'pen', 'cat', 'catCd', 'archV', 'catXp', 'arch', 'shot', 'wt0', 'bp', 'tru', 'hp', 'hb', 'tcd', 'dk',
   'inc', 'ib', 'ik', 'rwhy', 'ord', 'ordT', 'ocd', 'rqcd', 'rqcd2', 'aspy', 'rcl', 'rcm', 'rst', 'rev', 'bt', 'tw', 'spy', 'miss', 'rv', 'twp', 'shS', 'shL', 'shUsed', 'sfire', 'away', 'awayL',
-  'blk', 'mine', 'trA', 'tbm', 'tba', 'dmR', 'grT', 'grU', 'mvd', 'spl', 'ref', 'sup', 'ruin', 'incN', 'incR', 'NM', 'rfMark', 'gz', 'cav', 'cvU', 'bsp', 'bkn', 'bse', 'inv', 'kd', 'kyol'];
+  'blk', 'mine', 'trA', 'tbm', 'tba', 'dmR', 'grT', 'grU', 'mvd', 'spl', 'ref', 'sup', 'ruin', 'incN', 'incR', 'NM', 'rfMark', 'gz', 'cav', 'cvU', 'bsp', 'bkn', 'bse', 'inv', 'kd', 'kyol', 'sdk'];
 const SAVE_SETS = ['foc', 'kc'];
 const svGet = {};
 const svSet = {};
