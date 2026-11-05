@@ -3084,8 +3084,10 @@ let cav;
 let cvU;
 let kd;
 let kyol;
-// sdk[t]: Sadık halk isyanı: bastırılamazsa bölgenin döneceği eski sahibi (-1 yok).
+// sdk[t]: Sadık halk isyanı: bastırılamazsa bölgenin döneceği eski sahibi (-1 yok, -2 sadık isyandan sıçrayan: dönecek yer yok).
+// sdkR[t]: bu bölgede sonraki Sadık halk ayaklanmasının en erken turu (aynı bölge sürekli el değiştirmesin diye).
 let sdk;
+let sdkR;
 // Bot casusları (oyuncunun başkentini arar): bsp görevler, bkn[p] botun bildiği başkent, bse["p_t"] görünürlük sonu (tur).
 let bsp = [];
 let bkn = {};
@@ -8353,6 +8355,7 @@ function init(noDraft, seed) {
   kd = Array.from({ length: PM }, () => Array(9).fill(0));
   kyol = Array(PM).fill(-1);
   sdk = Array(N).fill(-1);
+  sdkR = Array(N).fill(0);
   bsp = [];
   bkn = {};
   bse = {};
@@ -8431,6 +8434,8 @@ function start(p) {
   const g = first ? START_G : Math.floor((gBase + gMine + gTax + gPort) * (pn ? .5 : 1) * (p > 0 ? [.75, 1, 1.3][DIF] : 1));
   pen[p] = 0;
   if (first)
+    gold[p] = 0;
+  if (!(gold[p] >= 0))
     gold[p] = 0;
   gold[p] += g;
   tribPay(p);
@@ -8989,7 +8994,7 @@ async function cavCounter(a, t) {
     clampGold(q);
   }
   // Süvari işgal ettiği bölgeye geçer (2 süvari varsa biri yerinde kalır); %40 ihtimalle çatışmada düşer.
-  cav[t]--;
+  cav[t] = Math.max(0, cav[t] - 1);
   cvU[t] = Math.min(cvU[t], cav[t]);
   const died = Math.random() < cvDie(q);
   cav[fr] = died ? 0 : 1;
@@ -10496,7 +10501,10 @@ function incTick(p) {
     const u = cand[Math.random() < .7 ? 0 : Math.floor(Math.random() * cand.length)];
     const tl = Math.max(...mem.map(m => inc[m]));
     const fromT = mem.find(m => adj[m].has(u)) ?? o;
+    const loyalSrc = sdk[o] >= 0 || sdk[o] == -2 || sdk[fromT] >= 0 || sdk[fromT] == -2;
     startRevolt(u, 2, o, `Komşu ${NM[fromT]} bölgesindeki kötü huylu isyan buraya sıçradı.`);
+    if (loyalSrc)
+      sdk[u] = -2;
     inc[u] = Math.max(1, tl);
     nav.push({ k: 'clash', t: u, col: '#ff3030', t0: performance.now(), dur: 600 });
     if (p == 0)
@@ -10505,7 +10513,18 @@ function incTick(p) {
   // Sadık halk: bastırılamayan isyan bölgeyi eski sahibine geri verir (eski devlet hâlâ ayaktaysa).
   const back = sec.filter(t => sdk[t] >= 0 && sdk[t] != p && sdk[t] < P && cnt(sdk[t]) > 0);
   back.forEach(t => loyalBack(t));
-  const sec2 = sec.filter(t => !back.includes(t));
+  // Eski devlet artık yoksa (ya da isyan sadık bir isyandan sıçradıysa) yeni devlet kurulmaz: isyan söner.
+  const fade = sec.filter(t => !back.includes(t) && (sdk[t] >= 0 || sdk[t] == -2));
+  fade.forEach(t => {
+    inc[t] = 0;
+    ik[t] = 0;
+    rcl[t] = -1;
+    sdk[t] = -1;
+    fl.push({ t, dx: 0, txt: 'İsyan söndü', col: '#cfd8dc', t0: performance.now() });
+    if (p == 0)
+      hl += ` ${NM[t]} bölgesindeki halk, dönecek devleti kalmayınca dağıldı; isyan söndü.`;
+  });
+  const sec2 = sec.filter(t => !back.includes(t) && !fade.includes(t));
   if (sec2.length)
     secede(p, sec2);
 }
@@ -10545,8 +10564,10 @@ function loyalBack(t) {
 }
 // Sadık halk (Halk yolu 3): fethedilen bölgede %40 ihtimalle eski devlete sadık halk ayaklanır.
 function loyalRise(t, old) {
-  if (!(old >= 0 && old < P && old != NEU) || own[t] == old || !kh(old, 8) || cnt(old) == 0 || Math.random() >= .4)
+  if (!(old >= 0 && old < P && old != NEU) || own[t] == old || !kh(old, 8) || cnt(old) == 0 || rd < (sdkR[t] || 0) || Math.random() >= .4)
     return;
+  // Aynı bölgede 5 tur içinde yeniden Sadık halk ayaklanması olmaz.
+  sdkR[t] = rd + 5;
   const kind = Math.random() < .9 ? 1 : 2;
   startRevolt(t, kind, null, `Halk eski devletine (${PN[old]}) sadık kaldı ve işgale karşı ayaklandı.`, true);
   if (inc[t] > 0)
@@ -16978,6 +16999,64 @@ function botShift(p) {
     show(u, dst, 'cat', n);
   }
 }
+// Oyun sonu harcaması: 15. turdan sonra hazinesi yarıdan fazla dolu olan bot, %25'e inene kadar fazlasını cepheye harcar:
+// cephe kışlasını 3. seviyeye çıkarır, okçu ve süvari yetiştirir, surlu düşmanın yanına mancınık yapar,
+// tehdit altındaki sınıra sur çeker, kalanla madenleri yükseltir. Botlar sadece oyuncunun da alabildiği şeyleri alır.
+function botSpend(p) {
+  if (rd < 15 || gold[p] < capOf(p) * .5)
+    return;
+  const foe = v => own[v] != p && own[v] != NEU && own[v] < P && !friend(p, own[v]);
+  const T = [...Array(N).keys()].filter(u => own[u] == p && !inc[u]);
+  const front = T.filter(u => [...adj[u]].some(foe));
+  const floor = capOf(p) * .25;
+  const threat = u => Math.max(0, ...[...adj[u]].filter(foe).map(v => est(p, v)));
+  for (let g = 0; g < 14 && gold[p] > floor; g++) {
+    let done = false;
+    const buy = (c, f) => {
+      if (done || gold[p] - c < floor * .5 || gold[p] < c)
+        return;
+      gold[p] -= c;
+      f();
+      done = true;
+    };
+    // 1. Cephe kışlası 3. seviyeye
+    const ub = front.filter(u => bar[u] >= 1 && bar[u] < 3).sort((x, y) => bar[y] - bar[x] || threat(y) - threat(x))[0];
+    if (ub != null)
+      buy(UPC, () => {
+        bar[ub]++;
+        if (Vg.has(ub))
+          pulse(ub, '#ffffff');
+      });
+    // 2. Okçu: kışlalı cephede okçusu eksik bölge
+    const ak = front.filter(u => bar[u] && arch[u] < ARCHMAX).sort((x, y) => arch[x] - arch[y] || threat(y) - threat(x))[0];
+    if (ak != null)
+      buy(AC, () => arch[ak]++);
+    // 3. Süvari: 3. seviye kışlalı cephe
+    const sv = front.filter(u => bar[u] >= 3 && cav[u] < CAVMAX).sort((x, y) => cav[x] - cav[y])[0];
+    if (sv != null)
+      buy(CVC, () => cav[sv]++);
+    // 4. Mancınık: surlu düşman komşusu olan 3. seviye kışlalı cephe
+    const ct = front.filter(u => bar[u] >= 3 && cat[u] < CATMAX && [...adj[u]].some(v => foe(v) && wall[v] > 0))[0];
+    if (ct != null)
+      buy(CTC, () => {
+        cat[ct]++;
+        catCd[ct] = -9;
+      });
+    // 5. Sur: tehdit altındaki surusuz sınır bölgesi
+    const wf = front.filter(u => !wall[u] && threat(u) >= arm[u]).sort((x, y) => (threat(y) - arm[y]) - (threat(x) - arm[x]))[0];
+    if (wf != null)
+      buy(WC(0), () => {
+        wall[wf] = 1;
+        wallStart(wf);
+      });
+    // 6. Maden yükseltme
+    const um = T.filter(u => mn[u] && mn[u] < 3)[0];
+    if (um != null)
+      buy(UPC, () => mn[um]++);
+    if (!done)
+      break;
+  }
+}
 // Deniz çıkarması planı: normal ve zor modda bot bazen iskelesinde büyük bir ordu toplar (normal 12-20, zor 20-30)
 // ve ancak o kadar asker birikince denize açılır. Kolay modda plan yapılmaz.
 function invPlan(p) {
@@ -17366,6 +17445,7 @@ async function ai0(p) {
       }
     }
   }
+  botSpend(p);
   // Mancınık: surlu düşman komşusu olan sv3 kışlalarda yapılır, hazırsa önce surlu hedeflere atılır.
   if (!svW && gold[p] >= CTC && Math.random() < .5) {
     const cc = mine().filter(a => bar[a] >= 3 && cat[a] < CATMAX && !inc[a] && [...adj[a]].some(t => own[t] != p && own[t] != NEU && !friend(p, own[t]) && wall[t] > 0));
@@ -18242,7 +18322,7 @@ const SAVE_KEY = 'fetih_save';
 const SAVE_VARS = ['P', 'turn', 'phase', 'pool', 'rd', 'dr', 'dnx', 'over', 'NI', 'spyXp', 'spyMade', 'taxEvery', 'taxAuto', 'taxTip', 'taxMode', 'durL', 'durLP', 'durLN', 'playMs', 'lateOn', 'ext', 'mvCount', 'allyAsked', 'lastRef', 'lastCq',
   'own', 'arm', 'cap', 'wall', 'bar', 'dep', 'tax', 'gold', 'ally', 'mn', 'att', 'won', 'pen', 'cat', 'catCd', 'archV', 'catXp', 'arch', 'shot', 'wt0', 'bp', 'tru', 'hp', 'hb', 'tcd', 'dk',
   'inc', 'ib', 'ik', 'rwhy', 'ord', 'ordT', 'ocd', 'rqcd', 'rqcd2', 'aspy', 'rcl', 'rcm', 'rst', 'rev', 'bt', 'tw', 'spy', 'miss', 'rv', 'twp', 'shS', 'shL', 'shUsed', 'sfire', 'away', 'awayL',
-  'blk', 'mine', 'trA', 'tbm', 'tba', 'dmR', 'grT', 'grU', 'mvd', 'spl', 'ref', 'sup', 'ruin', 'incN', 'incR', 'NM', 'rfMark', 'gz', 'cav', 'cvU', 'bsp', 'bkn', 'bse', 'inv', 'kd', 'kyol', 'sdk'];
+  'blk', 'mine', 'trA', 'tbm', 'tba', 'dmR', 'grT', 'grU', 'mvd', 'spl', 'ref', 'sup', 'ruin', 'incN', 'incR', 'NM', 'rfMark', 'gz', 'cav', 'cvU', 'bsp', 'bkn', 'bse', 'inv', 'kd', 'kyol', 'sdk', 'sdkR'];
 const SAVE_SETS = ['foc', 'kc'];
 const svGet = {};
 const svSet = {};
