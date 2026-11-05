@@ -2784,26 +2784,39 @@ let mv = false;
 // INC isyan çıkarma, ALC ittifak, EXC ittifaktan çıkma, SUP müttefike takviye, TWC okçu kulesi,
 // SPC casus, UPC seviye yükseltme, SSC/SLC küçük/büyük gemi, LOOT deniz aşırı yağma, SEAR top menzili.
 let ov = new Int8Array(W * H).fill(-1);
-const BC = 40;
-const WC = l => (l > 0 ? 150 : 50);
+// ---- Fiyatlar ----
+// Büyük hazine (Hazine yolu 2) bilen devlet için yapı, yükseltme, birlik, gemi, mayın ve başkent taşıma %20 ucuzdur.
+// Fiyat, o an sırası olan devlete göre hesaplanır (her devlet alışverişini kendi turunda yapar); düğmelerdeki fiyatlar da buna göre görünür.
+const disc = c => {
+  try {
+    const q = turn >= 0 && turn < PM ? turn : 0;
+    return kh(q, 4) ? Math.round(c * .8) : c;
+  }
+  catch (e) {
+    return c;
+  }
+};
+const defCost = (k, v) => Object.defineProperty(globalThis, k, { get: () => disc(v), configurable: true });
+defCost('BC', 40);
+const WC = l => disc(l > 0 ? 150 : 50);
 // Seviye 2 surlu bölgeye en az WALLMIN askerle saldırılabilir.
 const WALLMIN = 15;
 // Seviye 1 surlu bölgeye en az WALLMIN1 askerle saldırılabilir.
 const WALLMIN1 = 10;
 // Mancınık: kışla sv3 gerekir, kışla başına en fazla CATMAX, 2 turda bir taş atar.
-const CTC = 50;
+defCost('CTC', 50);
 const CATMAX = 2;
 const MI = 5;
-const AC = 15;
+defCost('AC', 15);
 const TR = 20;
 const TT = 2;
-const DC = 30;
+defCost('DC', 30);
 let NI = 8;
 const NEU = 8;
-const CMC = 50;
-const DC2 = 50;
-const DC3 = 50;
-const MNC = 20;
+defCost('CMC', 50);
+defCost('DC2', 50);
+defCost('DC3', 50);
+defCost('MNC', 20);
 const CAPS = 20;
 // İsyan çıkarma: her devlet turda en fazla 3 isyan çıkarabilir; turun ilki 10, ikinci ve üçüncüsü 20 altın.
 const INCMAX = 3;
@@ -2816,18 +2829,18 @@ const INCc = p => incUsed(p) ? INC2 : INC1;
 const ALC = 0;
 const EXC = 0;
 const SUP = 15;
-const TWC = 50;
-const TW2 = 50;
+defCost('TWC', 50);
+defCost('TW2', 50);
 // Bir bölgede en fazla 4 yapı (sur sayılmaz): kışla, maden, sandık, okçu kulesi, iskele, gözetleme kulesi.
 const BLDMAX = 4;
 const bldN = t => (bar[t] ? 1 : 0) + (mn[t] ? 1 : 0) + (dep[t] ? 1 : 0) + (tw[t] ? 1 : 0) + (dk[t] ? 1 : 0) + (gz && gz[t] ? 1 : 0);
 const bldOK = t => bldN(t) < BLDMAX;
 // Gözetleme kulesi: 2 bölge içindeki asker sayılarını gösterir.
-const GZC = 30;
+defCost('GZC', 30);
 const GZR = 2;
 // Süvari: sv3 kışla gerekir, bölge başına en fazla 2. Savunmada asker sayılmaz ama süvarili bölgeye yapılan saldırı
 // başarısız olursa karşı saldırıya geçip saldıranın sınırdaki bölgesini işgal eder. Süvarili saldırıyla fetihte şansa bağlı yağma.
-const CVC = 25;
+defCost('CVC', 25);
 const CAVMAX = 2;
 // Süvari yağması: süvarili saldırıyla fethedilen bölgeden şansa bağlı 5-20 altın.
 const CVLOOT0 = 5;
@@ -2846,7 +2859,7 @@ const KD = [
   { ic: '⚔️', nm: 'Talim', ef: 'Kışlalar her seviyede 1 asker fazla üretir (sv1 +3, sv2 +5, sv3 +7).' },
   { ic: '🐎', nm: 'Akıncılar', ef: 'Süvarinin ölme riski %40\'tan %20\'ye iner; yağma 10–25 altın olur.' },
   { ic: '⛏️', nm: 'Madencilik ve ganimet', ef: 'Her maden seviyesi 2 altın fazla verir (sv1 +7, sv2 +14, sv3 +21); ayrıca her fetihte +3 altın.' },
-  { ic: '🪙', nm: 'Büyük hazine', ef: 'Her altın sandığının kapasitesi 20 artar.' },
+  { ic: '🪙', nm: 'Büyük hazine', ef: 'Her altın sandığının kapasitesi 20 artar; ayrıca yapılar, yükseltmeler, birlikler, gemiler, mayın ve başkent taşıma %20 ucuzlar.' },
   { ic: '🐪', nm: 'Ticaret yolları', ef: 'Bölgelerinden gelen temel gelirin sınırı 15\'ten 25 altına çıkar; ayrıca her iskelen her tur altın getirir: sv1 +3, sv2 +5, sv3 +7.' },
   { ic: '🌾', nm: 'Gönüllüler', ef: 'Refahın %85 ve üstündeyse her tur başkentine 2 gönüllü asker katılır.' },
   { ic: '🤝', nm: 'Sadakat', ef: 'Refah düşüşleri yarıya iner: başarısız saldırı −2, fazladan fetih −5.' },
@@ -2881,19 +2894,19 @@ function kdBot(p) {
     kdLearn(p, nx(b));
   }
 }
-const SPC = 10;
-const UPC = 30;
-const SSC = 20;
-const SLC = 50;
+defCost('SPC', 10);
+defCost('UPC', 30);
+defCost('SSC', 20);
+defCost('SLC', 50);
 const LOOT = 15;
 const SEAR = 85;
-const MC = n => Math.min(80, 40 + 5 * n);
+const MC = n => disc(Math.min(80, 40 + 5 * n));
 // Altın sandığı: devletin altın sınırı sandıkların kapasitelerinin toplamıdır (sv1 50, sv2 70, sv3 100).
 // Başkentte her zaman en az 1. seviye bir sandık bulunur. DPC sandık kurma, DPU[sv] yükseltme ücreti.
 // Sandıklı bölge fethedilirse içindeki altının yarısı yağmalanır.
 const DEPV = [0, 50, 70, 100];
-const DPC = 25;
-const DPU = [0, 30, 35];
+defCost('DPC', 25);
+Object.defineProperty(globalThis, 'DPU', { get: () => [0, disc(30), disc(35)], configurable: true });
 // Sandık yağmasında seviyeye göre ek ganimet.
 const LOOTB = [0, 10, 20, 35];
 // Gelir: bölgelerden gelen temel gelir en fazla INC0 olur; üstüne maden ve vergi eklenir.
@@ -3724,7 +3737,7 @@ async function shipDuel(a, ub) {
 // Hasarlı bombardıman filosu onarım için iskelesine döner (yolda batmaz); iskelede tamir olur ve
 // sahibinin bir sonraki turunda kendiliğinden kaldığı kıyıya geri gelip bombardımana devam eder.
 const REPAIRP = .35;
-const REPAIRC = 20;
+defCost('REPAIRC', 20);
 async function blkRepairGo(s) {
   const u = bD(s);
   const b = blk[s];
@@ -15436,7 +15449,7 @@ function openPop(cx, cy) {
     o.push(mn[t] ? ['um', mn[t] >= 3 ? 'Maden seviye 3 (tam)' : `Madeni yükselt: Sv${mn[t] + 1} (${UPC} altın)`, mn[t] < 3 && gold[0] >= UPC] : full ? ['m', ...FL('Maden')] : ['m', `Maden (${mc} altın)`, gold[0] >= mc]);
     if (mn[t])
       inf.y += ` Maden sv${mn[t]}: +${(MI + (kh(0, 3) ? 2 : 0)) * mn[t]} altın/tur.`;
-    o.push(dep[t] ? ['udp', dep[t] >= 3 ? 'Altın sandığı seviye 3 (tam)' : `Sandığı yükselt: Sv${dep[t] + 1}, ${DEPV[dep[t] + 1]} kapasite (${DPU[dep[t]]} altın)`, dep[t] < 3 && gold[0] >= DPU[dep[t]]] : full ? ['dp', ...FL('Altın sandığı')] : ['dp', `Altın sandığı: ${DEPV[1]} kapasite (${DPC} altın)`, gold[0] >= DPC]);
+    o.push(dep[t] ? ['udp', dep[t] >= 3 ? 'Altın sandığı seviye 3 (tam)' : `Sandığı yükselt: Sv${dep[t] + 1}, ${DEPV[dep[t] + 1] + (kh(0, 4) ? 20 : 0)} kapasite (${DPU[dep[t]]} altın)`, dep[t] < 3 && gold[0] >= DPU[dep[t]]] : full ? ['dp', ...FL('Altın sandığı')] : ['dp', `Altın sandığı: ${DEPV[1] + (kh(0, 4) ? 20 : 0)} kapasite (${DPC} altın)`, gold[0] >= DPC]);
     inf.y += dep[t] ? ` Altın sandığı sv${dep[t]}: ${DEPV[dep[t]]} kapasite, içinde ~${depGold(t)} altın var. Bölge fethedilirse bunun yarısını kaybedersin; fetheden ayrıca seviyeye göre ek ganimet alır.` : ` Hazine sınırı: ${capOf(0)} altın (sandıklarının toplamı).`;
     o.push(['w', wall[t] >= 2 ? 'Okçulu sur (tam)' : wall[t] ? `Suru yükselt: Sv2 okçulu (${WC(1)} altın)` : `Sur (${WC(0)} altın)`, wall[t] < 2 && gold[0] >= WC(wall[t])]);
     if (blkOf(t) >= 0) {
