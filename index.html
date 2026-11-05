@@ -2842,8 +2842,8 @@ const SURP = 2;
 const KDR_EVERY = 5;
 const KDB = [{ nm: 'Ordu', ic: '⚔️' }, { nm: 'Hazine', ic: '💰' }, { nm: 'Halk', ic: '🏛️' }];
 const KD = [
-  { ic: '🛡️', nm: 'Talim', ef: 'Kışlalar her seviyede 1 asker fazla üretir (sv1 +3, sv2 +5, sv3 +7).' },
-  { ic: '🏹', nm: 'Usta okçular', ef: 'Okçuların hep tecrübeli sayılır: yeni yetiştirdiklerin de hemen savunmaya katılır.' },
+  { ic: '🛡️', nm: 'Düzenli geri çekilme', ef: 'Saldırın başarısız olursa saldıran askerlerin dörtte biri ölmeyip geri döner.' },
+  { ic: '⚔️', nm: 'Talim', ef: 'Kışlalar her seviyede 1 asker fazla üretir (sv1 +3, sv2 +5, sv3 +7).' },
   { ic: '🐎', nm: 'Akıncılar', ef: 'Süvarinin ölme riski %40\'tan %20\'ye iner; yağma 10–25 altın olur.' },
   { ic: '⛏️', nm: 'Madencilik', ef: 'Her maden seviyesi 2 altın fazla verir (sv1 +7, sv2 +14, sv3 +21).' },
   { ic: '🪙', nm: 'Büyük hazine', ef: 'Her altın sandığının kapasitesi 20 artar.' },
@@ -8327,7 +8327,7 @@ function start(p) {
   pool = Math.max(1, (p == 0 ? 3 : 2 + [-1, 0, 1][DIF]) + (cnt(p) >> 2));
   bar.forEach((b, t) => {
     if (b && own[t] == p && !inc[t])
-      arm[t] += 2 * b + (kh(p, 0) ? 1 : 0);
+      arm[t] += 2 * b + (kh(p, 1) ? 1 : 0);
   });
   // Gönüllüler (Halk yolu): refah %85 ve üstündeyse başkente 2 gönüllü asker katılır.
   if (kh(p, 6) && ref[p] >= 85 && cap[p] >= 0 && own[cap[p]] == p && !inc[cap[p]]) {
@@ -8356,7 +8356,7 @@ function start(p) {
     const nw = performance.now();
     bar.forEach((b, t) => {
       if (b && own[t] == 0 && !inc[t])
-        fl.push({ t, dx: 17, txt: `+${2 * b + (kh(0, 0) ? 1 : 0)} asker`, col: '#fff', t0: nw + d++ * 200 });
+        fl.push({ t, dx: 17, txt: `+${2 * b + (kh(0, 1) ? 1 : 0)} asker`, col: '#fff', t0: nw + d++ * 200 });
     });
     mn.forEach((m, t) => {
       if (m && own[t] == 0)
@@ -8636,6 +8636,7 @@ async function battle(a, t, sea, F) {
   }
   let A = F != null ? F : arm[a] - 1;
   let D = arm[t];
+  const sent = A;
 
   // Dayanıklılık (savaş zarları): Yüksek bölgenin askeri her kayıpta DURB ihtimalle kurtulur, Zayıf bölgeninki DURB ihtimalle bir asker fazla kaybeder.
   const dA = durCls(a);
@@ -8792,6 +8793,15 @@ async function battle(a, t, sea, F) {
     if (F == null)
       arm[a] = 1;
     arm[t] = D;
+    // Düzenli geri çekilme (Ordu yolu): saldıranların dörtte biri ölmeyip geri döner.
+    const rb = kh(own[a], 0) ? Math.floor(sent / 4) : 0;
+    if (rb > 0) {
+      arm[a] += rb;
+      if (own[a] == 0 || own[t] == 0 || Vg.has(a))
+        fl.push({ t: a, dx: 0, dy: -18, txt: `🛡️ ${rb} asker geri çekildi`, col: '#d9f2c4', t0: performance.now() + 200 });
+      if (own[a] == 0)
+        $('log').textContent += ` Düzenli geri çekilme: ${rb} asker kurtuldu.`;
+    }
     if (!sea)
       await cavCounter(a, t);
   }
@@ -9573,7 +9583,7 @@ const archN = u => arch[u] + (tw[u] ? 1 : 0) + (wall[u] >= 2 ? 2 : 0);
 // Savunmada okçu gücü: yeni okçular sadece saldırıya yardım eder; 2 saldırıya katılınca tecrübeli olur ve savunmaya da katılır.
 // Kule ve sur okçuları her zaman savunur.
 const ARCHVET = 2;
-const archVet = u => arch[u] > 0 && (archV[u] >= ARCHVET || kh(own[u], 1));
+const archVet = u => arch[u] > 0 && archV[u] >= ARCHVET;
 // Mancınık rütbesi: 2 sur yıkan mancınıklar her tur taş atabilir.
 const CATVET = 2;
 const catGap = t => (catXp[t] >= CATVET ? 1 : 2);
@@ -15409,7 +15419,7 @@ function openPop(cx, cy) {
     const FL = nm => [`${nm} (yapı sınırı dolu: ${BLDMAX}/${BLDMAX})`, false];
     o.push(bar[t] ? ['ub', bar[t] >= 3 ? 'Kışla seviye 3 (tam)' : `Kışlayı yükselt: Sv${bar[t] + 1} (${UPC} altın)`, bar[t] < 3 && gold[0] >= UPC] : full ? ['b', ...FL('Kışla')] : ['b', `Kışla (${BC} altın)`, gold[0] >= BC]);
     if (bar[t])
-      inf.y += ` Kışla sv${bar[t]}: +${2 * bar[t] + (kh(0, 0) ? 1 : 0)} asker/tur.` + (bar[t] >= 3 ? ' Bölge sınırda değilse, asker 10 olunca 1 asker kalacak şekilde en yakın sınıra kendiliğinden gider.' : '');
+      inf.y += ` Kışla sv${bar[t]}: +${2 * bar[t] + (kh(0, 1) ? 1 : 0)} asker/tur.` + (bar[t] >= 3 ? ' Bölge sınırda değilse, asker 10 olunca 1 asker kalacak şekilde en yakın sınıra kendiliğinden gider.' : '');
     o.push(mn[t] ? ['um', mn[t] >= 3 ? 'Maden seviye 3 (tam)' : `Madeni yükselt: Sv${mn[t] + 1} (${UPC} altın)`, mn[t] < 3 && gold[0] >= UPC] : full ? ['m', ...FL('Maden')] : ['m', `Maden (${mc} altın)`, gold[0] >= mc]);
     if (mn[t])
       inf.y += ` Maden sv${mn[t]}: +${(MI + (kh(0, 3) ? 2 : 0)) * mn[t]} altın/tur.`;
@@ -15850,7 +15860,7 @@ function openPop(cx, cy) {
         gold[0] -= UPC;
         bar[t]++;
         pulse(t, '#ffffff');
-        $('log').textContent = `${NM[t]}: kışla seviye ${bar[t]} oldu (+${2 * bar[t] + (kh(0, 0) ? 1 : 0)} asker/tur).`;
+        $('log').textContent = `${NM[t]}: kışla seviye ${bar[t]} oldu (+${2 * bar[t] + (kh(0, 1) ? 1 : 0)} asker/tur).`;
       }
       re();
       return;
