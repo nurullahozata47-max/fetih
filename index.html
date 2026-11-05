@@ -2090,13 +2090,260 @@ input, textarea {
   80% { transform: scale(1.1) rotate(4deg); }
   100% { transform: scale(1); }
 }
+/* ===== Rehber: bütün birlikler, yapılar ve kurallar ===== */
+#mnGuide {
+  margin-top: 10px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .1);
+  color: #f4efe2;
+}
+#gdb {
+  flex: none;
+  margin-left: auto;
+  margin-right: 6px;
+  padding: 2px 8px;
+  font-size: 15px;
+  line-height: 1.2;
+  border-radius: 6px;
+}
+#gdb + #camb {
+  margin-left: 0;
+}
+#guide {
+  position: fixed;
+  inset: 0;
+  z-index: 115;
+  display: flex;
+  justify-content: center;
+  background: rgba(4, 10, 14, .62);
+  color: #f4efe2;
+  font-family: Bahnschrift, "Segoe UI", system-ui, sans-serif;
+}
+#guide[hidden] {
+  display: none;
+}
+#guide .gd-sh {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  height: 100%;
+  background: linear-gradient(180deg, #16303c 0%, #0d1d25 38%, #0b171d 100%);
+  border-left: 1px solid rgba(255, 211, 107, .18);
+  border-right: 1px solid rgba(255, 211, 107, .18);
+  box-shadow: 0 0 60px rgba(0, 0, 0, .55);
+  animation: gdIn .22s ease-out both;
+}
+@keyframes gdIn {
+  from { transform: translateY(18px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+#guide .gd-hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 10px;
+}
+#guide .gd-hd h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: .3px;
+  color: #ffd36b;
+}
+#guide .gd-hd h2 small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: rgba(244, 239, 226, .65);
+}
+#guide .gd-x {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .14);
+  color: #f4efe2;
+  font-size: 17px;
+}
+#guide .gd-q {
+  margin: 0 16px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .1);
+}
+#guide .gd-q input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #f4efe2;
+  font: inherit;
+  font-size: 15px;
+}
+#guide .gd-q input::placeholder {
+  color: rgba(244, 239, 226, .45);
+}
+#guide .gd-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 0 16px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#guide .gd-tabs::-webkit-scrollbar {
+  display: none;
+}
+#guide .gd-tabs button {
+  flex: none;
+  padding: 8px 13px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .1);
+  color: rgba(244, 239, 226, .8);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+#guide .gd-tabs button.on {
+  background: #ffd36b;
+  border-color: #ffd36b;
+  color: #12252e;
+}
+#guide .gd-bd {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+#guide .gd-in {
+  margin: 0 0 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: rgba(244, 239, 226, .72);
+}
+#guide .gd-c {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+#guide .gd-ic {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #10222b;
+  box-shadow: inset 0 0 0 2px #f2b134;
+  font-size: 22px;
+  line-height: 1;
+}
+#guide .gd-ic canvas {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+}
+#guide .gd-ic.raw {
+  background: none;
+  box-shadow: none;
+}
+#guide .gd-tx {
+  flex: 1;
+  min-width: 0;
+}
+#guide .gd-nm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-size: 16.5px;
+  font-weight: 700;
+}
+#guide .gd-pr {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffd36b;
+  white-space: nowrap;
+}
+#guide .gd-rq {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(143, 211, 255, .12);
+  color: #a9dcff;
+  font-size: 12px;
+  font-weight: 600;
+}
+#guide .gd-lv {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+#guide .gd-lv span {
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(255, 211, 107, .1);
+  border: 1px solid rgba(255, 211, 107, .22);
+  font-size: 12.5px;
+  line-height: 1.3;
+}
+#guide .gd-lv b {
+  color: #ffd36b;
+  margin-right: 3px;
+}
+#guide .gd-c ul {
+  margin: 7px 0 0;
+  padding-left: 17px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: rgba(244, 239, 226, .88);
+}
+#guide .gd-c li {
+  margin: 3px 0;
+}
+#guide .gd-c li b {
+  color: #fff;
+}
+#guide .gd-c li.warn {
+  color: #ffb3a8;
+}
+#guide .gd-none {
+  padding: 30px 10px;
+  text-align: center;
+  color: rgba(244, 239, 226, .6);
+}
+#guide mark {
+  background: rgba(255, 211, 107, .35);
+  color: inherit;
+  border-radius: 3px;
+}
 </style>
 </head>
 <body>
 <main>
   <!-- Üst bilgi şeridi (haritanın üstünde yüzer) -->
   <div id="hudT">
-    <div class="ht-row"><h1 id="ttl">Fetih</h1><button id="camb" aria-label="Kamera savaşları takip etsin">🎥</button><button id="musb" class="mus-tg" aria-label="Müzik">🔊</button><button id="fsb" hidden aria-label="Tam ekran">⛶</button></div>
+    <div class="ht-row"><h1 id="ttl">Fetih</h1><button id="gdb" aria-label="Rehber">📖</button><button id="camb" aria-label="Kamera savaşları takip etsin">🎥</button><button id="musb" class="mus-tg" aria-label="Müzik">🔊</button><button id="fsb" hidden aria-label="Tam ekran">⛶</button></div>
     <!-- Üst kutucuklar: devletler, bölge sayıları, altın -->
     <div id="chips"></div>
   </div>
@@ -2157,6 +2404,7 @@ input, textarea {
       <button id="mnGo" class="mn-cta">Oyuna başla</button>
       <button id="mnCont" hidden>Oyuna devam et</button>
       <button id="mnInst" hidden>📲 Telefona uygulama olarak yükle</button>
+      <button id="mnGuide">📖 Rehber: birlikler, yapılar ve kurallar</button>
     </div>
     <div class="mn-pg" data-pg="map" hidden>
       <div class="mn-hd"><button class="mn-back" data-to="home" aria-label="Geri">‹</button><h3>Harita seç</h3></div>
@@ -17148,6 +17396,16 @@ const TS = [
     },
     done: () => tData.ev && tData.ev.has('txp') },
   tutBuild('Sur', 'Sur bölgeni korur: <b>düşman okları surun içine işlemez</b>. Suru 2. seviyeye yükseltirsen üstüne <b>okçular</b> çıkar: yakındaki saldırılarına ve savunmana ok atarlar, ayrıca o bölgeye <b>en az 15 askerle</b> saldırılabilir. Başkentine basılı tut ve <b>Sur</b> ör; panel kapanınca surun örülüşünü izle.', 'w', 'y', WC(0), () => wall[cap[0]] >= 1),
+  tutBuild('Yapı sınırı ve gözetleme', 'Bir bölgeye en fazla <b>' + BLDMAX + ' yapı</b> kurabilirsin (sur sayılmaz). Dolunca yeni yapı düğmeleri kapanır ama yükseltmeler serbest kalır; bu yüzden yapılarını bölgelere dağıt. Başkentinde şu an kışla, maden ve sandık var. Son yeri <b>Gözetleme kulesi</b>yle doldur: ' + GZR + ' bölge içindeki asker sayılarını ve yapıları görürsün, yakınına sızan düşman casuslarını da daha kolay yakalarsın. Başkentine basılı tut ve <b>Gözetleme kulesi</b>ne dokun.', 'gz', 'y', GZC, () => gz[cap[0]] >= 1),
+  (() => {
+    const s0 = tutBuild('Süvari', 'Kışla 3. seviyede <b>süvari</b> yetişir (bir bölgede en fazla ' + CAVMAX + '). Öğretici için kışlanı 3. seviyeye çıkardım. <b>Sürpriz hücum:</b> süvarili bölgeden saldırınca ilk ' + SURP + ' zarda savunanın zarı 1 düşer. <b>Yağma:</b> bu saldırıyla bölge alırsan ' + CVLOOT0 + '–' + CVLOOT + ' altın. <b>Karşı saldırı:</b> süvarili bölgene yapılan saldırı püskürtülürse süvari, saldıranın sınırdaki bölgesini işgal eder. Dikkat: saldırıya katılan süvari %' + Math.round(CVDIE * 100) + ' ihtimalle ölür. Süvariler her tur kendiliğinden düşman sınırına ilerler. Başkentine basılı tut, <b>Ordu</b> sekmesinde <b>Süvari yetiştir</b>.', 'sv', 'o', CVC, () => cav[cap[0]] >= 1);
+    const e0 = s0.enter;
+    s0.enter = () => {
+      e0();
+      bar[cap[0]] = Math.max(bar[cap[0]], 3);
+    };
+    return s0;
+  })(),
   { t: 'Ordu ve deniz', p: '<b>Ordu</b> sekmesi: okçu eğitirsin (komşu bölgelere ok atar, bir bölgede en fazla ' + ARCHMAX + ' okçu olur; okçulu bölgeden saldırınca önce ok yağdırırsın), kışla 2. seviyedeyse <b>casus</b> üretirsin; casus düşman bölgesindeki askerleri ve binaları gösterir ama içerilere gittikçe yakalanabilir. <b>Mancınık</b> (kışla 3. seviye) 2 turda bir komşu düşmana taş atar ve surları yıkabilir. <b>Okçu kulesi</b> 2 bölge uzağa ok atar, 2. seviyede alevli ok fırlatır. <b>Deniz</b> sekmesi (kıyıda): iskele kur; küçük gemiler denizden asker taşır ve çıkarma yapar. <b>Büyük savaş gemisi</b> (devlet başına en fazla 2) düşman kıyılarını bombalar, surları döver, bazen binaları yıkar; iki gemin varsa her birini ayrı bir kıyıya gönderebilirsin. Düşman gemisine <b>gemi savaşı</b> açabilirsin. 3. seviye iskele kıyına mayın döşer ve savaşta hasar alan gemini ara sıra 20 altına kendiliğinden onarır.', next: 1 },
   { t: 'Diplomasi', p: 'Bir rakibin bölgesine basılı tutarak diplomasiye ulaşırsın. <b>İttifak</b> ücretsizdir ama reddedebilir; müttefikinden asker, okçu, casus isteyebilir, ona saldırı emri verebilir, kendi askerinden ücretsiz takviye yollayabilirsin. <b>Haraç</b> panelinde çubuklarla miktarı (10–50 altın) ve süreyi (2–5 tur) seçersin: ne kadar az istersen o kadar kolay kabul eder; haracı her turunda gelirinden öder. Güçlü botlar da senden haraç isteyebilir; reddedersen sana yüklenirler. <b>İsyan çıkar</b>: turda en fazla 3 (ilki 10, sonrakiler 20 altın).', next: 1 },
   { t: 'Asker taşı', p: 'Asker taşımak kolay: parlayan bölgene dokunup seç, sonra yanındaki parlayan kendi bölgene dokun. Küçük bir panel açılır: <b>1</b>, <b>Yarısı</b> ya da <b>Hepsi</b>. Birini seç. İpucu: alttaki <b>Toplu taşıma</b> düğmesiyle birçok bölgeden askerleri tek bir yerde toplayabilirsin.',
@@ -17185,7 +17443,7 @@ const TS = [
     },
     done: () => rd > tData.rd && turn == 0 && !busy },
   { t: 'Refah ve isyan', p: 'Saldırmadığın her tur refah artar; başarısız saldırılar, fazladan fetihler ve sınırlardan yüksek vergi onu düşürür. Refah <b>%50</b>\'nin altına inerse isyanlar çıkar ve oradaki askerlerin en yakın güvenli bölgeye çekilir. <b>İyi huylu</b> isyan yerinde kalır; <b>kötü huylu</b> isyan (kırmızı) her tur komşu bölgelere yayılır ve güçlenir. İsyanı bastırmak için oraya isyancılardan (✊) fazla asker taşı; bastıramazsan bölgeler bağımsız bir devlet kurar. <b>%20</b>\'nin altında ülken ikiye bölünür.', hl: 'refah', next: 1 },
-  { t: 'Hazırsın!', p: 'Özetle: takviye dağıt, saldır, yapılarını seviye seviye büyüt, hazineni sandıklarla genişlet, vergini akıllı ayarla ve başkentini koru. Bir bölgeye basılı tutarak her zaman ne yapabileceğini görebilirsin. Oyunun kendiliğinden kaydedilir: uygulamayı kapatsan da menüdeki <b>Oyuna devam et</b> ile kaldığın yerden sürersin. Savaş animasyonlarını ⚙️ Ayarlar\'dan kapatabilirsin. Az askerle çok askeri yenersen sürprize hazır ol. İyi fetihler!', next: 2 },
+  { t: 'Hazırsın!', p: 'Özetle: takviye dağıt, saldır, yapılarını seviye seviye büyüt, hazineni sandıklarla genişlet, vergini akıllı ayarla ve başkentini koru. Bir bölgeye basılı tutarak her zaman ne yapabileceğini görebilirsin. Oyunun kendiliğinden kaydedilir: uygulamayı kapatsan da menüdeki <b>Oyuna devam et</b> ile kaldığın yerden sürersin. Bütün birliklerin, yapıların ve kuralların fiyatları ve etkileri <b>📖 Rehber</b>\'de (üst şeritteki 📖 düğmesi ya da ana menü). Savaş animasyonlarını ⚙️ Ayarlar\'dan kapatabilirsin. Az askerle çok askeri yenersen sürprize hazır ol. İyi fetihler!', next: 2 },
 ];
 // Öğretici: bu hamleye izin var mı? İzin yoksa rehber kartı sallanır ve uyarı verir.
 function tutOK(kind, v, quiet) {
@@ -19451,6 +19709,177 @@ document.getElementById('mnMus').onclick = () => Mus.toggle();
     upd();
   };
 }
+// ======================================================================
+// REHBER: bütün birlikler, yapılar ve kurallar tek yerde (menüden ve üst şeritteki 📖 düğmesinden açılır).
+// Fiyatlar ve sayılar oyundaki sabitlerden okunur; oyun değişince rehber de kendiliğinden güncel kalır.
+// ======================================================================
+const gdCoin = n => `<span class="gd-pr"><i class="coin"></i>${n}</span>`;
+// Simge: 'b:kisla' gibi haritadaki gerçek rozet (tuvale çizilir) ya da bir emoji.
+function gdData() {
+  const cv0 = `${CVLOOT0}–${CVLOOT}`;
+  return [
+    { id: 'tm', nm: 'Temel', in: 'Oyunun akışı ve savaşın kuralları.', it: [
+      { ic: '🎯', nm: 'Amaç', ul: ['Haritadaki bütün devletleri yenmek. Bir devlet bütün bölgelerini kaybedince oyundan çıkar; başkentin düşmesi de büyük darbedir (aşağıya bak).', 'Sen <b>sarı</b> krallıksın; rakipler bottur.'] },
+      { ic: '🔁', nm: 'Tur akışı', ul: ['<b>Takviye:</b> tur başında gelen askerleri bölgelerine dokunarak dağıt (ya da <b>Otomatik dağıt</b>).', '<b>Saldırı ve hamle:</b> bölgeni seç, düşmana dokun: saldır; kendi bölgene dokun: asker taşı.', '<b>İnşa:</b> kendi bölgene basılı tut: yapı paneli açılır.', 'Bitince <b>Turu bitir</b>; botlar sırayla oynar.'] },
+      { ic: '🎲', nm: 'Savaş ve zar', ul: ['Savaş zarla belirlenir; her turda zarı düşük kalan taraf 1 asker kaybeder. Çok askerle saldırmak kazanmayı kolaylaştırır.', 'Saldırıda bölgede en az 1 asker kalır; kazanırsan geri kalanı yeni bölgeye geçer.', 'Surlu bölgenin zarına sur seviyesi eklenir.', '<b>Asker dayanıklılığı:</b> halkı memnun bölgelerin askerleri daha az, yorgun bölgelerinki daha çok kayıp verir (haritada renkli).'] },
+      { ic: '⚔️', nm: 'Fetih hakkı', ul: ['Her tur <b>3 fetih</b> yapabilirsin; istersen 5\'e çıkarabilirsin ama fazladan her fetih refahı %10 düşürür.', 'İsyanlı kendi bölgene asker göndermek de bir fetih hakkı harcar.'] },
+      { ic: '❔', nm: 'Sis', ul: ['Rakip bölgelerdeki <b>"?"</b> asker sayısını bilmediğin anlamına gelir.', 'Casus, keşif gemisi ve gözetleme kulesi sisi kaldırır; müttefiklerinin bölgelerini her zaman görürsün.'] },
+      { ic: '🏰', nm: 'Başkent', ul: [`Seçtiğin ilk bölge başkentin olur. Başkentler gizlidir; casusla bulunur.`, `İlk ${CAPT} tur başkentlere saldırılamaz.`, `Başkent düşünce: devletin toplam askeri 50'den azsa tamamen işgal edilir, 50 ve üstüyse ikiye bölünür.`, `Oyunda bir kez ${CMC} altınla başkentini başka bölgene taşıyabilirsin; sandığın da birlikte gelir.`] },
+      { ic: '💾', nm: 'Kayıt', ul: ['Oyun her an kendiliğinden kaydedilir. Uygulamayı kapatsan da menüdeki <b>Oyuna devam et</b> ile kaldığın yerden sürersin.'] },
+    ] },
+    { id: 'yp', nm: 'Yapılar', in: `Kendi bölgene basılı tut → <b>Yapılar</b> sekmesi. Bir bölgeye en fazla <b>${BLDMAX} yapı</b> kurulur (sur sayılmaz); dolunca yeni yapı kurulamaz ama yükseltme serbesttir. İsyanlı bölgeye inşa yapılamaz.`, it: [
+      { ic: 'b:bar', nm: 'Kışla', pr: BC, lv: [['Sv1', '+2 asker/tur'], [`Sv2 (${UPC})`, '+4 asker/tur, casus'], [`Sv3 (${UPC})`, '+6 asker/tur, mancınık, süvari']], ul: ['Her tur başında o bölgede asker üretir.', 'Sv3 kışlada 10 asker birikince, bölge sınırda değilse askerler kendiliğinden en yakın sınıra gider (1 asker kalır).', 'Okçu yetiştirmek için kışla gerekir.'] },
+      { ic: 'b:mn', nm: 'Maden', pr: `${MC(0)}+`, lv: [['Sv1', `+${MI} altın/tur`], [`Sv2 (${UPC})`, `+${2 * MI}`], [`Sv3 (${UPC})`, `+${3 * MI}`]], ul: [`Gelirini büyütmenin en güvenli yolu. Her yeni maden 5 altın daha pahalıdır (en fazla ${MC(99)}).`] },
+      { ic: '💰', nm: 'Altın sandığı', pr: DPC, lv: [['Sv1', `${DEPV[1]} kapasite`], [`Sv2 (${DPU[1]})`, `${DEPV[2]}`], [`Sv3 (${DPU[2]})`, `${DEPV[3]}`]], ul: ['Hazinen en fazla sandıklarının toplam kapasitesi kadar altın tutar; sığmayan altın kaybolur.', 'Başkentinde her zaman bir sandık vardır.', 'Sandıklı bölgen fethedilirse içindeki altının yarısını kaybedersin; fetheden ayrıca ganimet alır.'] },
+      { ic: '🧱', nm: 'Sur', pr: `${WC(0)} / ${WC(1)}`, lv: [['Sv1', `en az ${WALLMIN1} askerle saldırılır`], ['Sv2', `okçulu sur, en az ${WALLMIN} askerle`]], ul: ['Düşman okları surun içine işlemez; savunmada zar sur seviyesi kadar artar.', 'Saldırılar her zaman aşamaz: bazen surlar saldıranı geri püskürtür.', 'Sv2 surun üstündeki okçular yakındaki saldırılarına ve savunmana ok atar.', 'Mancınık ve savaş gemileri surları yıkabilir. Sur yapı sınırına sayılmaz.'] },
+      { ic: '🏹', nm: 'Okçu kulesi', pr: TWC, lv: [['Sv1', '2 bölge menzil'], [`Sv2 (${TW2})`, 'alevli ok, %50 daha etkili']], ul: ['Kule kendisi de bir okçu gibi ok atar.', 'Bölgedeki okçuların menzili 2 bölgeye çıkar.'] },
+      { ic: '🔭', nm: 'Gözetleme kulesi', pr: GZC, ul: [`${GZR} bölge içindeki bütün asker sayılarını ve yapıları gösterir.`, 'Yakınına sızan düşman casuslarının yakalanma ihtimali %30 artar; başkentinin yakınına kurarsan yerini korur.', 'Bölgede isyan varken çalışmaz.'] },
+      { ic: '⚓', nm: 'İskele', pr: DC, nt: 'sadece kıyıda', ul: ['Gemi yapmak için gerekir. Ayrıntılar <b>Deniz</b> sekmesinde.'] },
+    ] },
+    { id: 'or', nm: 'Ordu', in: 'Kendi bölgene basılı tut → <b>Ordu</b> sekmesi. Birlikleri taşımak için bölgeni seçip kendi bölgene dokun: açılan panelde asker, okçu, mancınık ve süvari satırları vardır.', it: [
+      { ic: '🛡️', nm: 'Asker', ul: ['Tur başında takviye ve kışlalardan gelir.', 'Taşı: <b>1</b>, <b>Yarısı</b> ya da <b>Hepsi</b>. <b>Toplu taşıma</b> ile birçok bölgeden askeri tek yerde toplarsın.', 'Kendi topraklarından bağlantılı uzak bölgelerinden de saldırabilirsin.'] },
+      { ic: 'b:arch', nm: 'Okçu', pr: AC, rq: 'kışla', ul: [`Bir bölgede en fazla ${ARCHMAX} okçu olur.`, 'Turda bir kez komşu düşmana ok atar (okçu kulesi varsa 2 bölge uzağa).', 'Okçulu bölgeden saldırınca önce ok yağdırırsın; yakındaki saldırılarına da destek verirler.', `Acemi okçu sadece saldırıda savaşır; ${ARCHVET} saldırıya katılınca tecrübeli olur (★) ve savunmaya da katılır.`, 'Sınırda olmayan bir bölgede 2 okçu varsa biri kalır, diğeri tur başında en yakın düşman sınırına gider.'] },
+      { ic: 'b:cav', nm: 'Süvari', pr: CVC, rq: 'kışla sv3', ul: [`Bir bölgede en fazla ${CAVMAX} süvari olur.`, `<b>Sürpriz hücum:</b> süvarili bölgeden saldırınca savaşın ilk ${SURP} zarında savunanın zarı 1 düşer.`, `<b>Yağma:</b> bu saldırıyla bölge alırsan şansa bağlı ${cv0} altın.`, '<b>Karşı saldırı:</b> süvarili bölgene yapılan saldırı püskürtülürse süvari, saldıranın sınırdaki bölgesini işgal eder (surlu bölge ve başkent hariç). Oradaki askerler geri çekilir.', 'Her süvari turda bir saldırıya katılır; surlu bölgelerde ve denizden çıkarmada etkisi yoktur. Savunmada asker sayılmaz.', 'Süvariler her tur kendiliğinden en yakın düşman sınırına ilerler.', { w: `Saldırıya ve karşı saldırıya katılan süvari %${Math.round(CVDIE * 100)} ihtimalle ölür.` }] },
+      { ic: '🪨', nm: 'Mancınık', pr: CTC, rq: 'kışla sv3', ul: [`Bir bölgede en fazla ${CATMAX} mancınık olur.`, '2 turda bir komşu düşman bölgesine taş atar; surları yıkabilir. İsabet etmezse taş boşa gider.', `${CATVET} sur yıkınca rütbe alır ve her tur atar.`, 'Gemiyle taşınabilir (5 yer kaplar).'] },
+      { ic: 'b:spy', nm: 'Casus', pr: SPC, rq: 'kışla sv2', ul: ['Bir bölgede en fazla 5 casus; turda en fazla 5 tane yetiştirilir.', 'Düşman bölgesine gönder: tur sonunda yakalanmazsa o bölge ve bir komşusu 2 tur görünür; başkenti bulabilir.', 'İçerilere gittikçe yakalanma riski artar. Her başarılı görev riski %10 azaltır (en fazla %50).', { w: 'Botlar da senin başkentini bulmak için casus gönderir; yakalandıklarında haber verilir.' }] },
+    ] },
+    { id: 'dz', nm: 'Deniz', in: 'Kıyıdaki bölgene basılı tut → <b>Deniz</b> sekmesi. Bir iskelede en fazla 4 gemi olur.', it: [
+      { ic: '⚓', nm: 'İskele', pr: DC, lv: [['Sv1', 'küçük gemi'], [`Sv2 (${DC2})`, 'büyük savaş gemisi'], [`Sv3 (${DC3})`, 'mayın, otomatik onarım']] },
+      { ic: '⛵', nm: 'Küçük gemi', pr: SSC, ul: [`${CAPS} yer taşır: asker ve okçu 1, mancınık 5 yer.`, 'Çıkarma: bölgeyi seçip denizin ötesindeki bir kıyıya dokun.', `Deniz aşırı fetihte +${LOOT} altın yağma.`, '<b>Keşif seferi:</b> menzildeki bir kıyıya gider; oradaki asker ve binalar 2 tur görünür.'] },
+      { ic: '🚢', nm: 'Büyük savaş gemisi', pr: SLC, rq: 'iskele sv2', ul: [`Devlet başına en fazla ${SLMAX}.`, '<b>Top ateşi:</b> menzildeki düşman kıyısına ya da gemisine ateş eder.', '<b>💣 Kıyı bombardımanı:</b> seçtiğin düşman kıyısından başlayıp yanındaki kıyılarda devriye gezer, her tur birini bombalar, surları döver, bazen binaları yıkar. İki gemin varsa her biri ayrı kıyıya gider; geri çağırana kadar sürer.', '<b>⚔️ Gemi savaşı:</b> düşman gemisinin yanına gidip top düellosuna girer.', '<b>🛡 Koruma:</b> iskelesinin yakınını bombalayan düşman gemisine kendiliğinden saldırır.', 'Çıkarmalarda küçük gemilere eşlik eder, mayınları temizler.'] },
+      { ic: '💣', nm: 'Mayın', pr: MNC, rq: 'iskele sv3', ul: ['Bu bölgenin ve yanındaki 2 kıyının açıklarını korur; gelen düşman gemileri batar.', 'Mayın tarlası bir kez patlar.'] },
+      { ic: '🔧', nm: 'Onarım', ul: [`Sv3 iskelede, gemi savaşında hasar alan bombardıman gemin %35 ihtimalle ${REPAIRC} altına kendiliğinden onarılır.`, 'Hasarlı gemi dönüş yolunda batabilir.'] },
+    ] },
+    { id: 'hk', nm: 'Yönetim', in: 'Altın, vergi, halkın refahı, isyanlar ve diğer devletlerle ilişkiler (diplomasi).', it: [
+      { ic: '🪙', nm: 'Gelir', ul: [`Her tur: bölgelerinden temel gelir (en fazla ${INC0}), madenler ve vergi.`, 'Bir turda saldırıp hiç bölge alamazsan sonraki tur gelirin yarıya düşer.', `Herkes ${START_G} altınla başlar.`] },
+      { ic: '💰', nm: 'Vergi', ul: ['Kendi bölgene basılı tut → <b>Vergi</b>. Normalde 2 turda bir toplanır.', 'İç bölgeler 2 altın verebilir; sınır bölgelerinden 2 altın istersen halk kızar: refah düşer, isyan çıkabilir.', 'Vergiyi her tur toplamak daha çok altın getirir ama isyan riskini artırır.'] },
+      { ic: '😊', nm: 'Refah', ul: ['Saldırmadığın her tur <b>+8</b>.', 'Başarısız her saldırı <b>−4</b>, bir turda 3\'ten fazla her fetih <b>−10</b>.', { w: '%50\'nin altında kendiliğinden isyanlar çıkar; %20\'nin altında ülke ikiye bölünür.' }] },
+      { ic: '🔥', nm: 'İsyan', ul: ['İsyan çıkınca oradaki askerler en yakın güvenli bölgeye çekilir.', 'Bastırmak için isyancılardan fazla asker taşı (bir fetih hakkı harcar). Süresi dolarsa bölge bağımsız bir devlet olur.', '<b>Kötü huylu isyan</b> her tur komşu bölgelere yayılır (en fazla 4 bölge).'] },
+      { ic: '🤝', nm: 'İttifak', pr: ALC ? ALC : 'ücretsiz', ul: ['Rakip bölgesine basılı tut → diplomasi. Bot reddedebilir.', 'Müttefikinden asker, okçu ya da casus isteyebilir, ona saldırı emri verebilirsin.', `Müttefikine kendi askerinden takviye yollamak ücretsizdir (altınla ${SUP}).`, 'İttifaktan çıkmak ücretsizdir.'] },
+      { ic: '👑', nm: 'Haraç', ul: [`Bir botun panelinde miktarı (${TRMIN}–${TRMAX} altın) ve süreyi (${TTMIN}–${TTMAX} tur) seçersin; ne kadar az istersen o kadar kolay kabul eder.`, 'Haraç her turunda ödeyenin gelirinden kesilir.', { w: 'Güçlü botlar da senden haraç isteyebilir; reddedersen sana yüklenirler.' }] },
+      { ic: '📣', nm: 'İsyan çıkarma', pr: `${INC1} / ${INC2}`, ul: [`Rakibin 1–3 askerli bir bölgesinde para dağıtıp isyan çıkarırsın; turda en fazla ${INCMAX} (ilki ${INC1}, sonrakiler ${INC2} altın).`, 'Başkentlerde ve kalabalık bölgelerde işe yaramaz; altın boşa gider.'] },
+    ] },
+  ];
+}
+let gdTab = 'tm';
+let gdQ = '';
+// Haritadaki gerçek rozeti küçük bir tuvale çizer: harita tuvalinin köşesine geçici çizip kopyalar, sonra köşeyi geri koyar.
+function gdBadge(el, k) {
+  const R = 92;
+  const k2 = el.getContext('2d');
+  el.width = R;
+  el.height = R;
+  let sv = null;
+  try {
+    sv = c.getImageData(0, 0, R, R);
+  }
+  catch (e) {
+    return;
+  }
+  c.save();
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, R, R);
+  c.translate(R / 2, R / 2);
+  c.scale(4.1, 4.1);
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.font = 'bold 15px sans-serif';
+  const col = '#f2b134';
+  if (k == 'bar') {
+    c.beginPath();
+    c.arc(0, 0, 10, 0, 7);
+    c.fillStyle = '#10222b';
+    c.fill();
+    c.lineWidth = 2;
+    c.strokeStyle = col;
+    c.stroke();
+    drawTent(0, 0, col);
+  }
+  else if (k == 'mn')
+    drawMine(0, 0, col);
+  else if (k == 'arch')
+    drawArch(0, 0, '', col, false);
+  else if (k == 'spy')
+    drawSpy(0, 0, '', col, 0);
+  else if (k == 'cav')
+    drawCavBadge(0, 0, '', col, false, 0);
+  c.restore();
+  k2.clearRect(0, 0, R, R);
+  k2.drawImage(cv, 0, 0, R, R, 0, 0, R, R);
+  c.putImageData(sv, 0, 0);
+}
+function gdRender() {
+  const box = document.getElementById('guide');
+  const D = gdData();
+  const q = gdQ.trim().toLocaleLowerCase('tr');
+  box.querySelectorAll('.gd-tabs button').forEach(b => b.classList.toggle('on', !q && b.dataset.t == gdTab));
+  const strip = s => String(s).replace(/<[^>]+>/g, '');
+  const hit = it => !q || strip([it.nm, it.rq || '', ...(it.ul || []).map(x => typeof x == 'string' ? x : x.w), ...(it.lv || []).flat()].join(' ')).toLocaleLowerCase('tr').includes(q);
+  const card = it => {
+    const ic = it.ic.startsWith('b:') ? `<div class="gd-ic raw"><canvas data-b="${it.ic.slice(2)}"></canvas></div>` : `<div class="gd-ic">${it.ic}</div>`;
+    const pr = it.pr != null ? (typeof it.pr == 'number' || /^[\d\s/+–]+$/.test(String(it.pr)) ? gdCoin(it.pr) : `<span class="gd-pr">${it.pr}</span>`) : '';
+    const rq = it.rq ? `<span class="gd-rq">Gerekli: ${it.rq}</span>` : it.nt ? `<span class="gd-rq">${it.nt}</span>` : '';
+    const lv = it.lv ? `<div class="gd-lv">${it.lv.map(([a, b]) => `<span><b>${a}</b>${b}</span>`).join('')}</div>` : '';
+    const ul = it.ul ? `<ul>${it.ul.map(x => typeof x == 'string' ? `<li>${x}</li>` : `<li class="warn">⚠ ${x.w}</li>`).join('')}</ul>` : '';
+    return `<div class="gd-c">${ic}<div class="gd-tx"><div class="gd-nm">${it.nm}${pr}</div>${rq}${lv}${ul}</div></div>`;
+  };
+  let h = '';
+  if (q) {
+    const all = D.flatMap(s => s.it.filter(hit));
+    h = all.length ? all.map(card).join('') : '<div class="gd-none">Bu kelimeyle bir şey bulunamadı.</div>';
+  }
+  else {
+    const s = D.find(x => x.id == gdTab) || D[0];
+    h = `<p class="gd-in">${s.in}</p>` + s.it.map(card).join('');
+  }
+  const bd = box.querySelector('.gd-bd');
+  bd.innerHTML = h;
+  bd.querySelectorAll('canvas[data-b]').forEach(el => gdBadge(el, el.dataset.b));
+}
+function openGuide(tab) {
+  let box = document.getElementById('guide');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'guide';
+    box.hidden = true;
+    const D = gdData();
+    box.innerHTML = `<div class="gd-sh" role="dialog" aria-label="Rehber"><div class="gd-hd"><h2>📖 Rehber<small>Bütün birlikler, yapılar ve kurallar</small></h2><button class="gd-x" aria-label="Kapat">✕</button></div>` +
+      `<label class="gd-q"><span aria-hidden="true">🔍</span><input type="search" placeholder="Ara: süvari, sur, vergi…" aria-label="Rehberde ara"></label>` +
+      `<div class="gd-tabs">${D.map(s => `<button data-t="${s.id}">${s.nm}</button>`).join('')}</div><div class="gd-bd"></div></div>`;
+    document.body.appendChild(box);
+    box.querySelector('.gd-x').onclick = closeGuide;
+    box.onclick = e => {
+      if (e.target == box)
+        closeGuide();
+    };
+    box.querySelector('.gd-tabs').onclick = e => {
+      const b = e.target.closest('button[data-t]');
+      if (!b)
+        return;
+      gdTab = b.dataset.t;
+      gdQ = '';
+      box.querySelector('.gd-q input').value = '';
+      gdRender();
+      box.querySelector('.gd-bd').scrollTop = 0;
+    };
+    box.querySelector('.gd-q input').oninput = e => {
+      gdQ = e.target.value;
+      gdRender();
+    };
+  }
+  if (tab)
+    gdTab = tab;
+  gdRender();
+  box.hidden = false;
+  box.querySelector('.gd-bd').scrollTop = 0;
+}
+function closeGuide() {
+  const box = document.getElementById('guide');
+  if (box)
+    box.hidden = true;
+}
+document.getElementById('mnGuide').onclick = () => openGuide();
+document.getElementById('gdb').onclick = () => openGuide();
 (() => {
   const sp = document.getElementById('mnSetP');
   document.getElementById('mnSet').onclick = () => {
