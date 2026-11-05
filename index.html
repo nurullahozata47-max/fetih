@@ -2611,6 +2611,94 @@ input, textarea {
   width: 30px;
   height: 26px;
 }
+/* Kudret: ilk kazanılınca çıkan tanıtım kartı */
+#kdIn {
+  position: fixed;
+  inset: 0;
+  z-index: 116;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(4, 10, 14, .55);
+  color: #f4efe2;
+  font-family: Bahnschrift, "Segoe UI", system-ui, sans-serif;
+}
+#kdIn .ki-c {
+  width: min(380px, 100%);
+  padding: 22px 20px 18px;
+  border-radius: 20px;
+  text-align: center;
+  background: radial-gradient(120% 70% at 50% 0%, #3a3012 0%, #16303c 55%, #0d1d25 100%);
+  border: 1px solid rgba(255, 211, 107, .45);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .6), 0 0 40px rgba(255, 190, 60, .15);
+  animation: kiIn .35s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+@keyframes kiIn {
+  from { transform: scale(.85); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+#kdIn .ki-c svg {
+  width: 74px;
+  height: 63px;
+  filter: drop-shadow(0 4px 14px rgba(255, 190, 60, .45));
+  animation: kiCr 2.4s ease-in-out infinite;
+}
+@keyframes kiCr {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+#kdIn h3 {
+  margin: 8px 0 6px;
+  font-size: 23px;
+  color: #ffd36b;
+}
+#kdIn p {
+  margin: 0 0 12px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: rgba(244, 239, 226, .88);
+}
+#kdIn .ki-y {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+#kdIn .ki-y span {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .12);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+#kdIn button {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 13px;
+  border-radius: 12px;
+  border: 0;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+}
+#kdIn .ki-go {
+  background: #ffd36b;
+  color: #12252e;
+}
+#kdIn .ki-no {
+  background: rgba(255, 255, 255, .08);
+  color: #f4efe2;
+}
+#kdb.kd-hl {
+  animation: kdHl 1s ease-in-out infinite;
+}
+@keyframes kdHl {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 211, 107, 0); transform: scale(1); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 211, 107, .55); transform: scale(1.12); }
+}
 </style>
 </head>
 <body>
@@ -2702,7 +2790,7 @@ input, textarea {
   </div>
   <div id="onl" hidden><div class="on-card" id="onc"></div></div>
   <button id="mnSet" aria-label="Ayarlar">⚙️</button>
-  <div id="mnSetP" hidden><div class="set-card"><div class="set-hd"><b>⚙️ Ayarlar</b><button id="mnSetX" aria-label="Kapat">✕</button></div><div class="set-row"><span>Müzik</span><button id="mnMus" class="mus-tg" aria-label="Müzik">🔊</button></div><div class="set-row"><span>Parça</span><button id="mnTrk" class="mn-trk">⚔️ Marş</button></div><div class="set-row"><span>Ses düzeyi</span><input id="mnVol" type="range" min="0" max="100" value="70" aria-label="Müzik sesi"></div><div class="set-row"><span>Savaş animasyonu</span><button id="mnBfx" class="mn-trk">Açık</button></div></div></div>
+  <div id="mnSetP" hidden><div class="set-card"><div class="set-hd"><b>⚙️ Ayarlar</b><button id="mnSetX" aria-label="Kapat">✕</button></div><div class="set-row"><span>Müzik</span><button id="mnMus" class="mus-tg" aria-label="Müzik">🔊</button></div><div class="set-row"><span>Parça</span><button id="mnTrk" class="mn-trk">⚔️ Marş</button></div><div class="set-row"><span>Ses düzeyi</span><input id="mnVol" type="range" min="0" max="100" value="70" aria-label="Müzik sesi"></div><div class="set-row"><span>Ses efektleri</span><button id="mnSfx" class="mn-trk">Açık</button></div><div class="set-row"><span>Savaş animasyonu</span><button id="mnBfx" class="mn-trk">Açık</button></div></div></div>
 </div>
 <script>
 // ======================================================================
@@ -6502,6 +6590,13 @@ function drawNav(now) {
   const s = now / 1000;
   nav.forEach((e, idx) => {
     const u = (now - e.t0) / e.dur;
+    if (!e._sd && now >= e.t0) {
+      e._sd = 1;
+      try {
+        navSnd(e);
+      }
+      catch (er) { }
+    }
     if (e.k == 'stone') {
       // Mancınık taşı: kavis çizerek uçar, yerde gölgesi kayar
       if (u < 0 || u > 1)
@@ -8398,6 +8493,7 @@ function start(p) {
   if (p == 0 && !TUT && rd > 0 && rd % KDR_EVERY == 0 && !first) {
     hl += ` 👑 Yeni kudret kazandın! Üstteki taç düğmesinden devlet yolunda bir yetenek öğren.`;
     setTimeout(() => banner('👑 Yeni kudret kazandın!', '#f2b134'), 1300);
+    setTimeout(kdIntro, 2200);
   }
   if (p == 0)
     $('log').textContent = first ? `Başlangıç hazinesi: ${START_G} altın (herkes aynı parayla başlar). Vergi ve gelir gelecek turdan itibaren gelir.` + (hl ? ' ' + hl : '') : `Tur geliri: +${g} altın (temel ${gBase}${gTax ? `, vergi ${gTax}` : ', vergi gelecek tur'}${gMine ? `, maden ${gMine}` : ''}${gPort ? `, liman ${gPort}` : ''})` + (pn ? ' (ceza: geçen tur bölge alamadın, gelir yarıya düştü)' : '') + (lostG ? ` Sandıklar dolu: ${lostG} altın sığmadı, yeni sandık kur ya da yükselt.` : '') + (hl ? ' ' + hl : '');
@@ -8765,6 +8861,8 @@ async function battle(a, t, sea, F) {
       if (me == 0)
         fl.push({ t, dx: 0, dy: 30, txt: '+3 ganimet', col: '#ffd36b', t0: performance.now() + 650 });
     }
+    if (me == 0 && (lootG > 0 || sea || cvB || kh(me, 3)))
+      snd('coin', null, .6);
     // Süvari yağması: şansa bağlı 5-20 altın
     if (cvB) {
       const yg = kh(me, 2) ? 10 + Math.floor(Math.random() * 16) : CVLOOT0 + Math.floor(Math.random() * (CVLOOT - CVLOOT0 + 1));
@@ -9588,6 +9686,54 @@ async function fall(old, me, t, late) {
 }
 function pulse(t, col, a, n, fire) {
   fx.push({ t, col, a, n, fire, t0: performance.now() });
+  // Ok atışı (okçular, kule, sur okçuları): ok yağmuru sesi
+  if (a != null && n)
+    snd('arrows', t);
+}
+// Ses efekti: sadece ekranda görünen yerdeki olaylar için çalar; aynı ses arka arkaya üst üste binmez.
+const sndLast = {};
+function snd(k, t, dl) {
+  if (typeof Mus == 'undefined' || !Mus.sfxOn || demo || document.hidden)
+    return;
+  if (t != null && t >= 0 && !(Vg && Vg.has(t)) && !(own && own[t] == 0))
+    return;
+  const now = performance.now() + (dl || 0) * 1000;
+  if (sndLast[k] && Math.abs(now - sndLast[k]) < 140)
+    return;
+  sndLast[k] = now;
+  Mus.sfx(k, dl);
+}
+// Animasyon başladığı anda sesi: sahnenin içindeki çarpışma anına göre gecikmeli.
+function navSnd(e) {
+  const d = (e.dur || 0) / 1000;
+  const t = typeof e.t == 'number' ? e.t : null;
+  if (e.k == 'charge')
+    snd('clash', t, d * .45);
+  else if (e.k == 'volley') {
+    snd('arrows', t);
+    snd('clash', t, d * .66);
+  }
+  else if (e.k == 'equal') {
+    [.25, .45, .62, .8].forEach((f, i) => setTimeout(() => snd('clash', t), d * f * 1000));
+  }
+  else if (e.k == 'cavc') {
+    snd('hooves', t);
+    snd('clash', t, d * .48);
+  }
+  else if (e.k == 'clash')
+    snd('clash', t);
+  else if (e.k == 'strike')
+    snd('cannon', t);
+  else if (e.k == 'duel')
+    [0, .3, .6].forEach(f => setTimeout(() => snd('cannon', null), d * f * 1000));
+  else if (e.k == 'stone')
+    snd('thud', null, d);
+  else if (e.k == 'burst')
+    snd('fetih', t);
+  else if (e.k == 'sink' || e.k == 'slowsink')
+    snd('splash', null);
+  else if (e.k == 'carry' && e.what == 'cav')
+    snd('hooves', null);
 }
 // ======================================================================
 // 9. SİS, CASUSLAR, OKÇULAR
@@ -15142,23 +15288,26 @@ let popPos = null;
 const movable = t => arm[t] > 1 || arch[t] > 0 || (cat && cat[t] > 0) || (cav && cav[t] > 0);
 // ---- Gemiyle taşıma paneli: asker, okçu ve mancınık. Her küçük gemi 20 yer; mancınık 5 yer tutar. ----
 const CATS = 5;
+// Süvari gemide 2 yer kaplar (at ve binicisi).
+const CAVS = 2;
 function seaPick(a, t, cx, cy) {
   const cap0 = shipCap(a);
-  const mx = { s: Math.max(0, arm[a] - 1), a: Math.max(0, Math.min(arch[a], ARCHMAX - arch[t])), c: Math.max(0, Math.min(cat[a] || 0, CATMAX - (cat[t] || 0))) };
-  const W1 = { s: 1, a: 1, c: CATS };
-  const n = { s: 0, a: 0, c: 0 };
-  const used = () => n.s + n.a + n.c * CATS;
+  const mx = { s: Math.max(0, arm[a] - 1), a: Math.max(0, Math.min(arch[a], ARCHMAX - arch[t])), c: Math.max(0, Math.min(cat[a] || 0, CATMAX - (cat[t] || 0))), v: Math.max(0, Math.min(cav[a] || 0, CAVMAX - (cav[t] || 0))) };
+  const W1 = { s: 1, a: 1, c: CATS, v: CAVS };
+  const n = { s: 0, a: 0, c: 0, v: 0 };
+  const used = () => n.s + n.a + n.c * CATS + n.v * CAVS;
   const fit = k => Math.max(0, Math.min(mx[k] - n[k], Math.floor((cap0 - used()) / W1[k])));
   // Varsayılan: önce mancınık ve okçular, kalan yere askerler
   n.c = fit('c');
+  n.v = fit('v');
   n.a = fit('a');
   n.s = fit('s');
-  const row = (k, ic, nm) => mx[k] > 0 ? `<div class="mv-lbl">${ic} ${nm}${k == 'c' ? ' (her biri 5 yer)' : ''}</div><div class="sp-row"><button data-k="${k}0">0</button><button data-k="${k}-">−</button><span class="sp-n">${n[k]}</span><button data-k="${k}+">+</button><button data-k="${k}a">Max</button></div>` : '';
+  const row = (k, ic, nm) => mx[k] > 0 ? `<div class="mv-lbl">${ic} ${nm}${k == 'c' ? ` (her biri ${CATS} yer)` : k == 'v' ? ` (her biri ${CAVS} yer)` : ''}</div><div class="sp-row"><button data-k="${k}0">0</button><button data-k="${k}-">−</button><span class="sp-n">${n[k]}</span><button data-k="${k}+">+</button><button data-k="${k}a">Max</button></div>` : '';
   const draw = () => {
     const u = used();
     const ns = Math.ceil(u / CAPS);
     pop.classList.add('fixw');
-    pop.innerHTML = `<b>⛵ Gemiyle taşı: ${NM[a]} → ${NM[t]}</b><span>Yer: <b>${u}/${cap0}</b> · ${ns} küçük gemi (her gemi en fazla ${CAPS} yer)</span>` + row('s', '⚔', 'Asker') + row('a', '🏹', 'Okçu') + row('c', '🪨', 'Mancınık') + (mx.a == 0 && arch[a] > 0 ? '<span>🏹 Hedefte okçu için yer yok.</span>' : '') + (mx.c == 0 && cat[a] > 0 ? '<span>🪨 Hedefte mancınık için yer yok.</span>' : '') + `<button class="sp-go" data-k="go" ${u > 0 ? '' : 'disabled'}>⛵ Yola çık</button>`;
+    pop.innerHTML = `<b>⛵ Gemiyle taşı: ${NM[a]} → ${NM[t]}</b><span>Yer: <b>${u}/${cap0}</b> · ${ns} küçük gemi (her gemi en fazla ${CAPS} yer)</span>` + row('s', '⚔', 'Asker') + row('a', '🏹', 'Okçu') + row('c', '🪨', 'Mancınık') + row('v', '🐎', 'Süvari') + (mx.v == 0 && cav[a] > 0 ? '<span>🐎 Hedefte süvari için yer yok.</span>' : '') + (mx.a == 0 && arch[a] > 0 ? '<span>🏹 Hedefte okçu için yer yok.</span>' : '') + (mx.c == 0 && cat[a] > 0 ? '<span>🪨 Hedefte mancınık için yer yok.</span>' : '') + `<button class="sp-go" data-k="go" ${u > 0 ? '' : 'disabled'}>⛵ Yola çık</button>`;
   };
   draw();
   pop.hidden = false;
@@ -15198,7 +15347,8 @@ function seaPick(a, t, cx, cy) {
     const S1 = Math.min(n.s, arm[a] - 1);
     const A1 = Math.min(n.a, arch[a], ARCHMAX - arch[t]);
     const C1 = Math.min(n.c, cat[a] || 0, CATMAX - (cat[t] || 0));
-    const u = S1 + A1 + C1 * CATS;
+    const V1 = Math.min(n.v, cav[a] || 0, CAVMAX - (cav[t] || 0));
+    const u = S1 + A1 + C1 * CATS + V1 * CAVS;
     if (u < 1 || u > shipCap(a) || (S1 > 0 && !supUse(t))) {
       sel = null;
       ui();
@@ -15218,7 +15368,10 @@ function seaPick(a, t, cx, cy) {
     const cxp = catXp[a];
     if (!cat[a])
       catXp[a] = 0;
-    const what = [S1 ? `${S1} asker` : '', A1 ? `${A1} okçu` : '', C1 ? `${C1} mancınık` : ''].filter(Boolean).join(', ');
+    cav[a] -= V1;
+    const vU = Math.min(V1, cvU[a] || 0);
+    cvU[a] -= vU;
+    const what = [S1 ? `${S1} asker` : '', A1 ? `${A1} okçu` : '', C1 ? `${C1} mancınık` : '', V1 ? `${V1} süvari` : ''].filter(Boolean).join(', ');
     $('log').textContent = `${ns} küçük gemi ${what} ${NM[t]} bölgene taşıyor.`;
     ui();
     try {
@@ -15236,6 +15389,10 @@ function seaPick(a, t, cx, cy) {
       cat[t] += C1;
       catCd[t] = Math.max(catCd[t], ccd);
       catXp[t] = Math.max(catXp[t], cxp);
+    }
+    if (V1) {
+      cav[t] += V1;
+      cvU[t] += vU;
     }
     mvCount++;
     fl.push({ t, dx: 0, txt: '+' + what, col: '#fff', t0: performance.now() });
@@ -15485,7 +15642,7 @@ function openPop(cx, cy) {
         o.push(['mn', mine[t] ? 'Mayın tarlası döşeli' : `Mayın döşe (${MNC} altın)`, !mine[t] && gold[0] >= MNC]);
       if (shS[t] > 0)
         o.push(['sc', 'Keşif seferi', shUsed[t] < shS[t]]);
-      inf.d += ` İskele sv${dk[t]}.${dk[t] >= 3 ? ` Mayınlar bu bölgenin ve en yakın 2 komşu kıyı bölgenin açıklarını korur; çıkarma ya da bombardıman için gelen düşman gemileri batar. Mayın tarlası bir kez patlar.${mine[t] ? ' (Döşeli)' : ''} Onarım: gemi savaşında hasar alan bombardıman gemin %35 ihtimalle ${REPAIRC} altın karşılığında kendiliğinden bu iskeleye dönüp tamir olur, sonraki tur kaldığı kıyıya geri gider.` : ''} Gemiler: ${shS[t]} küçük (her biri ${CAPS} yer: asker ve okçu 1, mancınık 5 yer), ${shL[t]} büyük. Büyük gemi (devlet başına en fazla 2): top atar; 💣 kıyı bombardımanı yapar (her gemi ayrı emir alır; iki gemin varsa farklı kıyılara gönderebilirsin, aynı kıyıyı ikisi birden bombalamaz; seçtiğin düşman kıyısından başlayıp yanındaki 3 kıyıya kadar devriye gezer, her tur birini bombalar, surları döver; geri çağırana ya da batırılana kadar sürer; hasarlı gemi dönüş yolunda %35 ihtimalle batar); 🛡 iskelesini korur (iskele ve yanındaki 2 kıyıdan birini düşman gemisi bombalarsa kendiliğinden saldırır); ⚔️ gemi savaşı yapar (düşman gemisinin yanına gidip top düellosuna girer: %50 ihtimalle gemilerden biri batar, yoksa ikisi de hasar alır; bombardım gemisi en geç 2. düelloda batar); çıkarmalarda küçük gemilere eşlik eder, mayınları temizler ve karaya çıkmadan önce top atar. Çıkarma: bu bölgeyi seçip herhangi bir kıyı bölgesine dokun (deniz aşırı fetihte +${LOOT} yağma); kendi kıyı bölgene dokunursan asker, okçu ve mancınık taşırsın.`;
+      inf.d += ` İskele sv${dk[t]}.${dk[t] >= 3 ? ` Mayınlar bu bölgenin ve en yakın 2 komşu kıyı bölgenin açıklarını korur; çıkarma ya da bombardıman için gelen düşman gemileri batar. Mayın tarlası bir kez patlar.${mine[t] ? ' (Döşeli)' : ''} Onarım: gemi savaşında hasar alan bombardıman gemin %35 ihtimalle ${REPAIRC} altın karşılığında kendiliğinden bu iskeleye dönüp tamir olur, sonraki tur kaldığı kıyıya geri gider.` : ''} Gemiler: ${shS[t]} küçük (her biri ${CAPS} yer: asker ve okçu 1, süvari ${CAVS}, mancınık ${CATS} yer), ${shL[t]} büyük. Büyük gemi (devlet başına en fazla 2): top atar; 💣 kıyı bombardımanı yapar (her gemi ayrı emir alır; iki gemin varsa farklı kıyılara gönderebilirsin, aynı kıyıyı ikisi birden bombalamaz; seçtiğin düşman kıyısından başlayıp yanındaki 3 kıyıya kadar devriye gezer, her tur birini bombalar, surları döver; geri çağırana ya da batırılana kadar sürer; hasarlı gemi dönüş yolunda %35 ihtimalle batar); 🛡 iskelesini korur (iskele ve yanındaki 2 kıyıdan birini düşman gemisi bombalarsa kendiliğinden saldırır); ⚔️ gemi savaşı yapar (düşman gemisinin yanına gidip top düellosuna girer: %50 ihtimalle gemilerden biri batar, yoksa ikisi de hasar alır; bombardım gemisi en geç 2. düelloda batar); çıkarmalarda küçük gemilere eşlik eder, mayınları temizler ve karaya çıkmadan önce top atar. Çıkarma: bu bölgeyi seçip herhangi bir kıyı bölgesine dokun (deniz aşırı fetihte +${LOOT} yağma); kendi kıyı bölgene dokunursan asker, okçu ve mancınık taşırsın.`;
     }
     o.push(tw[t] ? ['uw', tw[t] >= 2 ? 'Okçu Kulesi seviye 2 (tam)' : `Kuleyi yükselt: Sv2 alevli oklar (${TW2} altın)`, tw[t] < 2 && gold[0] >= TW2] : full ? ['u', ...FL('Okçu Kulesi')] : ['u', `Okçu Kulesi (${TWC} altın)`, gold[0] >= TWC]);
     if (tw[t])
@@ -15671,7 +15828,14 @@ function openPop(cx, cy) {
     if (TUT && !tutOK('k', k))
       return;
     tutEvent(k);
+    const g0 = gold[0];
+    // Bir şey satın alındıysa: yapılar için çekiç, birlikler için altın sesi
+    const buySnd = () => {
+      if (gold[0] < g0)
+        snd(['k', 'sv', 'c', 'ct', 'ss', 'sl', 'mn', 's', 'r'].includes(k) ? 'coin' : 'build');
+    };
     const re = () => {
+      buySnd();
       ui();
       openPop(cx, cy);
     };
@@ -16016,6 +16180,7 @@ function openPop(cx, cy) {
     bd = k;
     build(t);
     bd = null;
+    buySnd();
     // Sur örülürken animasyon görünsün, ittifak kurulunca da panel kapansın (istersen yeniden açarsın).
     if (k == 'w' || k == 'a') {
       pop.hidden = true;
@@ -17474,7 +17639,7 @@ function ui(msg) {
   }
   setTxt('ttl', dr ? 'Fetih, bölge seçimi' : `Fetih, tur ${rd}` + (rd <= CAPT ? ` (başkentler ${CAPT + 1 - rd} tur daha dokunulmaz)` : ONLINE || TUT ? '' : ` · ⏳ ${Math.floor(playMs / 60000)} dk` + (lateOn ? ' (başkent = tam fetih)' : '')));
   setHTML('chips', PN.slice(0, P).map((n, p) => cnt(p) == 0 && !dr ? (p > 3 ? '' : `<span class="dead" style="--c:${COL[p]}">${n}</span>`) : `<span class="${p == turn && !over ? 'on' : ''}" style="--c:${COL[p]}">${n} ${cnt(p)}<em style="font-style:normal;font-size:.85em;margin-left:4px;color:${ref[p] < 20 ? '#d63a3a' : ref[p] < 50 ? '#e5566d' : ref[p] < 70 ? '#c98a12' : '#3a9a6c'}">${p == 0 ? '' : '%' + ref[p]}</em>${armyOf(p) < WEAK && !dr ? '<em style="font-style:normal;font-size:.8em;margin-left:4px;color:#e5566d">zayıf</em>' : ''}${p == 0 ? ` <i class="coin" aria-label="altın"></i>${gold[0]}/${capOf(0)}` : ally[p] > 0 ? (tru[p] ? ` (haraç: ${ally[p]} tur)` : ally[p] == 1 ? ' (ittifak: son tur)' : ` (ittifak: ${ally[p]} tur)`) : ''}${p > 0 && bp[p].some((v, q) => v > 0 && cnt(q) > 0) ? ` (+${bp[p].map((v, q) => v > 0 && cnt(q) > 0 ? PN[q] : '').filter(Boolean).join(', ')})` : ''}</span>`).join('') + (cnt(NEU) ? `<span style="--c:#9aa3a8">Boş ${cnt(NEU)}</span>` : ''));
-  setTxt('st', msg || (spySel != null && turn == 0 ? `${PN[spySel]} casusu için hedef seç: bir düşman bölgesine dokun.` : ctk && sel != null && turn == 0 ? `Mancınıklar hazır (${NM[sel]}). Komşu bir düşman bölgesine dokun.` : ordSel != null && turn == 0 ? `${PN[ordSel]} için hedef seç: ortak bir düşmanın bölgesine dokun.` : dr ? (turn == 0 && !busy ? `Bölge seç (${N - dnx} kaldı)` + (cap[0] < 0 ? ': ilk seçimin başkent olur.' : '.') : `${PN[turn]} seçiyor…`) : bd && turn == 0 ? ({ b: 'Kışla kurmak için kendi bölgene dokun.', m: 'Maden kurmak için kendi bölgene dokun.', a: 'İttifak için o krallığın herhangi bir bölgesine dokun.', w: 'Sur için başkentine (★) dokun.' }[bd]) : turn != 0 ? `${PN[turn]} oynuyor…` : gsk ? `⚔️ Gemi savaşı (${NM[sel]}): saldıracağın düşman gemisine ya da önünde durduğu kıyıya dokun.` : abk ? `💣 Bombardıman gemisi hazır (${NM[sel]}). Bombalanacak düşman kıyısına dokun.` : cn ? `Büyük gemiler hazır (${NM[sel]}). Kıyıdaki düşman bölgesine${foeShips(0, null).some(k => dseaOK(sel, blk[k].t)) ? ' ya da menzildeki düşman gemisine' : ''} dokun.` : sco ? `Keşif gemisi hazır (${NM[sel]}). Kıyıdaki bir bölgeye dokun.` : sp ? `Casus hazır (${NM[sel]}). Herhangi bir düşman bölgesine dokun; içerilere gittikçe yakalanma riski artar.` : ak ? `Okçular hazır (${NM[sel]}). Menzildeki düşmana dokun (${archRange(sel)} bölge).` : document.getElementById('txg') ? 'Vergi düzenini seç.' : phase == 'r' && !mv ? `Takviye: ${pool} birlik. Dokun: asker ekle. Basılı tut: inşa et.${TUT ? '' : ' Tek seferde dağıtmak için: Otomatik dağıt.'}` : mv && bk ? (bk.src.size ? `Toplu taşıma: ${bk.src.size} bölgeden ${[...bk.src].reduce((a, u) => a + arm[u] - 1, 0)} asker seçildi. Şimdi hedef bölgeye basılı tut.` : 'Toplu taşıma: asker toplanacak bölgelere dokun, sonra hedefe basılı tut.') : mv ? (sel == null ? 'Taşımak için 2+ birlikli bölgeni seç. Basılı tut: toplu taşıma.' : `${NM[sel]} seçili. Hedef bölgene dokun, her dokunuş 1 birlik taşır.`) : sel == null ? `Saldırmak için 2+ birlikli bölgeni seç. (Fetih: ${won[0] + sup[0]}/${ext ? 5 : 3}, refah %${ref[0]})` : `${NM[sel]} seçili. Kendi bölgene dokun: asker taşı. Düşmana dokun: saldır.${shipCap(sel) > 0 ? ` Gemilerle ${shipCap(sel)} yerlik taşıma yapabilirsin (asker, okçu, mancınık): denizin ötesindeki bir kıyıya dokun.` : ''} Koyu renkli düşmana dokun; bağlantılı bölgelerinden de saldırabilirsin.`));
+  setTxt('st', msg || (spySel != null && turn == 0 ? `${PN[spySel]} casusu için hedef seç: bir düşman bölgesine dokun.` : ctk && sel != null && turn == 0 ? `Mancınıklar hazır (${NM[sel]}). Komşu bir düşman bölgesine dokun.` : ordSel != null && turn == 0 ? `${PN[ordSel]} için hedef seç: ortak bir düşmanın bölgesine dokun.` : dr ? (turn == 0 && !busy ? `Bölge seç (${N - dnx} kaldı)` + (cap[0] < 0 ? ': ilk seçimin başkent olur.' : '.') : `${PN[turn]} seçiyor…`) : bd && turn == 0 ? ({ b: 'Kışla kurmak için kendi bölgene dokun.', m: 'Maden kurmak için kendi bölgene dokun.', a: 'İttifak için o krallığın herhangi bir bölgesine dokun.', w: 'Sur için başkentine (★) dokun.' }[bd]) : turn != 0 ? `${PN[turn]} oynuyor…` : gsk ? `⚔️ Gemi savaşı (${NM[sel]}): saldıracağın düşman gemisine ya da önünde durduğu kıyıya dokun.` : abk ? `💣 Bombardıman gemisi hazır (${NM[sel]}). Bombalanacak düşman kıyısına dokun.` : cn ? `Büyük gemiler hazır (${NM[sel]}). Kıyıdaki düşman bölgesine${foeShips(0, null).some(k => dseaOK(sel, blk[k].t)) ? ' ya da menzildeki düşman gemisine' : ''} dokun.` : sco ? `Keşif gemisi hazır (${NM[sel]}). Kıyıdaki bir bölgeye dokun.` : sp ? `Casus hazır (${NM[sel]}). Herhangi bir düşman bölgesine dokun; içerilere gittikçe yakalanma riski artar.` : ak ? `Okçular hazır (${NM[sel]}). Menzildeki düşmana dokun (${archRange(sel)} bölge).` : document.getElementById('txg') ? 'Vergi düzenini seç.' : phase == 'r' && !mv ? `Takviye: ${pool} birlik. Dokun: asker ekle. Basılı tut: inşa et.${TUT ? '' : ' Tek seferde dağıtmak için: Otomatik dağıt.'}` : mv && bk ? (bk.src.size ? `Toplu taşıma: ${bk.src.size} bölgeden ${[...bk.src].reduce((a, u) => a + arm[u] - 1, 0)} asker seçildi. Şimdi hedef bölgeye basılı tut.` : 'Toplu taşıma: asker toplanacak bölgelere dokun, sonra hedefe basılı tut.') : mv ? (sel == null ? 'Taşımak için 2+ birlikli bölgeni seç. Basılı tut: toplu taşıma.' : `${NM[sel]} seçili. Hedef bölgene dokun, her dokunuş 1 birlik taşır.`) : sel == null ? `Saldırmak için 2+ birlikli bölgeni seç. (Fetih: ${won[0] + sup[0]}/${ext ? 5 : 3}, refah %${ref[0]})` : `${NM[sel]} seçili. Kendi bölgene dokun: asker taşı. Düşmana dokun: saldır.${shipCap(sel) > 0 ? ` Gemilerle ${shipCap(sel)} yerlik taşıma yapabilirsin (asker, okçu, süvari, mancınık): denizin ötesindeki bir kıyıya dokun.` : ''} Koyu renkli düşmana dokun; bağlantılı bölgelerinden de saldırabilirsin.`));
   const ok = turn == 0 && phase == 'a' && !busy && !over;
   const adr = dr && !ONLINE && !TUT;
   const arr = autoROK();
@@ -19122,7 +19287,12 @@ const Mus = (() => {
   let toneTrk = null;
   let on = true;
   let vol = .7;
+  // Ses efektleri müzikten ayrı açılıp kapanır (müzik kapalıyken de çalabilir).
+  let sfxOn = true;
+  let sfxM = null;
+  let outIn = null;
   try {
+    sfxOn = localStorage.getItem('fetih_sfx') != '0';
     on = localStorage.getItem('fetih_mus') != '0';
     const v = localStorage.getItem('fetih_vol');
     if (v != null)
@@ -19175,6 +19345,10 @@ const Mus = (() => {
     const mk = ac.createGain();
     mk.gain.value = .77;
     master.connect(hpf);
+    outIn = hpf;
+    sfxM = ac.createGain();
+    sfxM.gain.value = sfxOn ? vol : 0;
+    sfxM.connect(hpf);
     hpf.connect(lim);
     lim.connect(mk);
     mk.connect(ac.destination);
@@ -19958,7 +20132,107 @@ const Mus = (() => {
       pluck(G, deg(9, 0), t + .28, .17, .9);
     }
   }
+  // ---- Ses efektleri ----
+  // Telefon hoparlörüne uygun: orta frekanslar, yumuşak başlangıç ve kısa sönüm; hiçbiri sert kare dalga değil.
+  function sNoise(out, t, type, f, q, v, d, f2) {
+    const n = noise();
+    const fl = ac.createBiquadFilter();
+    fl.type = type;
+    fl.frequency.setValueAtTime(f, t);
+    if (f2)
+      fl.frequency.exponentialRampToValueAtTime(f2, t + d);
+    fl.Q.value = q;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(v, t + Math.min(.01, d * .2));
+    g.gain.exponentialRampToValueAtTime(.0008, t + d);
+    n.connect(fl);
+    fl.connect(g);
+    g.connect(out);
+    n.start(t, Math.random() * .5);
+    n.stop(t + d + .05);
+  }
+  function sTone(out, t, f, v, d, type, f2) {
+    const o = ac.createOscillator();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(f, t);
+    if (f2)
+      o.frequency.exponentialRampToValueAtTime(f2, t + d);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(v, t + .004);
+    g.gain.exponentialRampToValueAtTime(.0008, t + d);
+    o.connect(g);
+    g.connect(out);
+    o.start(t);
+    o.stop(t + d + .05);
+  }
+  function sfx(k, dl) {
+    if (!ac || !sfxOn || !sfxM)
+      return;
+    const t = ac.currentTime + .02 + (dl || 0);
+    const O = sfxM;
+    const r = () => 1 + (Math.random() - .5) * .06;
+    if (k == 'clash') {
+      // İki kılıç çarpışması: metalik tınılar ve kısa bir şıngırtı
+      [[0, 1], [.13, .75]].forEach(([d0, s0]) => {
+        const k0 = r();
+        [1870, 2740, 3910, 5230].forEach((f, i) => sTone(O, t + d0, f * k0, .07 * s0 / (1 + i * .5), .26 - i * .04));
+        sNoise(O, t + d0, 'bandpass', 4300, 1.4, .3 * s0, .07);
+      });
+    }
+    else if (k == 'hooves') {
+      // Dörtnala at nalları: üçlü vuruşlar
+      for (let c = 0; c < 4; c++)
+        [0, .07, .15].forEach((o, i) => {
+          const tt = t + c * .3 + o;
+          sNoise(O, tt, 'bandpass', 520 + i * 90, 2.2, .42 - c * .04, .07);
+          sTone(O, tt, 230 + i * 20, .1, .06);
+        });
+    }
+    else if (k == 'arrows') {
+      // Ok yağmuru: havada vızıldayan oklar, sonra saplanma sesleri
+      for (let i = 0; i < 5; i++)
+        sNoise(O, t + i * .045, 'bandpass', 2800 * r(), 2.5, .22, .32, 900);
+      for (let i = 0; i < 3; i++)
+        sNoise(O, t + .42 + i * .06, 'bandpass', 950 * r(), 4, .3, .05);
+    }
+    else if (k == 'cannon') {
+      // Top: patlama çatırtısı ve sönen gürleme
+      sNoise(O, t, 'bandpass', 1500, .8, .3, .06);
+      sNoise(O, t, 'lowpass', 900, .7, .32, .75, 180);
+      sTone(O, t, 120, .16, .45, 'sine', 48);
+    }
+    else if (k == 'thud') {
+      // Mancınık taşı yere düşer
+      sNoise(O, t, 'lowpass', 700, .8, .38, .32, 160);
+      sTone(O, t, 150, .16, .25, 'sine', 70);
+    }
+    else if (k == 'build') {
+      // İnşaat: üç tahta çekiç vuruşu
+      [0, .15, .3].forEach((o, i) => {
+        sTone(O, t + o, (820 - i * 40) * r(), .15, .08, 'triangle');
+        sNoise(O, t + o, 'bandpass', 1300, 6, .32, .045);
+      });
+    }
+    else if (k == 'coin') {
+      // Altın şıngırtısı
+      [[0, 1760], [.07, 2637], [.15, 3520]].forEach(([o, f], i) => sTone(O, t + o, f, .085 - i * .015, .3));
+    }
+    else if (k == 'fetih') {
+      // Fetih: kısa davul ve iki notalı boru
+      drum(O, t, .26, 150, 85, .32);
+      drum(O, t + .12, .18, 150, 85, .25);
+      horn(O, deg(4, 0), t + .1, .035, .18, false);
+      horn(O, deg(7, 0), t + .3, .04, .4, false);
+    }
+    else if (k == 'splash') {
+      sNoise(O, t, 'lowpass', 1800, .7, .25, .6, 300);
+    }
+  }
   function apply() {
+    if (sfxM)
+      sfxM.gain.setTargetAtTime(sfxOn ? vol : 0, ac.currentTime, .1);
     if (master)
       master.gain.setTargetAtTime(on ? vol : 0, ac.currentTime, .15);
     try {
@@ -19980,7 +20254,7 @@ const Mus = (() => {
   // İlk dokunuşta ses açılır (tarayıcılar sesi kullanıcı dokunmadan başlatmaz).
   // Telefonlarda ses ancak dokunma bitince (pointerup / touchend / click) açılabilir.
   const unlock = () => {
-    if (!on)
+    if (!on && !sfxOn)
       return;
     ensure();
     if (ac && ac.state != 'running')
@@ -20097,13 +20371,33 @@ const Mus = (() => {
       warUntil = Math.max(warUntil, performance.now() + (ms || 7000));
     },
     jingle,
+    sfx(k, dl) {
+      if (!sfxOn)
+        return;
+      if (!ac)
+        ensure();
+      sfx(k, dl);
+    },
+    get sfxOn() {
+      return sfxOn;
+    },
+    sfxToggle() {
+      sfxOn = !sfxOn;
+      try {
+        localStorage.setItem('fetih_sfx', sfxOn ? '1' : '0');
+      }
+      catch (e) { }
+      if (sfxOn)
+        ensure();
+      apply();
+    },
     apply,
     // Test için: bir temayı sessizce dosyaya işler (oyunda kullanılmaz).
     async render(th, fl, secs, warOn, jg, tk) {
       const tk0 = trk;
       if (tk)
         trk = tk;
-      const sv = [ac, master, musG, warG, sfxG, rev, theme, flavor, war, on, tone, toneTrk];
+      const sv = [ac, master, musG, warG, sfxG, rev, theme, flavor, war, on, tone, toneTrk, sfxM, outIn, sfxOn];
       const oc = new OfflineAudioContext(2, 44100 * secs, 44100);
       build(oc);
       master.gain.value = vol;
@@ -20114,13 +20408,19 @@ const Mus = (() => {
       warG.gain.value = warOn ? .6 : 0;
       seed = 11;
       const spb = curSpb();
-      if (jg)
+      if (jg && jg.startsWith('sfx:')) {
+        sfxOn = true;
+        sfxM.gain.value = vol;
+        master.gain.value = 0;
+        jg.slice(4).split(',').forEach((k, i) => sfx(k, .1 + i * 1.6));
+      }
+      else if (jg)
         jingle(jg);
       else
         for (let i = 0, t = .05; t < secs - 1; i++, t += spb)
           scheduleStep(i, t);
       const buf = await oc.startRendering();
-      [ac, master, musG, warG, sfxG, rev, theme, flavor, war, on, tone, toneTrk] = sv;
+      [ac, master, musG, warG, sfxG, rev, theme, flavor, war, on, tone, toneTrk, sfxM, outIn, sfxOn] = sv;
       trk = tk0;
       return buf;
     }
@@ -20138,6 +20438,21 @@ $('camb').onclick = () => {
 };
 camBtn();
 document.getElementById('mnMus').onclick = () => Mus.toggle();
+// Ses efektleri (kılıç, at nalı, top, ok, inşaat...) müzikten ayrı açılıp kapanır.
+{
+  const bs = document.getElementById('mnSfx');
+  const upd = () => {
+    bs.textContent = Mus.sfxOn ? '🔔 Açık' : 'Kapalı';
+    bs.classList.toggle('off', !Mus.sfxOn);
+  };
+  upd();
+  bs.onclick = () => {
+    Mus.sfxToggle();
+    upd();
+    if (Mus.sfxOn)
+      Mus.sfx('coin');
+  };
+}
 // Savaş animasyonu (hücum ve çatışma sahnesi) açılıp kapatılabilir; kapalıyken eski kısa çarpışma işareti çıkar.
 {
   const bt0 = document.getElementById('mnBfx');
@@ -20186,13 +20501,13 @@ function gdData() {
     { id: 'or', nm: 'Ordu', in: 'Kendi bölgene basılı tut → <b>Ordu</b> sekmesi. Birlikleri taşımak için bölgeni seçip kendi bölgene dokun: açılan panelde asker, okçu, mancınık ve süvari satırları vardır.', it: [
       { ic: '🛡️', nm: 'Asker', ul: ['Tur başında takviye ve kışlalardan gelir.', 'Taşı: <b>1</b>, <b>Yarısı</b> ya da <b>Hepsi</b>. <b>Toplu taşıma</b> ile birçok bölgeden askeri tek yerde toplarsın.', 'Kendi topraklarından bağlantılı uzak bölgelerinden de saldırabilirsin.'] },
       { ic: 'b:arch', nm: 'Okçu', pr: AC, rq: 'kışla', ul: [`Bir bölgede en fazla ${ARCHMAX} okçu olur.`, 'Turda bir kez komşu düşmana ok atar (okçu kulesi varsa 2 bölge uzağa).', 'Okçulu bölgeden saldırınca önce ok yağdırırsın; yakındaki saldırılarına da destek verirler.', `Acemi okçu sadece saldırıda savaşır; ${ARCHVET} saldırıya katılınca tecrübeli olur (★) ve savunmaya da katılır.`, 'Sınırda olmayan bir bölgede 2 okçu varsa biri kalır, diğeri tur başında en yakın düşman sınırına gider.'] },
-      { ic: 'b:cav', nm: 'Süvari', pr: CVC, rq: 'kışla sv3', ul: [`Bir bölgede en fazla ${CAVMAX} süvari olur.`, `<b>Sürpriz hücum:</b> süvarili bölgeden saldırınca savaşın ilk ${SURP} zarında savunanın zarı 1 düşer.`, `<b>Yağma:</b> bu saldırıyla bölge alırsan şansa bağlı ${cv0} altın.`, '<b>Karşı saldırı:</b> süvarili bölgene yapılan saldırı püskürtülürse süvari, saldıranın sınırdaki bölgesini işgal eder (surlu bölge ve başkent hariç). Oradaki askerler geri çekilir.', 'Her süvari turda bir saldırıya katılır; surlu bölgelerde ve denizden çıkarmada etkisi yoktur. Savunmada asker sayılmaz.', 'Süvariler her tur kendiliğinden en yakın düşman sınırına ilerler.', { w: `Saldırıya ve karşı saldırıya katılan süvari %${Math.round(CVDIE * 100)} ihtimalle ölür.` }] },
+      { ic: 'b:cav', nm: 'Süvari', pr: CVC, rq: 'kışla sv3', ul: [`Bir bölgede en fazla ${CAVMAX} süvari olur.`, `<b>Sürpriz hücum:</b> süvarili bölgeden saldırınca savaşın ilk ${SURP} zarında savunanın zarı 1 düşer.`, `<b>Yağma:</b> bu saldırıyla bölge alırsan şansa bağlı ${cv0} altın.`, '<b>Karşı saldırı:</b> süvarili bölgene yapılan saldırı püskürtülürse süvari, saldıranın sınırdaki bölgesini işgal eder (surlu bölge ve başkent hariç). Oradaki askerler geri çekilir.', 'Her süvari turda bir saldırıya katılır; surlu bölgelerde ve denizden çıkarmada etkisi yoktur. Savunmada asker sayılmaz.', 'Süvariler her tur kendiliğinden en yakın düşman sınırına ilerler.', `Gemiyle taşınabilir (${CAVS} yer kaplar).`, { w: `Saldırıya ve karşı saldırıya katılan süvari %${Math.round(CVDIE * 100)} ihtimalle ölür.` }] },
       { ic: '🪨', nm: 'Mancınık', pr: CTC, rq: 'kışla sv3', ul: [`Bir bölgede en fazla ${CATMAX} mancınık olur.`, '2 turda bir komşu düşman bölgesine taş atar; surları yıkabilir. İsabet etmezse taş boşa gider.', `${CATVET} sur yıkınca rütbe alır ve her tur atar.`, 'Gemiyle taşınabilir (5 yer kaplar).'] },
       { ic: 'b:spy', nm: 'Casus', pr: SPC, rq: 'kışla sv2', ul: ['Bir bölgede en fazla 5 casus; turda en fazla 5 tane yetiştirilir.', 'Düşman bölgesine gönder: tur sonunda yakalanmazsa o bölge ve bir komşusu 2 tur görünür; başkenti bulabilir.', 'İçerilere gittikçe yakalanma riski artar. Her başarılı görev riski %10 azaltır (en fazla %50).', { w: 'Botlar da senin başkentini bulmak için casus gönderir; yakalandıklarında haber verilir.' }] },
     ] },
     { id: 'dz', nm: 'Deniz', in: 'Kıyıdaki bölgene basılı tut → <b>Deniz</b> sekmesi. Bir iskelede en fazla 4 gemi olur.', it: [
       { ic: '⚓', nm: 'İskele', pr: DC, lv: [['Sv1', 'küçük gemi'], [`Sv2 (${DC2})`, 'büyük savaş gemisi'], [`Sv3 (${DC3})`, 'mayın, otomatik onarım']] },
-      { ic: '⛵', nm: 'Küçük gemi', pr: SSC, ul: [`${CAPS} yer taşır: asker ve okçu 1, mancınık 5 yer.`, 'Çıkarma: bölgeyi seçip denizin ötesindeki bir kıyıya dokun.', `Deniz aşırı fetihte +${LOOT} altın yağma.`, '<b>Keşif seferi:</b> menzildeki bir kıyıya gider; oradaki asker ve binalar 2 tur görünür.'] },
+      { ic: '⛵', nm: 'Küçük gemi', pr: SSC, ul: [`${CAPS} yer taşır: asker ve okçu 1, süvari ${CAVS}, mancınık ${CATS} yer.`, 'Çıkarma: bölgeyi seçip denizin ötesindeki bir kıyıya dokun.', `Deniz aşırı fetihte +${LOOT} altın yağma.`, '<b>Keşif seferi:</b> menzildeki bir kıyıya gider; oradaki asker ve binalar 2 tur görünür.'] },
       { ic: '🚢', nm: 'Büyük savaş gemisi', pr: SLC, rq: 'iskele sv2', ul: [`Devlet başına en fazla ${SLMAX}.`, '<b>Top ateşi:</b> menzildeki düşman kıyısına ya da gemisine ateş eder.', '<b>💣 Kıyı bombardımanı:</b> seçtiğin düşman kıyısından başlayıp yanındaki kıyılarda devriye gezer, her tur birini bombalar, surları döver, bazen binaları yıkar. İki gemin varsa her biri ayrı kıyıya gider; geri çağırana kadar sürer.', '<b>⚔️ Gemi savaşı:</b> düşman gemisinin yanına gidip top düellosuna girer.', '<b>🛡 Koruma:</b> iskelesinin yakınını bombalayan düşman gemisine kendiliğinden saldırır.', 'Çıkarmalarda küçük gemilere eşlik eder, mayınları temizler.'] },
       { ic: '💣', nm: 'Mayın', pr: MNC, rq: 'iskele sv3', ul: ['Bu bölgenin ve yanındaki 2 kıyının açıklarını korur; gelen düşman gemileri batar.', 'Mayın tarlası bir kez patlar.'] },
       { ic: '🔧', nm: 'Onarım', ul: [`Sv3 iskelede, gemi savaşında hasar alan bombardıman gemin %35 ihtimalle ${REPAIRC} altına kendiliğinden onarılır.`, 'Hasarlı gemi dönüş yolunda batabilir.'] },
@@ -20368,7 +20683,46 @@ function kdRender() {
   const rv = [...Array(P).keys()].filter(q => q > 0 && cnt(q) > 0 && kyol[q] >= 0);
   box.querySelector('.kd-rv').innerHTML = rv.length ? 'Rakiplerin yolu: ' + rv.map(q => `<span style="--c:${COL[q]}">${PN[q]}: ${KDB[kyol[q]].ic} ${KDB[kyol[q]].nm} (${kdN(q)})</span>`).join('') : '';
 }
+// İlk kudret kazanılınca bir kez çıkan tanıtım kartı (taç düğmesini de parlatır).
+let kdIntroShown = false;
+function kdIntro() {
+  let seen = false;
+  try {
+    seen = localStorage.getItem('fetih_kdintro') == '1';
+  }
+  catch (e) { }
+  if (seen || kdIntroShown || TUT || over)
+    return;
+  kdIntroShown = true;
+  try {
+    localStorage.setItem('fetih_kdintro', '1');
+  }
+  catch (e) { }
+  const kb = document.getElementById('kdb');
+  if (kb)
+    kb.classList.add('kd-hl');
+  const o = document.createElement('div');
+  o.id = 'kdIn';
+  o.innerHTML = `<div class="ki-c" role="dialog" aria-label="Kudret">${crownSVG()}<h3>İlk kudretini kazandın!</h3>` +
+    `<p>Her ${KDR_EVERY} turda 1 <b>kudret</b> kazanırsın. Kudretle devletine kalıcı yetenekler öğretirsin. Üç yol var; her yolda 3 yetenek sırayla açılır. Bütün ağacı bitiremezsin: hangi yolda derinleşeceğini sen seçersin. Kudretin birikir, istediğin zaman harcarsın.</p>` +
+    `<div class="ki-y">${KDB.map(b => `<span>${b.ic} ${b.nm}</span>`).join('')}</div>` +
+    `<button class="ki-go">👑 Kudret'i aç</button><button class="ki-no">Sonra (üstteki taç düğmesi)</button></div>`;
+  document.body.appendChild(o);
+  const close = () => {
+    o.remove();
+  };
+  o.querySelector('.ki-go').onclick = () => {
+    close();
+    if (kb)
+      kb.classList.remove('kd-hl');
+    openKudret();
+  };
+  o.querySelector('.ki-no').onclick = close;
+}
 function openKudret() {
+  const kb0 = document.getElementById('kdb');
+  if (kb0)
+    kb0.classList.remove('kd-hl');
   let box = document.getElementById('kdp');
   if (!box) {
     box = document.createElement('div');
