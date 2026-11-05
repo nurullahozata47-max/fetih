@@ -2845,9 +2845,9 @@ const KD = [
   { ic: '🛡️', nm: 'Düzenli geri çekilme', ef: 'Saldırın başarısız olursa saldıran askerlerin dörtte biri ölmeyip geri döner.' },
   { ic: '⚔️', nm: 'Talim', ef: 'Kışlalar her seviyede 1 asker fazla üretir (sv1 +3, sv2 +5, sv3 +7).' },
   { ic: '🐎', nm: 'Akıncılar', ef: 'Süvarinin ölme riski %40\'tan %20\'ye iner; yağma 10–25 altın olur.' },
-  { ic: '⛏️', nm: 'Madencilik', ef: 'Her maden seviyesi 2 altın fazla verir (sv1 +7, sv2 +14, sv3 +21).' },
+  { ic: '⛏️', nm: 'Madencilik ve ganimet', ef: 'Her maden seviyesi 2 altın fazla verir (sv1 +7, sv2 +14, sv3 +21); ayrıca her fetihte +3 altın.' },
   { ic: '🪙', nm: 'Büyük hazine', ef: 'Her altın sandığının kapasitesi 20 artar.' },
-  { ic: '🐪', nm: 'Ticaret yolları', ef: 'Bölgelerinden gelen temel gelirin sınırı 15\'ten 25 altına çıkar.' },
+  { ic: '🐪', nm: 'Ticaret yolları', ef: 'Bölgelerinden gelen temel gelirin sınırı 15\'ten 25 altına çıkar; ayrıca her iskelen her tur altın getirir: sv1 +3, sv2 +5, sv3 +7.' },
   { ic: '🌾', nm: 'Gönüllüler', ef: 'Refahın %85 ve üstündeyse her tur başkentine 2 gönüllü asker katılır.' },
   { ic: '🤝', nm: 'Sadakat', ef: 'Refah düşüşleri yarıya iner: başarısız saldırı −2, fazladan fetih −5.' },
   { ic: '✊', nm: 'Sadık halk', ef: 'Bir bölgeni rakip fethederse %40 ihtimalle oradaki halk işgalciye karşı ayaklanır (%90 iyi huylu, %10 kötü huylu). İşgalcinin askerleri çekilmez; isyan bastırılamazsa bölge sana geri döner. Başkentin düşüp bütün ülke işgal edilirse çalışmaz.' }
@@ -8317,7 +8317,9 @@ function start(p) {
     taxCollect(p);
   if (taxNow && p == 0 && !ONLINE)
     durTick();
-  const g = first ? START_G : Math.floor((gBase + gMine + gTax) * (pn ? .5 : 1) * (p > 0 ? [.75, 1, 1.3][DIF] : 1));
+  // Ticaret yolları (Hazine yolu 3): iskelelerden liman geliri.
+  const gPort = kh(p, 5) ? dk.reduce((a, l, t) => a + (own[t] == p && l && !inc[t] ? [0, 3, 5, 7][l] : 0), 0) : 0;
+  const g = first ? START_G : Math.floor((gBase + gMine + gTax + gPort) * (pn ? .5 : 1) * (p > 0 ? [.75, 1, 1.3][DIF] : 1));
   pen[p] = 0;
   if (first)
     gold[p] = 0;
@@ -8384,7 +8386,7 @@ function start(p) {
     setTimeout(() => banner('👑 Yeni kudret kazandın!', '#f2b134'), 1300);
   }
   if (p == 0)
-    $('log').textContent = first ? `Başlangıç hazinesi: ${START_G} altın (herkes aynı parayla başlar). Vergi ve gelir gelecek turdan itibaren gelir.` + (hl ? ' ' + hl : '') : `Tur geliri: +${g} altın (temel ${gBase}${gTax ? `, vergi ${gTax}` : ', vergi gelecek tur'}${gMine ? `, maden ${gMine}` : ''})` + (pn ? ' (ceza: geçen tur bölge alamadın, gelir yarıya düştü)' : '') + (lostG ? ` Sandıklar dolu: ${lostG} altın sığmadı, yeni sandık kur ya da yükselt.` : '') + (hl ? ' ' + hl : '');
+    $('log').textContent = first ? `Başlangıç hazinesi: ${START_G} altın (herkes aynı parayla başlar). Vergi ve gelir gelecek turdan itibaren gelir.` + (hl ? ' ' + hl : '') : `Tur geliri: +${g} altın (temel ${gBase}${gTax ? `, vergi ${gTax}` : ', vergi gelecek tur'}${gMine ? `, maden ${gMine}` : ''}${gPort ? `, liman ${gPort}` : ''})` + (pn ? ' (ceza: geçen tur bölge alamadın, gelir yarıya düştü)' : '') + (lostG ? ` Sandıklar dolu: ${lostG} altın sığmadı, yeni sandık kur ya da yükselt.` : '') + (hl ? ' ' + hl : '');
   if (p == 0) {
     busy = false;
     ui();
@@ -8742,6 +8744,13 @@ async function battle(a, t, sea, F) {
       gold[me] += LOOT;
       fl.push({ t, dx: 0, txt: `+${LOOT} yağma`, col: '#ffd36b', t0: performance.now() + 300 });
     }
+    // Madencilik ve ganimet (Hazine yolu 1): her fetihte +3 altın.
+    if (kh(me, 3)) {
+      gold[me] += 3;
+      clampGold(me);
+      if (me == 0)
+        fl.push({ t, dx: 0, dy: 30, txt: '+3 ganimet', col: '#ffd36b', t0: performance.now() + 650 });
+    }
     // Süvari yağması: şansa bağlı 5-20 altın
     if (cvB) {
       const yg = kh(me, 2) ? 10 + Math.floor(Math.random() * 16) : CVLOOT0 + Math.floor(Math.random() * (CVLOOT - CVLOOT0 + 1));
@@ -8863,6 +8872,10 @@ async function cavCounter(a, t) {
   shS[fr] = 0;
   shL[fr] = 0;
   mine[fr] = null;
+  if (kh(q, 3)) {
+    gold[q] += 3;
+    clampGold(q);
+  }
   // Süvari işgal ettiği bölgeye geçer (2 süvari varsa biri yerinde kalır); %40 ihtimalle çatışmada düşer.
   cav[t]--;
   cvU[t] = Math.min(cvU[t], cav[t]);
