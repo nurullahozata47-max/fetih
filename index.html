@@ -563,7 +563,7 @@ button:active:not(:disabled) {
   white-space: nowrap;
 }
 #bn.on {
-  animation: bnIn 1.9s ease-out;
+  animation: bnIn 3.9s ease-out;
 }
 /* Sıra şeridi üst panelin hemen altında belirir (konumu "top" ile değil kaydırmayla oynar) */
 @keyframes bnIn {
@@ -571,14 +571,14 @@ button:active:not(:disabled) {
     opacity: 0;
     transform: translate(-50%, -24px) scale(.9);
   }
-  12% {
+  6% {
     opacity: 1;
     transform: translate(-50%, 0) scale(1.04);
   }
-  20% {
+  10% {
     transform: translate(-50%, 0) scale(1);
   }
-  80% {
+  90% {
     opacity: 1;
     transform: translate(-50%, 0);
   }
@@ -2936,6 +2936,8 @@ const CVLOOT0 = 5;
 const CVLOOT = 20;
 // Süvari kaybı: saldırıya (ya da karşı saldırıya) katılan süvari %40 ihtimalle ölür.
 const CVDIE = .4;
+// Ekranda gelip giden yazıların süresi (ms).
+const FLT = 3900;
 // Sürpriz hücum: süvarili saldırıda savunanın zarı ilk SURP atışta 1 düşer.
 const SURP = 2;
 // ---- Kudret: devlet yolu (3 kollu küçük yetenek ağacı) ----
@@ -15199,13 +15201,14 @@ function anim(ts) {
     });
   drawNav(now);
   drawDockShips(s);
-  fl = fl.filter(f => now - f.t0 < 1900);
+  // Bölge üstündeki yazılar 3,9 saniye kalır (okunabilsin diye).
+  fl = fl.filter(f => now - f.t0 < FLT);
   g.textAlign = 'center';
   g.font = 'bold 11px sans-serif';
   g.lineWidth = 2.5;
   g.strokeStyle = 'rgba(10,20,26,.9)';
   fl.forEach(f => {
-    const a = (now - f.t0) / 1900;
+    const a = (now - f.t0) / FLT;
     if (a < 0)
       return;
     const [cx, cy] = cen[f.t];
@@ -19368,11 +19371,12 @@ const Mus = (() => {
   let on = true;
   let vol = .7;
   // Ses efektleri müzikten ayrı açılıp kapanır (müzik kapalıyken de çalabilir).
-  let sfxOn = true;
+  let sfxOn = false;
   let sfxM = null;
   let outIn = null;
   try {
-    sfxOn = localStorage.getItem('fetih_sfx') != '0';
+    // Ses efektleri yenilenirken varsayılan olarak kapalı (ayarlardan açılabilir).
+    sfxOn = localStorage.getItem('fetih_sfx2') == '1';
     on = localStorage.getItem('fetih_mus') != '0';
     const v = localStorage.getItem('fetih_vol');
     if (v != null)
@@ -20464,7 +20468,7 @@ const Mus = (() => {
     sfxToggle() {
       sfxOn = !sfxOn;
       try {
-        localStorage.setItem('fetih_sfx', sfxOn ? '1' : '0');
+        localStorage.setItem('fetih_sfx2', sfxOn ? '1' : '0');
       }
       catch (e) { }
       if (sfxOn)
