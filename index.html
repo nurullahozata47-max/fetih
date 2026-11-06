@@ -2699,13 +2699,345 @@ input, textarea {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255, 211, 107, 0); transform: scale(1); }
   50% { box-shadow: 0 0 0 6px rgba(255, 211, 107, .55); transform: scale(1.12); }
 }
+/* ===== Üst şerit: tek menü düğmesi (Kudret, Rehber, kamera, müzik, tam ekran) ===== */
+#optb {
+  position: relative;
+  flex: none;
+  margin-left: auto;
+  width: 40px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 8px;
+}
+#optb .ob-l {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  transition: transform .2s, opacity .2s;
+}
+#optb[aria-expanded="true"] .ob-l:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+#optb[aria-expanded="true"] .ob-l:nth-child(2) {
+  opacity: 0;
+}
+#optb[aria-expanded="true"] .ob-l:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+#optb em, #kdb em {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #e5566d;
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  box-shadow: 0 0 0 2px #10222b;
+}
+#kdb em {
+  position: static;
+  margin-left: auto;
+  box-shadow: none;
+}
+#optb em:empty, #kdb em:empty {
+  display: none;
+}
+#optb.has {
+  animation: kdGlow 1.6s ease-in-out infinite;
+}
+#optP {
+  position: absolute;
+  right: calc(env(safe-area-inset-right, 0px) + 10px);
+  top: calc(100% + 4px);
+  z-index: 12;
+  width: 220px;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(16, 34, 43, .97);
+  border: 1px solid rgba(255, 211, 107, .25);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
+  animation: opIn .16s ease-out both;
+}
+#optP[hidden] {
+  display: none;
+}
+/* Menü açıkken üst şerit, sıra yazılarının da üstünde dursun */
+#hudT:has(#optP:not([hidden])) {
+  z-index: 13;
+}
+@keyframes opIn {
+  from { opacity: 0; transform: translateY(-6px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+#optP .op-r, #optP #kdb, #optP #gdb, #optP #camb, #optP #musb, #optP #fsb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 11px 10px;
+  border-radius: 10px;
+  background: transparent;
+  border: 0;
+  color: #f4efe2;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  line-height: 1.1;
+}
+#optP .op-r + .op-r {
+  margin-top: 2px;
+}
+#optP .op-r:active {
+  background: rgba(255, 255, 255, .08);
+}
+#optP .op-r[hidden], #optP #fsb[hidden] {
+  display: none;
+}
+#optP .op-r i {
+  flex: none;
+  width: 26px;
+  font-style: normal;
+  font-size: 19px;
+  text-align: center;
+}
+#optP .op-r svg {
+  flex: none;
+  width: 26px;
+  height: 22px;
+}
+#optP .op-r .st {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(63, 185, 138, .2);
+  color: #7fe0b8;
+  font-size: 12px;
+  font-weight: 700;
+}
+#optP .op-r .st::after {
+  content: 'Açık';
+}
+#optP #camb.off {
+  opacity: 1;
+  text-decoration: none;
+}
+#camb.off .st, #musb.off .st {
+  background: rgba(255, 255, 255, .08);
+  color: rgba(244, 239, 226, .55);
+}
+#camb.off .st::after, #musb.off .st::after {
+  content: 'Kapalı';
+}
+#kdb.has {
+  background: rgba(255, 211, 107, .1);
+}
+/* Kudret: zorunlu seçim ve öğrenme kutlaması */
+#kdp .kd-force {
+  margin: 0 16px 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255, 211, 107, .22), rgba(255, 211, 107, .06));
+  border: 1px solid rgba(255, 211, 107, .55);
+  font-size: 14px;
+  line-height: 1.45;
+}
+#kdp .kd-force b {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 17px;
+  color: #ffd36b;
+}
+#kdp.force .kd-x {
+  visibility: hidden;
+}
+#kdFx {
+  position: fixed;
+  inset: 0;
+  z-index: 118;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: radial-gradient(circle at 50% 42%, rgba(60, 46, 10, .82), rgba(4, 10, 14, .9) 70%);
+  color: #f4efe2;
+  font-family: Bahnschrift, "Segoe UI", system-ui, sans-serif;
+  animation: fxBg .3s ease-out both;
+  overflow: hidden;
+}
+@keyframes fxBg {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+#kdFx .fx-ray {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  width: 760px;
+  height: 760px;
+  margin: -380px 0 0 -380px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(rgba(255, 211, 107, .16) 0deg 9deg, rgba(255, 211, 107, 0) 9deg 22.5deg);
+  -webkit-mask: radial-gradient(circle, #000 0%, transparent 62%);
+  mask: radial-gradient(circle, #000 0%, transparent 62%);
+  animation: fxRay 14s linear infinite;
+}
+@keyframes fxRay {
+  to { transform: rotate(360deg); }
+}
+#kdFx .fx-c {
+  position: relative;
+  width: min(360px, 100%);
+  text-align: center;
+}
+#kdFx .fx-ic {
+  position: relative;
+  width: 118px;
+  height: 118px;
+  margin: 0 auto 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #3a3012, #10222b 70%);
+  border: 3px solid #ffd36b;
+  box-shadow: 0 0 0 6px rgba(255, 211, 107, .15), 0 0 50px rgba(255, 200, 80, .55);
+  font-size: 60px;
+  line-height: 1;
+  animation: fxPop .7s cubic-bezier(.2, 1.6, .4, 1) both;
+}
+@keyframes fxPop {
+  0% { transform: scale(.2) rotate(-25deg); opacity: 0; }
+  60% { transform: scale(1.15) rotate(6deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+#kdFx .fx-ring {
+  position: absolute;
+  left: 50%;
+  top: 59px;
+  width: 118px;
+  height: 118px;
+  margin-left: -59px;
+  border-radius: 50%;
+  border: 3px solid #ffd36b;
+  animation: fxRing 1s ease-out .15s both;
+  pointer-events: none;
+}
+@keyframes fxRing {
+  from { transform: scale(1); opacity: .9; }
+  to { transform: scale(2.6); opacity: 0; }
+}
+#kdFx .fx-sp {
+  position: absolute;
+  left: 50%;
+  top: 118px;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px;
+  border-radius: 50%;
+  background: #ffe9a0;
+  box-shadow: 0 0 8px #ffd36b;
+  animation: fxSp 1.1s ease-out both;
+  pointer-events: none;
+}
+@keyframes fxSp {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--x), var(--y)) scale(.3); opacity: 0; }
+}
+#kdFx .fx-tag {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color: rgba(255, 211, 107, .8);
+  animation: fxUp .4s ease-out .35s both;
+}
+#kdFx h3 {
+  margin: 4px 0 12px;
+  font-size: 27px;
+  color: #ffd36b;
+  text-shadow: 0 2px 14px rgba(255, 190, 60, .45);
+  animation: fxUp .4s ease-out .45s both;
+}
+#kdFx .fx-ch {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(16, 34, 43, .85);
+  border: 1px solid rgba(255, 211, 107, .35);
+  text-align: left;
+  animation: fxUp .45s ease-out .6s both;
+}
+#kdFx .fx-ch small {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  color: rgba(244, 239, 226, .6);
+}
+#kdFx .fx-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 14px;
+}
+#kdFx .fx-row + .fx-row {
+  border-top: 1px solid rgba(255, 255, 255, .07);
+}
+#kdFx .fx-row span {
+  flex: 1;
+  color: rgba(244, 239, 226, .85);
+}
+#kdFx .fx-row s {
+  color: rgba(244, 239, 226, .45);
+}
+#kdFx .fx-row b {
+  color: #7fe0b8;
+  font-size: 15px;
+  white-space: nowrap;
+}
+#kdFx .fx-ok {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 13px;
+  border-radius: 12px;
+  border: 0;
+  background: #ffd36b;
+  color: #12252e;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  animation: fxUp .4s ease-out .9s both;
+}
+@keyframes fxUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
 </style>
 </head>
 <body>
 <main>
   <!-- Üst bilgi şeridi (haritanın üstünde yüzer) -->
   <div id="hudT">
-    <div class="ht-row"><h1 id="ttl">Fetih</h1><button id="kdb" aria-label="Kudret"></button><button id="gdb" aria-label="Rehber">📖</button><button id="camb" aria-label="Kamera savaşları takip etsin">🎥</button><button id="musb" class="mus-tg" aria-label="Müzik">🔊</button><button id="fsb" hidden aria-label="Tam ekran">⛶</button></div>
+    <div class="ht-row"><h1 id="ttl">Fetih</h1><button id="optb" aria-label="Menü" aria-expanded="false"><span class="ob-l"></span><span class="ob-l"></span><span class="ob-l"></span><em></em></button></div>
+    <div id="optP" hidden><button id="kdb" class="op-r" aria-label="Kudret"></button><button id="gdb" class="op-r"><i>📖</i><span>Rehber</span></button><button id="camb" class="op-r"><i>🎥</i><span>Savaş kamerası</span><b class="st"></b></button><button id="musb" class="op-r"><i class="mus-tg">🔊</i><span>Müzik</span><b class="st"></b></button><button id="fsb" class="op-r" hidden><i>⛶</i><span>Tam ekran</span></button></div>
     <!-- Üst kutucuklar: devletler, bölge sayıları, altın -->
     <div id="chips"></div>
   </div>
@@ -8498,9 +8830,9 @@ function start(p) {
   turnSeq++;
   banner(p == 0 ? 'Senin sıran' : PN[p] + ' oynuyor', COL[p]);
   if (p == 0 && !TUT && rd > 0 && rd % KDR_EVERY == 0 && !first) {
-    hl += ` 👑 Yeni kudret kazandın! Üstteki taç düğmesinden devlet yolunda bir yetenek öğren.`;
+    hl += ` 👑 Yeni kudret kazandın! Devlet yolunda bir yetenek seç.`;
     setTimeout(() => banner('👑 Yeni kudret kazandın!', '#f2b134'), 1300);
-    setTimeout(kdIntro, 2200);
+    setTimeout(kdForce, 1700);
   }
   if (p == 0)
     $('log').textContent = first ? `Başlangıç hazinesi: ${START_G} altın (herkes aynı parayla başlar). Vergi ve gelir gelecek turdan itibaren gelir.` + (hl ? ' ' + hl : '') : `Tur geliri: +${g} altın (temel ${gBase}${gTax ? `, vergi ${gTax}` : ', vergi gelecek tur'}${gMine ? `, maden ${gMine}` : ''}${gPort ? `, liman ${gPort}` : ''})` + (pn ? ' (ceza: geçen tur bölge alamadın, gelir yarıya düştü)' : '') + (lostG ? ` Sandıklar dolu: ${lostG} altın sığmadı, yeni sandık kur ya da yükselt.` : '') + (hl ? ' ' + hl : '');
@@ -17717,6 +18049,12 @@ function ui(msg) {
         kb.lastChild.textContent = n || '';
       kb.classList.toggle('has', n > 0);
       kb.hidden = !!TUT;
+      const ob = document.getElementById('optb');
+      if (ob && ob.lastChild) {
+        if (ob.lastChild.textContent != (n || ''))
+          ob.lastChild.textContent = n || '';
+        ob.classList.toggle('has', n > 0);
+      }
     }
     kdRender();
   }
@@ -18137,7 +18475,7 @@ const TS = [
     },
     done: () => rd > tData.rd && turn == 0 && !busy },
   { t: 'Refah ve isyan', p: 'Saldırmadığın her tur refah artar; başarısız saldırılar, fazladan fetihler ve sınırlardan yüksek vergi onu düşürür. Refah <b>%50</b>\'nin altına inerse isyanlar çıkar ve oradaki askerlerin en yakın güvenli bölgeye çekilir. <b>İyi huylu</b> isyan yerinde kalır; <b>kötü huylu</b> isyan (kırmızı) her tur komşu bölgelere yayılır ve güçlenir. İsyanı bastırmak için oraya isyancılardan (✊) fazla asker taşı; bastıramazsan bölgeler bağımsız bir devlet kurar. <b>%20</b>\'nin altında ülken ikiye bölünür.', hl: 'refah', next: 1 },
-  { t: 'Hazırsın!', p: 'Özetle: takviye dağıt, saldır, yapılarını seviye seviye büyüt, hazineni sandıklarla genişlet, vergini akıllı ayarla ve başkentini koru. Bir bölgeye basılı tutarak her zaman ne yapabileceğini görebilirsin. Oyunun kendiliğinden kaydedilir: uygulamayı kapatsan da menüdeki <b>Oyuna devam et</b> ile kaldığın yerden sürersin. Bütün birliklerin, yapıların ve kuralların fiyatları ve etkileri <b>📖 Rehber</b>\'de (üst şeritteki 📖 düğmesi ya da ana menü). Savaş animasyonlarını ⚙️ Ayarlar\'dan kapatabilirsin. Az askerle çok askeri yenersen sürprize hazır ol. İyi fetihler!', next: 2 },
+  { t: 'Hazırsın!', p: 'Özetle: takviye dağıt, saldır, yapılarını seviye seviye büyüt, hazineni sandıklarla genişlet, vergini akıllı ayarla ve başkentini koru. Bir bölgeye basılı tutarak her zaman ne yapabileceğini görebilirsin. Oyunun kendiliğinden kaydedilir: uygulamayı kapatsan da menüdeki <b>Oyuna devam et</b> ile kaldığın yerden sürersin. Bütün birliklerin, yapıların ve kuralların fiyatları ve etkileri <b>📖 Rehber</b>\'de (üst şeritteki ☰ menüsünde ya da ana menüde). Savaş animasyonlarını ⚙️ Ayarlar\'dan kapatabilirsin. Az askerle çok askeri yenersen sürprize hazır ol. İyi fetihler!', next: 2 },
 ];
 // Öğretici: bu hamleye izin var mı? İzin yoksa rehber kartı sallanır ve uyarı verir.
 function tutOK(kind, v, quiet) {
@@ -20331,6 +20669,9 @@ const Mus = (() => {
       b.textContent = on ? '🔊' : '🔇';
       b.setAttribute('aria-label', on ? 'Müziği kapat' : 'Müziği aç');
     });
+    const mb = document.getElementById('musb');
+    if (mb)
+      mb.classList.toggle('off', !on);
     const r = document.getElementById('mnVol');
     if (r)
       r.value = Math.round(vol * 100);
@@ -20570,7 +20911,7 @@ function gdData() {
       { ic: '⚔️', nm: 'Fetih hakkı', ul: ['Her tur <b>3 fetih</b> yapabilirsin; istersen 5\'e çıkarabilirsin ama fazladan her fetih refahı %10 düşürür.', 'İsyanlı kendi bölgene asker göndermek de bir fetih hakkı harcar.'] },
       { ic: '❔', nm: 'Sis', ul: ['Rakip bölgelerdeki <b>"?"</b> asker sayısını bilmediğin anlamına gelir.', 'Casus, keşif gemisi ve gözetleme kulesi sisi kaldırır; müttefiklerinin bölgelerini her zaman görürsün.'] },
       { ic: '🏰', nm: 'Başkent', ul: [`Seçtiğin ilk bölge başkentin olur. Başkentler gizlidir; casusla bulunur.`, `İlk ${CAPT} tur başkentlere saldırılamaz.`, `Başkent düşünce: devletin toplam askeri 50'den azsa tamamen işgal edilir, 50 ve üstüyse ikiye bölünür.`, `Oyunda bir kez ${CMC} altınla başkentini başka bölgene taşıyabilirsin; sandığın da birlikte gelir.`] },
-      { ic: 'crown', nm: 'Kudret ve devlet yolu', ul: [`Her ${KDR_EVERY} turda 1 <b>kudret</b> kazanırsın; üstteki taç düğmesinden harcarsın.`, 'Üç yol var: <b>Ordu</b>, <b>Hazine</b>, <b>Halk</b>. Her yolda 3 yetenek sırayla açılır; bütün ağacı bitiremezsin, hangi yolda derinleşeceğini sen seçersin.', ...KD.map((k, i) => `${k.ic} <b>${k.nm}</b> (${KDB[Math.floor(i / 3)].nm} ${i % 3 + 1}): ${k.ef}`), 'Botlar da oyun başında bir yol seçer; bir rakibin bölgesine basılı tutunca hangi yolu seçtiğini görürsün.'] },
+      { ic: 'crown', nm: 'Kudret ve devlet yolu', ul: [`Her ${KDR_EVERY} turda 1 <b>kudret</b> kazanırsın. Kazandığın tur Kudret paneli kendiliğinden açılır ve bir yetenek seçmeden oyuna devam edemezsin. Öğrendiklerine üstteki ☰ menüsünden bakabilirsin.`, 'Üç yol var: <b>Ordu</b>, <b>Hazine</b>, <b>Halk</b>. Her yolda 3 yetenek sırayla açılır; bütün ağacı bitiremezsin, hangi yolda derinleşeceğini sen seçersin.', ...KD.map((k, i) => `${k.ic} <b>${k.nm}</b> (${KDB[Math.floor(i / 3)].nm} ${i % 3 + 1}): ${k.ef}`), 'Botlar da oyun başında bir yol seçer; bir rakibin bölgesine basılı tutunca hangi yolu seçtiğini görürsün.'] },
       { ic: '💾', nm: 'Kayıt', ul: ['Oyun her an kendiliğinden kaydedilir. Uygulamayı kapatsan da menüdeki <b>Oyuna devam et</b> ile kaldığın yerden sürersin.'] },
     ] },
     { id: 'yp', nm: 'Yapılar', in: `Kendi bölgene basılı tut → <b>Yapılar</b> sekmesi. Bir bölgeye en fazla <b>${BLDMAX} yapı</b> kurulur (sur sayılmaz); dolunca yeni yapı kurulamaz ama yükseltme serbesttir. İsyanlı bölgeye inşa yapılamaz.`, it: [
@@ -20744,6 +21085,17 @@ function kdRender() {
     return;
   const pt = kdPts(0);
   const nxt = (Math.floor(rd / KDR_EVERY) + 1) * KDR_EVERY;
+  let fn = box.querySelector('.kd-force');
+  if (box.classList.contains('force')) {
+    if (!fn) {
+      fn = document.createElement('div');
+      fn.className = 'kd-force';
+      box.querySelector('.kd-pt').before(fn);
+    }
+    fn.innerHTML = `<b>👑 Yeni kudret kazandın!</b>Her ${KDR_EVERY} turda 1 kudret gelir. Devam etmek için bir yetenek seç: parlayan bir yeteneğe dokun, sonra <b style="display:inline;font-size:inherit">Öğren</b>. Bütün ağacı bitiremezsin; hangi yolda derinleşeceğini sen seçersin.`;
+  }
+  else if (fn)
+    fn.remove();
   box.querySelector('.kd-pt').innerHTML = `<b>${pt}</b><span>${pt ? `Harcanacak kudretin var. Parlayan bir yeteneğe dokun.` : 'Harcanacak kudretin yok.'}<br>Sonraki kudret: <b style="font-size:inherit">tur ${nxt}</b> (${nxt - rd} tur sonra).</span>`;
   const st = i => kh(0, i) ? 'own' : kdCan(0, i) ? 'can' : 'lock';
   box.querySelector('.kd-tree').innerHTML = KDB.map((B, b) => `<div class="kd-col"><div class="kd-bh">${B.ic} ${B.nm}</div>` +
@@ -20803,7 +21155,63 @@ function kdIntro() {
   };
   o.querySelector('.ki-no').onclick = close;
 }
-function openKudret() {
+// Kudret kazanıldığında panel kendiliğinden açılır ve bir yetenek seçilmeden kapanmaz.
+function kdForce() {
+  if (TUT || over || dr || turn != 0 || ONLINE && false)
+    return;
+  if (kdPts(0) > 0 && [...Array(9).keys()].some(i => kdCan(0, i)))
+    openKudret(true);
+}
+// Yetenek öğrenilince ne değiştiği (önce → sonra).
+function kdDiff(i) {
+  const b40 = Math.max(5, Math.round(40 * .8 / 5) * 5);
+  return [
+    [['Başarısız saldırıda kurtulan asker', 'hiç', 'dörtte biri']],
+    [['Kışla sv1 asker/tur', '+2', '+3'], ['Kışla sv2', '+4', '+5'], ['Kışla sv3', '+6', '+7']],
+    [['Süvari ölme riski', '%40', '%20'], ['Süvari yağması', '5–20', '10–25']],
+    [['Maden sv1 / sv3 geliri', '5 / 15', '7 / 21'], ['Her fetihte', '0', '+3 altın']],
+    [['Sandık kapasitesi', `${DEPV[1]}`, `${DEPV[1] + 20}`], ['Kışla fiyatı', '40', `${b40}`], ['Yapı, birlik, gemi fiyatları', '', '%20 ucuz']],
+    [['Temel gelir sınırı', '15', '25'], ['İskele geliri sv1 / sv2 / sv3', '0', '+3 / +5 / +7']],
+    [['Refah %85 ve üstündeyken', '', 'başkente +2 asker/tur']],
+    [['Başarısız saldırıda refah', '−4', '−2'], ['Fazladan fetihte refah', '−10', '−5']],
+    [['Fethedilen bölgende ayaklanma', 'yok', '%40'], ['İsyan bastırılamazsa', '', 'bölge sana döner']]
+  ][i];
+}
+// Haritada yeteneğin etkilediği yerler parlar.
+function kdMapFx(i) {
+  const my = [...Array(N).keys()].filter(t => own[t] == 0 && Vg.has(t));
+  const pick = { 1: t => bar[t] > 0, 3: t => mn[t] > 0, 4: t => dep[t] > 0, 5: t => dk[t] > 0, 2: t => cav[t] > 0, 6: t => t == cap[0], 8: t => isBorder(t) }[i];
+  const L = pick ? my.filter(pick) : (i == 7 || i == 0) ? [cap[0]] : [];
+  const txt = ['🛡️ geri çekilme', '+1 asker/tur', '🐎 akıncı', '+2 altın/sv', '+20 kapasite', '🐪 liman geliri', '🌾 gönüllüler', '🤝 sadakat', '✊ sadık halk'][i];
+  L.slice(0, 12).forEach((t, k) => setTimeout(() => {
+    pulse(t, '#ffd36b');
+    fl.push({ t, dx: 0, dy: -10, txt, col: '#ffe08a', t0: performance.now() });
+  }, 150 + k * 120));
+}
+function kdCelebrate(i, done) {
+  const k = KD[i];
+  const o = document.createElement('div');
+  o.id = 'kdFx';
+  const sp = Array.from({ length: 18 }, (_, j) => {
+    const a = j / 18 * Math.PI * 2;
+    const r = 90 + (j % 3) * 30;
+    return `<i class="fx-sp" style="--x:${(Math.cos(a) * r).toFixed(0)}px;--y:${(Math.sin(a) * r).toFixed(0)}px;animation-delay:${(.15 + (j % 4) * .05).toFixed(2)}s"></i>`;
+  }).join('');
+  const rows = kdDiff(i).map(([n, a, b]) => `<div class="fx-row"><span>${n}</span>${a ? `<s>${a}</s> →` : ''}<b>${b}</b></div>`).join('');
+  o.innerHTML = `<div class="fx-ray"></div><div class="fx-c"><div class="fx-ic">${k.ic}</div><div class="fx-ring"></div>${sp}` +
+    `<div class="fx-tag">${KDB[Math.floor(i / 3)].ic} ${KDB[Math.floor(i / 3)].nm} yolu · ${i % 3 + 1}. basamak</div><h3>${k.nm} öğrenildi!</h3>` +
+    `<div class="fx-ch"><small>NE DEĞİŞTİ</small>${rows}</div><button class="fx-ok">Harika!</button></div>`;
+  document.body.appendChild(o);
+  try {
+    snd('fetih');
+  }
+  catch (e) { }
+  o.querySelector('.fx-ok').onclick = () => {
+    o.remove();
+    done && done();
+  };
+}
+function openKudret(force) {
   const kb0 = document.getElementById('kdb');
   if (kb0)
     kb0.classList.remove('kd-hl');
@@ -20817,11 +21225,13 @@ function openKudret() {
       `<p class="kd-nt">Her kolda yetenekler yukarıdan aşağıya sırayla açılır. Bütün ağacı bitiremezsin: hangi yolda derinleşeceğini sen seçersin. Botlar da oyun başında bir yol seçer.</p></div></div>`;
     document.body.appendChild(box);
     box.querySelector('.kd-x').onclick = () => {
-      box.hidden = true;
+      if (!box.classList.contains('force'))
+        box.hidden = true;
     };
     box.onclick = e => {
       if (e.target == box) {
-        box.hidden = true;
+        if (!box.classList.contains('force'))
+          box.hidden = true;
         return;
       }
       const n = e.target.closest('.kd-n');
@@ -20834,21 +21244,56 @@ function openKudret() {
       if (go && !go.disabled && turn == 0 && !busy && !over && !dr) {
         const i = +go.dataset.l;
         if (kdLearn(0, i)) {
-          banner(`${KD[i].ic} ${KD[i].nm} öğrenildi!`, '#f2b134');
           $('log').textContent = `Kudret: ${KD[i].nm} öğrenildi. ${KD[i].ef}`;
           ui();
           kdRender();
+          kdCelebrate(i, () => {
+            // Kudret kalmadıysa zorunlu panel kapanır; haritada etkilenen yerler parlar.
+            if (!(kdPts(0) > 0 && [...Array(9).keys()].some(j => kdCan(0, j)))) {
+              box.classList.remove('force');
+              box.hidden = true;
+            }
+            else
+              kdSel = [...Array(9).keys()].find(j => kdCan(0, j)) ?? -1;
+            kdRender();
+            kdMapFx(i);
+          });
         }
       }
     };
   }
   if (kdSel < 0 || kh(0, kdSel))
     kdSel = [...Array(9).keys()].find(i => kdCan(0, i)) ?? -1;
+  box.classList.toggle('force', !!force);
   box.hidden = false;
   kdRender();
 }
-document.getElementById('kdb').innerHTML = crownSVG() + '<em></em>';
+document.getElementById('kdb').innerHTML = crownSVG() + '<span>Kudret</span><em></em>';
 document.getElementById('kdb').onclick = () => openKudret();
+// Üst şeritteki tek menü düğmesi: Kudret, Rehber, savaş kamerası, müzik, tam ekran.
+{
+  const ob = document.getElementById('optb');
+  const op = document.getElementById('optP');
+  const shut = () => {
+    op.hidden = true;
+    ob.setAttribute('aria-expanded', 'false');
+  };
+  ob.onclick = e => {
+    e.stopPropagation();
+    op.hidden = !op.hidden;
+    ob.setAttribute('aria-expanded', op.hidden ? 'false' : 'true');
+  };
+  // Kudret, Rehber ve tam ekran paneli kapatır; kamera ve müzik açık/kapalı durumunu görebilmen için açık kalır.
+  op.addEventListener('click', e => {
+    const r = e.target.closest('.op-r');
+    if (r && !['camb', 'musb'].includes(r.id))
+      shut();
+  });
+  document.addEventListener('pointerdown', e => {
+    if (!op.hidden && !e.target.closest('#optP') && !e.target.closest('#optb'))
+      shut();
+  });
+}
 document.getElementById('mnGuide').onclick = () => openGuide();
 document.getElementById('gdb').onclick = () => openGuide();
 (() => {
