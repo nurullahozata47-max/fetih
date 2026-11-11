@@ -2847,6 +2847,81 @@ input, textarea {
 #kdb.has {
   background: rgba(255, 211, 107, .1);
 }
+/* Kudret: dördüncü basamak (özel güç) */
+#kdp .kd-n.kd-u {
+  padding-top: 18px;
+  border-width: 2px;
+  border-style: dashed;
+  border-color: rgba(255, 211, 107, .45);
+  background: linear-gradient(180deg, #1d1a0e, #0f1d24);
+}
+#kdp .kd-n.kd-u em {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 7px;
+  border-radius: 8px;
+  background: #ffd36b;
+  color: #3a2400;
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .5px;
+  white-space: nowrap;
+}
+#kdp .kd-n.kd-u.own {
+  border-style: solid;
+  border-color: #ffd36b;
+  background: radial-gradient(circle at 50% 30%, #6b5212, #2a2410 70%);
+  box-shadow: 0 0 22px rgba(255, 211, 107, .55), inset 0 0 12px rgba(255, 211, 107, .25);
+  animation: kdGlow 2.2s ease-in-out infinite;
+}
+#kdp .kd-n.kd-u.lock i,
+#kdp .kd-n.kd-u.gone i {
+  filter: grayscale(.6);
+  opacity: .55;
+}
+#kdp .kd-n.kd-u.gone {
+  opacity: .5;
+}
+#kdFx.ult .fx-ic {
+  width: 132px;
+  height: 132px;
+  font-size: 70px;
+  border-width: 4px;
+  box-shadow: 0 0 0 8px rgba(255, 211, 107, .2), 0 0 80px rgba(255, 200, 80, .8);
+}
+#kdFx.ult .fx-crown {
+  width: 64px;
+  height: 46px;
+  margin: 0 auto -10px;
+  position: relative;
+  z-index: 2;
+  animation: fxPop .7s cubic-bezier(.2, 1.6, .4, 1) .25s both;
+}
+#kdFx.ult .fx-crown svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 10px rgba(255, 211, 107, .9));
+}
+#kdFx.ult .fx-ring {
+  top: 102px;
+  width: 132px;
+  height: 132px;
+  margin-left: -66px;
+}
+#kdFx.ult .fx-ring.r2 {
+  animation-delay: .5s;
+}
+#kdFx.ult .fx-sp {
+  top: 168px;
+}
+#kdFx.ult h3 {
+  font-size: 30px;
+  color: #ffd36b;
+  text-shadow: 0 0 18px rgba(255, 211, 107, .6);
+}
 /* Kudret: zorunlu seçim ve öğrenme kutlaması */
 #kdp .kd-force {
   margin: 0 16px 10px;
@@ -3288,6 +3363,22 @@ const KD = [
   { ic: '🤝', nm: 'Sadakat', ef: 'Refah düşüşleri yarıya iner: başarısız saldırı −2, fazladan fetih −5.' },
   { ic: '✊', nm: 'Sadık halk', ef: 'Bir bölgeni rakip fethederse %40 ihtimalle oradaki halk işgalciye karşı ayaklanır (%90 iyi huylu, %10 kötü huylu). İşgalcinin askerleri çekilmez; isyan bastırılamazsa bölge sana geri döner. Başkentin düşüp bütün ülke işgal edilirse çalışmaz.' }
 ];
+// Özel güçler (dördüncü basamak): bir dalın 3 yeteneğini de öğrenen devlet o dalın özel gücünü kazanır.
+// Her devlet yalnızca ilk fullediği dalın özel gücünü alır. kus[p]: özel güç dalı (-1 yok).
+// kuS[p]: Yıkılmaz Devlet'in tek seferlik başkent kurtuluşu duruyor mu. rsR[p]: rüşvetin verildiği son tur.
+// pcB/pcT/pcU[q]: q botundan barış satın alan, q'nun yükleneceği hedef ve barışın son turu. pcR[p]: son barış alımı.
+// rin[o]: o kaynaklı kötü huylu isyanı çıkaran devlet (Yıkılmaz Devlet: isyan olgunlaşınca bölgeler ona geçer).
+const RSC = 15;
+const PCC = 50;
+const PCT = 3;
+const PCCD = 5;
+const KU = [
+  { ic: '🗡️', nm: 'Kılıç Hakkı', ef: 'Kazandığın her savaşta öldürdüğün düşman askerlerinin üçte biri esir düşer ve fethettiğin bölgede senin için savaşır. Bir rakip sana saldırıp başaramazsa, savunan askerlerinin yarısı karşı hücuma geçer ve saldırının geldiği bölgeyi alır; fetih hakkından düşmez (başkent, surlu ve isyandaki bölgeler alınmaz).' },
+  { ic: '⚖️', nm: 'Altının Gücü', ef: `<b>Rüşvet:</b> rakibin sınırındaki bir bölgenin komutanına asker başına ${RSC} altın verirsin; bölge savaşmadan, askerleriyle birlikte sana geçer (turda 1, fetih hakkından düşmez; başkent ve surlu bölgeler satın alınamaz). <b>Barış satın al:</b> bir bota ${PCC} altın verirsin; ${PCT} tur sana saldırmaz ve senin seçtiğin rakibe yüklenir (${PCCD} turda bir).` },
+  { ic: '🏰', nm: 'Yıkılmaz Devlet', ef: 'Başkentin düşerse devletin bölünmez ve yıkılmaz; başkent kendiliğinden en güvenli bölgene taşınır (oyunda bir kez). Refah %20\'nin altına inse de ülken ikiye bölünmez. Rakip bölgesinde iki katı fiyatına <b>kötü huylu isyan</b> çıkarabilirsin; isyan bastırılamazsa isyandaki bölgeler bağımsız devlet kurmaz, sana katılır.' }
+];
+const ku = (p, b) => !!(kus && kus[p] == b);
+const pcNo = (p, q) => !!(pcU && q >= 0 && pcU[p] >= rd && pcB[p] == q);
 const kh = (p, i) => !!(kd && kd[p] && kd[p][i]);
 const kdN = p => kd && kd[p] ? kd[p].reduce((a, b) => a + b, 0) : 0;
 const kdPts = p => Math.max(0, Math.floor(rd / KDR_EVERY) - kdN(p));
@@ -3297,8 +3388,21 @@ function kdLearn(p, i) {
   if (!kdCan(p, i))
     return false;
   kd[p][i] = 1;
+  // Dal fullendi: ilk fullenen dalın özel gücü açılır.
+  const b = Math.floor(i / 3);
+  if (kus[p] < 0 && [0, 1, 2].every(j => kh(p, b * 3 + j))) {
+    kus[p] = b;
+    kuS[p] = b == 2 ? 1 : 0;
+    if (p == 0)
+      kuPend = b;
+    else if (cnt(p) > 0) {
+      hl += ` 👑 ${PN[p]} ${KDB[b].nm} yolunu tamamladı ve özel güç kazandı: ${KU[b].nm}!`;
+      setTimeout(() => banner(`👑 ${PN[p]}: ${KU[b].ic} ${KU[b].nm}`, COL[p]), 900);
+    }
+  }
   return true;
 }
+let kuPend = -1;
 // Botlar: oyun başında bir yol seçer, kudretinin çoğunu o yola harcar.
 function kdBot(p) {
   if (!kd || !kd[p])
@@ -3418,6 +3522,14 @@ let cav;
 let cvU;
 let kd;
 let kyol;
+let kus = [];
+let kuS = [];
+let rsR = [];
+let pcB = [];
+let pcT = [];
+let pcU = [];
+let pcR = [];
+let rin = [];
 // sdk[t]: Sadık halk isyanı: bastırılamazsa bölgenin döneceği eski sahibi (-1 yok, -2 sadık isyandan sıçrayan: dönecek yer yok).
 // sdkR[t]: bu bölgede sonraki Sadık halk ayaklanmasının en erken turu (aynı bölge sürekli el değiştirmesin diye).
 let sdk;
@@ -8743,6 +8855,15 @@ function init(noDraft, seed) {
   cvU = Array(N).fill(0);
   kd = Array.from({ length: PM }, () => Array(9).fill(0));
   kyol = Array(PM).fill(-1);
+  kus = Array(PM).fill(-1);
+  kuS = Array(PM).fill(0);
+  rsR = Array(PM).fill(-1);
+  pcB = Array(PM).fill(-1);
+  pcT = Array(PM).fill(-1);
+  pcU = Array(PM).fill(-1);
+  pcR = Array(PM).fill(-99);
+  rin = Array(N).fill(-1);
+  kuPend = -1;
   sdk = Array(N).fill(-1);
   sdkR = Array(N).fill(0);
   bsp = [];
@@ -9090,6 +9211,12 @@ function next() {
 // a bölgesinden t bölgesine saldırı. F verilirse sadece F asker savaşır (gemi çıkarması).
 async function battle(a, t, sea, F) {
   await camShow(a, t);
+  // Barış satın aldığın bota kendin saldırırsan barış bozulur.
+  if (pcU[own[t]] >= rd && pcB[own[t]] == own[a]) {
+    pcU[own[t]] = -1;
+    if (own[a] == 0)
+      $('log').textContent = `${PN[own[t]]} ile satın aldığın barışı kendi saldırınla bozdun.`;
+  }
   // Savaş müziği katmanı (şu an kapalı).
   if (own[a] == 0 || own[t] == 0 || Vg.has(t))
     Mus.war();
@@ -9160,6 +9287,8 @@ async function battle(a, t, sea, F) {
   let A = F != null ? F : arm[a] - 1;
   let D = arm[t];
   const sent = A;
+  // Kılıç Hakkı: savaşın başındaki savunan sayısı (kazanılırsa üçte biri esir düşer).
+  const D0k = D;
 
   // Dayanıklılık (savaş zarları): Yüksek bölgenin askeri her kayıpta DURB ihtimalle kurtulur, Zayıf bölgeninki DURB ihtimalle bir asker fazla kaybeder.
   const dA = durCls(a);
@@ -9284,6 +9413,13 @@ async function battle(a, t, sea, F) {
         $('log').textContent += ` Süvarilerin ${NM[t]} bölgesini yağmaladı: +${yg} altın.`;
     }
     arm[t] = A;
+    // Kılıç Hakkı (Ordu özel gücü): öldürülen savunanların üçte biri esir düşüp fatihin ordusuna katılır.
+    if (ku(me, 0) && D0k >= 3) {
+      const pr = Math.floor(D0k / 3);
+      arm[t] += pr;
+      if (me == 0 || old == 0 || Vg.has(t))
+        fl.push({ t, dx: 0, dy: 16, txt: `🗡️ +${pr} esir`, col: '#ffe08a', t0: performance.now() + 700 });
+    }
     if (F == null)
       arm[a] = 1;
     if (wall[t])
@@ -9334,10 +9470,83 @@ async function battle(a, t, sea, F) {
       if (own[a] == 0)
         $('log').textContent += ` Düzenli geri çekilme: ${rb} asker kurtuldu.`;
     }
-    if (!sea)
-      await cavCounter(a, t);
+    if (!sea && !(await cavCounter(a, t)))
+      await swordCounter(a, t);
   }
   return w;
+}
+// Kılıç Hakkı karşı hücumu: Kılıç Hakkı'na sahip devlete yapılan saldırı başarısız olursa savunan askerlerin yarısı
+// saldırının geldiği sınır bölgesini alır (fetih hakkından düşmez). Başkent, surlu ve isyandaki bölgeler alınmaz.
+async function swordCounter(a, t) {
+  const q = own[t];
+  const o = own[a];
+  if (!ku(q, 0) || q == NEU || q >= P || o == NEU || o >= P || q == o || friend(q, o) || inc[t] || arm[t] < 2)
+    return false;
+  let fr = a;
+  if (!adj[t].has(a)) {
+    const cand = [...adj[t]].filter(u => own[u] == o);
+    if (!cand.length)
+      return false;
+    fr = cand.sort((x, y) => (HD[a][x] - HD[a][y]) || (arm[x] - arm[y]))[0];
+  }
+  if (own[fr] != o || wall[fr] > 0 || cap[o] == fr || prot(fr) || inc[fr])
+    return false;
+  const n = arm[fr];
+  const go = Math.max(1, Math.floor(arm[t] / 2));
+  const vis = q == 0 || o == 0 || Vg.has(t) || Vg.has(fr);
+  if (vis) {
+    await camShow(t, fr);
+    fl.push({ t, dx: 0, dy: -18, txt: '🗡️ Karşı hücum!', col: '#ffe08a', t0: performance.now() });
+    nav.push({ k: 'march', x0: cen[t][0] * S, y0: cen[t][1] * S, x1: cen[fr][0] * S, y1: cen[fr][1] * S, n: Math.min(10, go), col: COL[q], t0: performance.now(), dur: 900 });
+    await sleep(850);
+    nav.push({ k: 'clash', t: fr, t0: performance.now(), dur: 480, col: COL[q] });
+    await sleep(450);
+  }
+  // Saldıranın oradaki askerleri komşu bir bölgelerine çekilir (yoksa dağılır).
+  const back = [...adj[fr]].filter(u => own[u] == o && !inc[u]).sort((x, y) => arm[y] - arm[x])[0];
+  if (back != null && n > 0) {
+    arm[back] += n;
+    if (vis)
+      nav.push({ k: 'march', x0: cen[fr][0] * S, y0: cen[fr][1] * S, x1: cen[back][0] * S, y1: cen[back][1] * S, n: Math.min(10, n), col: COL[o], t0: performance.now(), dur: 800 });
+  }
+  if (back != null && cav[fr] > 0)
+    cav[back] = Math.min(CAVMAX, cav[back] + cav[fr]);
+  own[fr] = q;
+  arm[fr] = go;
+  arm[t] = Math.max(1, arm[t] - go);
+  tax[fr] = 1;
+  inc[fr] = 0;
+  arch[fr] = 0;
+  archV[fr] = 0;
+  cat[fr] = 0;
+  catXp[fr] = 0;
+  spy[fr] = 0;
+  tw[fr] = 0;
+  cav[fr] = 0;
+  cvU[fr] = 0;
+  shS[fr] = 0;
+  shL[fr] = 0;
+  mine[fr] = null;
+  pulse(fr, COL[q]);
+  fl.push({ t: fr, dx: 0, txt: '🗡️ Ele geçirildi!', col: '#fff', t0: performance.now() });
+  if (sel == fr)
+    sel = null;
+  if (q == 0) {
+    banner(`🗡️ Kılıç Hakkı: ${NM[fr]} senin!`, COL[0]);
+    $('log').textContent += ` Kılıç Hakkı: saldırıyı püskürten askerlerin karşı hücuma geçti ve ${PN[o]} ülkesinin ${NM[fr]} bölgesini aldı (${go} asker).`;
+  }
+  else if (o == 0) {
+    banner(`🗡️ ${PN[q]} karşı hücumla ${NM[fr]} bölgeni aldı!`, COL[q]);
+    $('log').textContent += ` Saldırın püskürtüldü; ${PN[q]} Kılıç Hakkı ile karşı hücuma geçti ve ${NM[fr]} bölgeni aldı, askerlerin geri çekildi.`;
+  }
+  else if (vis)
+    hl += ` ${PN[q]} karşı hücumla ${PN[o]} ülkesinin ${NM[fr]} bölgesini aldı.`;
+  ui();
+  await conquerFx(t, fr, o);
+  sdk[fr] = -1;
+  loyalRise(fr, o);
+  ui();
+  return true;
 }
 // Süvari karşı saldırısı: süvarili bölgeye yapılan saldırı başarısız olunca süvari, saldıranın geri çekildiği
 // sınır bölgesini işgal eder. Oradaki askerler komşu bir bölgelerine çekilir. Surlu bölge, başkent ve
@@ -9426,6 +9635,7 @@ async function cavCounter(a, t) {
   sdk[fr] = -1;
   loyalRise(fr, o);
   ui();
+  return true;
 }
 // Bir hücrenin 4 komşusu (harita kenarında olmayanlar). Performans: tek dizi, filtre yok.
 const nb = i => {
@@ -9597,6 +9807,13 @@ function newState(old) {
   spl[old] = spl[r] = 1;
   mvd[r] = 0;
   ally[r] = tru[r] = att[r] = won[r] = pen[r] = hp[r] = hb[r] = tcd[r] = rev[r] = bt[r] = 0;
+  if (kus && kus.length) {
+    kus[r] = -1;
+    kuS[r] = 0;
+    rsR[r] = -1;
+    pcU[r] = -1;
+    pcR[r] = -99;
+  }
   bp[r] = Array(PM).fill(0);
   for (let q = 0; q < PM; q++)
     bp[q][r] = 0;
@@ -9738,6 +9955,8 @@ function startRevolt(t, kind, org, why, stay) {
     if (org == null || org < 0) {
       org = t;
       rcm[t] = Math.random() < .5 ? 3 : 4;
+      if (rin)
+        rin[t] = -1;
     }
     rcl[t] = org;
     inc[t] = 3;
@@ -9775,7 +9994,8 @@ function welfareTick(p, a, w) {
       hl += ' Dikkat: refah %50 altında, kendiliğinden isyanlar çıkabilir!';
   }
   if (ref[p] < 20) {
-    if (!civilSplit(p))
+    // Yıkılmaz Devlet: refah çökse de ülke ikiye bölünmez (isyanlar yine çıkar).
+    if (ku(p, 2) || !civilSplit(p))
       autoRevolt(p);
     return;
   }
@@ -9818,6 +10038,21 @@ async function capLost(old, me, t) {
   if (old == 0 || me == 0)
     Mus.jingle('cap');
   const rest = [...Array(N).keys()].filter(u => own[u] == old);
+  // Yıkılmaz Devlet (Halk özel gücü): oyunda bir kez başkent düşse de devlet bölünmez ve yıkılmaz.
+  if (ku(old, 2) && kuS[old] && rest.length) {
+    kuS[old] = 0;
+    cap[old] = safest(old, rest);
+    const msg = old == 0 ? `Başkentin düştü ama 🏰 Yıkılmaz Devlet seni kurtardı: devletin bölünmedi, başkentin ${NM[cap[0]]} bölgesine taşındı. Bu hak bir kez kullanılır.` : `${PN[old]} başkentini kaybetti ama 🏰 Yıkılmaz Devlet sayesinde bölünmedi ve yıkılmadı; başkentini gizlice başka bölgesine taşıdı.`;
+    if (old == 0) {
+      pulse(cap[0], '#ffd36b', null, 3);
+      fl.push({ t: cap[0], dx: 0, dy: -10, txt: '🏰 Yeni başkent', col: '#ffd36b', t0: performance.now() + 300 });
+    }
+    banner(old == 0 ? '🏰 Yıkılmaz Devlet: başkentin taşındı!' : `🏰 ${PN[old]} yıkılmadı!`, COL[old]);
+    $('log').textContent = msg;
+    if (turn != 0 || old == 0)
+      hl += ' ' + msg;
+    return;
+  }
   if (armyOf(old) < WEAK || P >= PM || (lateOn && old != 0)) {
     await fall(old, me, t, lateOn && old != 0 && armyOf(old) >= WEAK);
     return;
@@ -10824,11 +11059,121 @@ const canInc2 = (p, t) => {
   const q = own[t];
   return q != p && q != NEU && q >= 0 && q < P && cap[q] != t && arm[t] >= 1 && arm[t] <= 3 && !inc[t] && !friend(p, q) && [...adj[t]].some(u => own[u] == p);
 };
+// ---- Altının Gücü (Hazine özel gücü): rüşvet ve barış satın alma ----
+// Rüşvet: rakibin sınırındaki bölgenin komutanı asker başına RSC altına bölgeyi askerleriyle birlikte teslim eder.
+const canBribe = (p, t) => {
+  const q = own[t];
+  return ku(p, 1) && q != p && q != NEU && q >= 0 && q < P && !friend(p, q) && !wall[t] && !(inc[t] > 0) && !prot(t) && (p == 0 ? !(cap[q] == t && capVis(t)) : cap[q] != t) && [...adj[t]].some(u => own[u] == p);
+};
+const bribeC = t => RSC * Math.max(1, arm[t]);
+async function bribe(p, t) {
+  const q = own[t];
+  const lg = m => p == 0 && ($('log').textContent = m);
+  if (!canBribe(p, t) || rsR[p] == rd)
+    return false;
+  const c = bribeC(t);
+  if (gold[p] < c)
+    return lg('Rüşvet için yeterli altının yok.'), false;
+  // Başkentin komutanı rüşvet almaz: başkent ortaya çıkar, altın harcanmaz.
+  if (cap[q] == t) {
+    kc.add(t);
+    pulse(t, '#ffd36b');
+    fl.push({ t, dx: 0, txt: 'Başkent!', col: '#ffd36b', t0: performance.now() });
+    lg(`${NM[t]} komutanı rüşveti reddetti: burası ${PN[q]} krallığının başkentiymiş! Altının sende kaldı.`);
+    return false;
+  }
+  gold[p] -= c;
+  rsR[p] = rd;
+  if (q == 0 || Vg.has(t))
+    await camShow(t, t);
+  own[t] = p;
+  tax[t] = 1;
+  inc[t] = 0;
+  spy[t] = 0;
+  shS[t] = 0;
+  shL[t] = 0;
+  mine[t] = null;
+  sdk[t] = -1;
+  cvU[t] = 0;
+  if (p == 0 && q < P)
+    hp[q]++;
+  if (q == 0)
+    hb[p]++;
+  const vis = p == 0 || q == 0 || Vg.has(t);
+  if (vis) {
+    pulse(t, '#ffd36b', null, 3);
+    nav.push({ k: 'burst', t, col: '#ffd36b', t0: performance.now(), dur: 1100 });
+    fl.push({ t, dx: 0, dy: -14, txt: `💰 Rüşvet: −${c}`, col: '#ffd36b', t0: performance.now() });
+    fl.push({ t, dx: 0, dy: 14, txt: 'Komutan teslim oldu!', col: '#fff', t0: performance.now() + 400 });
+    try {
+      snd('coin', null, .6);
+    }
+    catch (e) { }
+  }
+  await fadeTo(t, q, 12, 40);
+  if (p == 0) {
+    banner(`💰 ${NM[t]} rüşvetle senin!`, COL[0]);
+    lg(`${NM[t]} komutanına ${c} altın rüşvet verdin: bölge ${arm[t]} askeriyle birlikte savaşmadan sana geçti.`);
+  }
+  else if (q == 0) {
+    hl += ` 💰 ${PN[p]}, ${NM[t]} komutanına rüşvet verdi: bölgen askerleriyle birlikte ${PN[p]} tarafına geçti!`;
+    setTimeout(() => banner(`💰 ${PN[p]} ${NM[t]} bölgeni rüşvetle aldı!`, COL[p]), 400);
+  }
+  else if (vis)
+    hl += ` ${PN[p]}, ${PN[q]} ülkesinin ${NM[t]} bölgesini rüşvetle aldı.`;
+  ui();
+  return true;
+}
+// Barış satın al: q botu PCT tur boyunca p'ye saldırmaz ve p'nin seçtiği r rakibine yüklenir.
+const pcOK = (p, q) => ku(p, 1) && q > 0 && q < P && q != p && !HUM.has(q) && cnt(q) > 0 && !friend(p, q) && rd - pcR[p] >= PCCD;
+const pcTargets = (p, q) => [...Array(P).keys()].filter(r => r != p && r != q && cnt(r) > 0 && !friend(q, r));
+function buyPeace(p, q, r) {
+  if (!pcOK(p, q) || gold[p] < PCC || !pcTargets(p, q).includes(r))
+    return false;
+  gold[p] -= PCC;
+  pcB[q] = p;
+  pcT[q] = r;
+  pcU[q] = rd + PCT;
+  pcR[p] = rd;
+  if (p == 0) {
+    banner(`🕊️ ${PN[q]} ${PCT} tur sana saldırmayacak`, COL[q]);
+    $('log').textContent = `${PN[q]} krallığına ${PCC} altın verdin: ${PCT} tur boyunca sana saldırmayacak ve ${PN[r]} topraklarına yüklenecek. Ona sen saldırırsan barış bozulur.`;
+  }
+  else if (r == 0) {
+    hl += ` 🕊️ ${PN[p]}, ${PN[q]} krallığına altın verip onu senin üstüne saldı! ${PN[q]} ${PCT} tur sana yüklenecek.`;
+    setTimeout(() => banner(`⚠ ${PN[p]}, ${PN[q]} krallığını sana saldı!`, COL[p]), 400);
+  }
+  return true;
+}
+function peacePanel(q) {
+  const L = pcTargets(0, q);
+  pop.classList.add('fixw');
+  pop.innerHTML = `<b>🕊️ ${PN[q]} krallığından barış satın al</b><span>${PCC} altın verirsin: ${PN[q]} ${PCT} tur boyunca sana saldırmaz ve senin seçtiğin rakibe yüklenir. Ona sen saldırırsan barış bozulur.</span><span><b>${PN[q]} kime saldırsın?</b></span>` +
+    `<div class="pgrid">${L.map(r => `<button data-k="r${r}" style="border-left:6px solid ${COL[r]}"><span class="lb">⚔ ${PN[r]}</span></button>`).join('')}</div><button data-k="no">Vazgeç</button>`;
+  pop.hidden = false;
+  pop.style.left = '50%';
+  pop.style.top = '22%';
+  pop.style.transform = 'translateX(-50%)';
+  pop.onclick = e => {
+    const kb = e.target.closest && e.target.closest('[data-k]');
+    const kk = kb && kb.dataset.k;
+    if (!kk)
+      return;
+    if (kk[0] == 'r')
+      buyPeace(0, q, +kk.slice(1));
+    pop.hidden = true;
+    pop.style.transform = '';
+    pop.classList.remove('fixw');
+    ui();
+  };
+}
 // Rakip bölgede isyan çıkarma (20 altın).
-function incite(p, t) {
+function incite(p, t, kind = 1) {
   const q = own[t];
   const lg = s => $('log').textContent = s;
-  const c = INCc(p);
+  if (kind == 2 && !ku(p, 2))
+    kind = 1;
+  const c = INCc(p) * kind;
   if (incUsed(p) >= INCMAX)
     return p == 0 ? lg(`Bu tur zaten ${INCMAX} isyan çıkardın.`) : undefined;
   if (gold[p] < c)
@@ -10852,11 +11197,13 @@ function incite(p, t) {
       return lg(`${NM[t]}: isyan çıkmadı, bölgede çok fazla asker vardı. ${c} altın boşa gitti.`);
     }
   }
-  startRevolt(t, 1, null, `${PN[p]} krallığı para dağıtıp halkı kışkırttı.`);
+  startRevolt(t, kind, null, `${PN[p]} krallığı para dağıtıp halkı kışkırttı.`);
+  if (kind == 2 && inc[t] > 0)
+    rin[t] = p;
   if (p == 0)
-    lg(`${NM[t]} bölgesinde isyan çıktı. ${PN[q]} 2 tur içinde bastıramazsa bölge bağımsız bir devlet olur.`);
+    lg(kind == 2 ? `${NM[t]} bölgesinde kötü huylu isyan çıktı! ${PN[q]} bastıramazsa her tur yayılır; isyan sonuna varınca isyandaki bölgeler sana katılır.` : `${NM[t]} bölgesinde isyan çıktı. ${PN[q]} 2 tur içinde bastıramazsa bölge bağımsız bir devlet olur.`);
   else
-    hl += ` ${PN[p]} ${NM[t]} bölgende isyan çıkardı! 2 tur içinde oraya asker gönder.`;
+    hl += kind == 2 ? ` ${PN[p]} ${NM[t]} bölgende KÖTÜ HUYLU isyan çıkardı! Bastıramazsan yayılır ve bölgeler ${PN[p]} tarafına geçer.` : ` ${PN[p]} ${NM[t]} bölgende isyan çıkardı! 2 tur içinde oraya asker gönder.`;
 }
 // Her turun sonunda isyanlar: yeterli askerle bastırılır; bastırılmazsa kötü huylu isyan güçlenip yayılır,
 // süresi dolan isyanlı bölgeler bağımsız küçük bir devlet kurar.
@@ -10918,11 +11265,15 @@ function incTick(p) {
     if (p == 0)
       hl += ` İsyan ${NM[u]} bölgene sıçradı!`;
   }
+  // Yıkılmaz Devlet: kışkırtılan kötü huylu isyan olgunlaşınca bölgeler isyanı çıkaran devlete geçer.
+  const gv = sec.map(t => [t, ik[t] == 2 && rcl[t] >= 0 ? rin[rcl[t]] : -1]).filter(([t, q]) => q >= 0 && q < P && q != p && cnt(q) > 0 && ku(q, 2));
+  gv.forEach(([t, q]) => revoltJoin(t, q));
+  const gvT = gv.map(x => x[0]);
   // Sadık halk: bastırılamayan isyan bölgeyi eski sahibine geri verir (eski devlet hâlâ ayaktaysa).
-  const back = sec.filter(t => sdk[t] >= 0 && sdk[t] != p && sdk[t] < P && cnt(sdk[t]) > 0);
+  const back = sec.filter(t => !gvT.includes(t) && sdk[t] >= 0 && sdk[t] != p && sdk[t] < P && cnt(sdk[t]) > 0);
   back.forEach(t => loyalBack(t));
   // Eski devlet artık yoksa (ya da isyan sadık bir isyandan sıçradıysa) yeni devlet kurulmaz: isyan söner.
-  const fade = sec.filter(t => !back.includes(t) && (sdk[t] >= 0 || sdk[t] == -2));
+  const fade = sec.filter(t => !gvT.includes(t) && !back.includes(t) && (sdk[t] >= 0 || sdk[t] == -2));
   fade.forEach(t => {
     inc[t] = 0;
     ik[t] = 0;
@@ -10932,9 +11283,42 @@ function incTick(p) {
     if (p == 0)
       hl += ` ${NM[t]} bölgesindeki halk, dönecek devleti kalmayınca dağıldı; isyan söndü.`;
   });
-  const sec2 = sec.filter(t => !back.includes(t) && !fade.includes(t));
+  const sec2 = sec.filter(t => !gvT.includes(t) && !back.includes(t) && !fade.includes(t));
   if (sec2.length)
     secede(p, sec2);
+}
+// Yıkılmaz Devlet: olgunlaşan kötü huylu isyan, isyanı çıkaran devlete katılır; isyancılar onun askeri olur.
+function revoltJoin(t, q) {
+  const o = own[t];
+  own[t] = q;
+  arm[t] = Math.max(1, ib[t]);
+  inc[t] = 0;
+  ik[t] = 0;
+  rcl[t] = -1;
+  sdk[t] = -1;
+  tax[t] = 1;
+  arch[t] = 0;
+  archV[t] = 0;
+  cat[t] = 0;
+  catXp[t] = 0;
+  spy[t] = 0;
+  tw[t] = 0;
+  cav[t] = 0;
+  shS[t] = 0;
+  shL[t] = 0;
+  mine[t] = null;
+  fadeTo(t, o);
+  pulse(t, COL[q]);
+  nav.push({ k: 'burst', t, col: COL[q], t0: performance.now(), dur: 1100 });
+  fl.push({ t, dx: 0, txt: '✊ İsyancılar katıldı!', col: '#fff', t0: performance.now() });
+  if (q == 0) {
+    hl += ` ✊ ${NM[t]} isyancıları ${PN[o]} yönetimini yıktı ve sana katıldı!`;
+    setTimeout(() => banner(`✊ ${NM[t]} isyancıları sana katıldı!`, COL[0]), 600);
+  }
+  else if (o == 0)
+    hl += ` ${NM[t]} bölgendeki kötü huylu isyanı bastıramadın: isyancılar ${PN[q]} tarafına geçti.`;
+  else if (Vg.has(t))
+    hl += ` ${NM[t]} isyancıları ${PN[q]} devletine katıldı.`;
 }
 // Sadık halk isyanı başardı: bölge eski sahibine döner, isyancılar onun askeri olur.
 function loyalBack(t) {
@@ -16224,8 +16608,22 @@ function openPop(cx, cy) {
     }
     if (ally[q] > 0 && !tru[q])
       o.push(['x', EXC ? `İttifaktan çık (${EXC} altın)` : 'İttifaktan çık (ücretsiz)', gold[0] >= EXC]);
+    if (kus[q] >= 0)
+      info += ` 👑 Özel güç: ${KU[kus[q]].ic} <b>${KU[kus[q]].nm}</b>.`;
+    if (pcU[q] >= rd && pcB[q] == 0)
+      info += ` 🕊️ Satın aldığın barış: ${pcU[q] - rd + 1} tur daha sana saldırmaz, ${PN[pcT[q]]} topraklarına yükleniyor.`;
+    if (ku(0, 1) && canBribe(0, t)) {
+      o.push(['rs', rsR[0] == rd ? 'Rüşvet (bu tur verildi)' : `💰 Rüşvet ver (${bribeC(t)} altın)`, rsR[0] != rd && gold[0] >= bribeC(t)]);
+      info += ` 💰 Rüşvet: komutan ${bribeC(t)} altına (asker başına ${RSC}) ${NM[t]} bölgesini askerleriyle birlikte sana teslim eder; fetih hakkından düşmez, turda bir kez.`;
+    }
+    if (ku(0, 1) && q > 0 && !HUM.has(q) && !friend(0, q)) {
+      const w = PCCD - (rd - pcR[0]);
+      o.push(['pc', w > 0 ? `Barış satın al (${w} tur sonra)` : `🕊️ Barış satın al (${PCC} altın)`, pcOK(0, q) && gold[0] >= PCC && pcTargets(0, q).length > 0]);
+    }
     if (canInc3(0, t) && (!visSet().has(t) || canInc2(0, t))) {
       o.push(['i', incUsed(0) >= INCMAX ? `İsyan çıkar (bu tur ${INCMAX}/${INCMAX})` : `İsyan çıkar (${INCc(0)} altın · ${incUsed(0)}/${INCMAX})`, incUsed(0) < INCMAX && gold[0] >= INCc(0)]);
+      if (ku(0, 2))
+        o.push(['i2', incUsed(0) >= INCMAX ? `Kötü huylu isyan (bu tur ${INCMAX}/${INCMAX})` : `🔥 Kötü huylu isyan (${2 * INCc(0)} altın · ${incUsed(0)}/${INCMAX})`, incUsed(0) < INCMAX && gold[0] >= 2 * INCc(0)]);
       info += ` ${NM[t]}: isyan çıkar (turda en fazla ${INCMAX}; ilki ${INC1}, sonrakiler ${INC2} altın). Rakip asker gönderirse bastırabilir; ne kadar çok gönderirse o kadar kolay. 2 tur içinde bastıramazsa bölge bağımsız küçük bir devlet olur.`;
     }
     if (ONLINE) {
@@ -16578,10 +16976,28 @@ function openPop(cx, cy) {
       ui();
       return;
     }
-    if (k == 'i') {
-      incite(0, t);
+    if (k == 'i' || k == 'i2') {
+      incite(0, t, k == 'i2' ? 2 : 1);
       pop.hidden = true;
       ui();
+      return;
+    }
+    if (k == 'rs') {
+      pop.hidden = true;
+      busy = true;
+      ui();
+      try {
+        await bribe(0, t);
+      }
+      catch (er) {
+        console.error(er);
+      }
+      busy = false;
+      ui();
+      return;
+    }
+    if (k == 'pc') {
+      peacePanel(own[t]);
       return;
     }
     if (k == 't' || k == 'y') {
@@ -17559,12 +17975,35 @@ function invPlan(p) {
   const need = Math.min(shS[u] * CAPS, DIF == 2 ? 20 + Math.floor(Math.random() * 11) : 12 + Math.floor(Math.random() * 9));
   inv[p] = { u, need, rd0: rd };
 }
+// Altının Gücü (Hazine özel gücü) botta: ucuz sınır bölgelerini rüşvetle alır, güçlü komşusunu barışla başkasına salar.
+// Turun başında, para başka işlere harcanmadan yapılır.
+async function kuBot(p) {
+  if (!ku(p, 1) || ONLINE)
+    return;
+  if (rsR[p] != rd && Math.random() < .75) {
+    const L = [...Array(N).keys()].filter(t => canBribe(p, t) && !pcNo(p, own[t]) && bribeC(t) <= gold[p] * .8).sort((x, y) => ((HUM.has(own[y]) ? 1 : 0) - (HUM.has(own[x]) ? 1 : 0)) || (arm[y] - arm[x]));
+    if (L.length) {
+      await bribe(p, L[0]);
+      await sleep(300);
+    }
+  }
+  if (rd - pcR[p] >= PCCD && gold[p] >= PCC && Math.random() < .6) {
+    const nb = [...Array(P).keys()].filter(q => pcOK(p, q) && [...Array(N).keys()].some(u => own[u] == q && [...adj[u]].some(v => own[v] == p)));
+    if (nb.length) {
+      const q = nb.sort((x, y) => armyOf(y) - armyOf(x))[0];
+      const tg = pcTargets(p, q).sort((x, y) => ((HUM.has(y) ? 1 : 0) - (HUM.has(x) ? 1 : 0)) || (armyOf(y) - armyOf(x)))[0];
+      if (tg != null)
+        buyPeace(p, q, tg);
+    }
+  }
+}
 async function ai0(p) {
   busy = true;
   ui();
   await sleep(500);
   await blkPatrol(p);
   await botNavalDefense(p);
+  await kuBot(p);
   kdBot(p);
   botSpies(p);
   const mine = () => [...Array(N).keys()].filter(t => own[t] == p);
@@ -17765,9 +18204,9 @@ async function ai0(p) {
     }
   }
   if (rev[p] > 0 && !svW) {
-    const cd = [...Array(N).keys()].filter(t => HUM.has(own[t]) && canInc3(p, t) && est(p, t) >= 1 && est(p, t) <= 3);
+    const cd = [...Array(N).keys()].filter(t => HUM.has(own[t]) && !pcNo(p, own[t]) && canInc3(p, t) && est(p, t) >= 1 && est(p, t) <= 3);
     if (cd.length && gold[p] >= INCc(p)) {
-      incite(p, cd[Math.floor(Math.random() * cd.length)]);
+      incite(p, cd[Math.floor(Math.random() * cd.length)], ku(p, 2) && gold[p] >= 2 * INCc(p) && Math.random() < .6 ? 2 : 1);
       rev[p] = 0;
     }
     else
@@ -17899,7 +18338,7 @@ async function ai0(p) {
       let bt2 = null;
       let bb2 = 1;
       for (let t = 0; t < N; t++) {
-        if (friend(p, own[t]) || own[t] == NEU || prot(t) || !fireOK(u, t))
+        if (friend(p, own[t]) || pcNo(p, own[t]) || own[t] == NEU || prot(t) || !fireOK(u, t))
           continue;
         const et = est(p, t);
         if (et > bb2) {
@@ -17918,7 +18357,7 @@ async function ai0(p) {
       let bt = null;
       let bb = 1;
       [...Array(N).keys()].filter(t => archIn(a, t)).forEach(t => {
-        if (friend(p, own[t]) || prot(t))
+        if (friend(p, own[t]) || pcNo(p, own[t]) || prot(t))
           return;
         const et = est(p, t);
         if (et > bb) {
@@ -17954,7 +18393,7 @@ async function ai0(p) {
   }
   for (const a of mine()) {
     if (cat[a] > 0 && catReady(a) && !inc[a]) {
-      const tg = [...adj[a]].filter(t => own[t] != p && own[t] != NEU && !friend(p, own[t]) && !prot(t)).sort((x, y) => (wall[y] - wall[x]) || (est(p, y) - est(p, x)))[0];
+      const tg = [...adj[a]].filter(t => own[t] != p && own[t] != NEU && !friend(p, own[t]) && !pcNo(p, own[t]) && !prot(t)).sort((x, y) => (wall[y] - wall[x]) || (est(p, y) - est(p, x)))[0];
       if (tg != null && (wall[tg] > 0 || Math.random() < .4)) {
         await catapult(a, tg);
         ui();
@@ -17981,13 +18420,15 @@ async function ai0(p) {
         return;
       const sc0 = arm[a] >= 5 ? seaTargets(a).filter(t => !va.has(t)) : [];
       [...va, ...sc0].forEach(t => {
-        if (friend(p, own[t]) || prot(t))
+        if (friend(p, own[t]) || pcNo(p, own[t]) || prot(t))
           return;
         const F = va.has(t) ? arm[a] - 1 : Math.min(arm[a] - 1, shipCap(a));
         if (wall[t] > 0 && F < (wall[t] >= 2 ? WALLMIN : WALLMIN1))
           return;
         // Süvarili bölgeye başarısız saldırı karşı saldırıyla bölge kaybettirir: daha büyük üstünlük ister.
-        const s = F - est(p, t) - (visTo(p, t) && cav[t] > 0 ? 2 : 0) + (va.has(t) && cav[a] > (cvU[a] || 0) && !wall[t] ? 1 : 0);
+        // Kılıç Hakkı'na sahip devlete başarısız saldırı bölge kaybettirir: bot daha büyük üstünlük ister.
+        // Barış satın alınan bot, kendisine gösterilen rakibe yüklenir.
+        const s = F - est(p, t) - (visTo(p, t) && cav[t] > 0 ? 2 : 0) - (ku(own[t], 0) ? 3 : 0) + (va.has(t) && cav[a] > (cvU[a] || 0) && !wall[t] ? 1 : 0) + (pcU[p] >= rd && own[t] == pcT[p] ? 3 : 0);
         const pc = bp[p].some(v => v > 0);
         // Oyuncunun müttefiki olarak verilen saldırı emri: o devlete öncelik verir.
         const ob = ally[p] > 0 && !tru[p] && ord[p] >= 0 && own[t] == ord[p] ? 3 + (t == ordT[p] ? 2 : 0) : 0;
@@ -18815,7 +19256,7 @@ const SAVE_KEY = 'fetih_save';
 const SAVE_VARS = ['P', 'turn', 'phase', 'pool', 'rd', 'dr', 'dnx', 'over', 'NI', 'spyXp', 'spyMade', 'taxEvery', 'taxAuto', 'taxTip', 'taxMode', 'durL', 'durLP', 'durLN', 'playMs', 'lateOn', 'ext', 'mvCount', 'allyAsked', 'lastRef', 'lastCq',
   'own', 'arm', 'cap', 'wall', 'bar', 'dep', 'tax', 'gold', 'ally', 'mn', 'att', 'won', 'pen', 'cat', 'catCd', 'archV', 'catXp', 'arch', 'shot', 'wt0', 'bp', 'tru', 'hp', 'hb', 'tcd', 'dk',
   'inc', 'ib', 'ik', 'rwhy', 'ord', 'ordT', 'ocd', 'rqcd', 'rqcd2', 'aspy', 'rcl', 'rcm', 'rst', 'rev', 'bt', 'tw', 'spy', 'miss', 'rv', 'twp', 'shS', 'shL', 'shUsed', 'sfire', 'away', 'awayL',
-  'blk', 'mine', 'trA', 'tbm', 'tba', 'dmR', 'grT', 'grU', 'mvd', 'spl', 'ref', 'sup', 'ruin', 'incN', 'incR', 'NM', 'rfMark', 'gz', 'cav', 'cvU', 'bsp', 'bkn', 'bse', 'inv', 'kd', 'kyol', 'sdk', 'sdkR'];
+  'blk', 'mine', 'trA', 'tbm', 'tba', 'dmR', 'grT', 'grU', 'mvd', 'spl', 'ref', 'sup', 'ruin', 'incN', 'incR', 'NM', 'rfMark', 'gz', 'cav', 'cvU', 'bsp', 'bkn', 'bse', 'inv', 'kd', 'kyol', 'sdk', 'sdkR', 'kus', 'kuS', 'rsR', 'pcB', 'pcT', 'pcU', 'pcR', 'rin'];
 const SAVE_SETS = ['foc', 'kc'];
 const svGet = {};
 const svSet = {};
@@ -21063,7 +21504,7 @@ function gdData() {
       { ic: '⚔️', nm: 'Fetih hakkı', ul: ['Her tur <b>3 fetih</b> yapabilirsin; istersen 5\'e çıkarabilirsin ama fazladan her fetih refahı %10 düşürür.', 'İsyanlı kendi bölgene asker göndermek de bir fetih hakkı harcar.'] },
       { ic: '❔', nm: 'Sis', ul: ['Rakip bölgelerdeki <b>"?"</b> asker sayısını bilmediğin anlamına gelir.', 'Casus, keşif gemisi ve gözetleme kulesi sisi kaldırır; müttefiklerinin bölgelerini her zaman görürsün.'] },
       { ic: '🏰', nm: 'Başkent', ul: [`Bölgeler dağıtıldıktan sonra kendi bölgelerinden birini başkent seçersin; botlar da gizlice seçer. Başkentler gizlidir; casusla bulunur.`, `İlk ${CAPT} tur başkentlere saldırılamaz.`, `Başkent düşünce: devletin toplam askeri 50'den azsa tamamen işgal edilir, 50 ve üstüyse ikiye bölünür.`, `Oyunda bir kez ${CMC} altınla başkentini başka bölgene taşıyabilirsin; sandığın da birlikte gelir.`] },
-      { ic: 'crown', nm: 'Kudret ve devlet yolu', ul: [`Her ${KDR_EVERY} turda 1 <b>kudret</b> kazanırsın. Kazandığın tur Kudret paneli kendiliğinden açılır ve bir yetenek seçmeden oyuna devam edemezsin. Öğrendiklerine üstteki ☰ menüsünden bakabilirsin.`, 'Üç yol var: <b>Ordu</b>, <b>Hazine</b>, <b>Halk</b>. Her yolda 3 yetenek sırayla açılır; bütün ağacı bitiremezsin, hangi yolda derinleşeceğini sen seçersin.', ...KD.map((k, i) => `${k.ic} <b>${k.nm}</b> (${KDB[Math.floor(i / 3)].nm} ${i % 3 + 1}): ${k.ef}`), 'Botlar da oyun başında bir yol seçer; bir rakibin bölgesine basılı tutunca hangi yolu seçtiğini görürsün.'] },
+      { ic: 'crown', nm: 'Kudret ve devlet yolu', ul: [`Her ${KDR_EVERY} turda 1 <b>kudret</b> kazanırsın. Kazandığın tur Kudret paneli kendiliğinden açılır ve bir yetenek seçmeden oyuna devam edemezsin. Öğrendiklerine üstteki ☰ menüsünden bakabilirsin.`, 'Üç yol var: <b>Ordu</b>, <b>Hazine</b>, <b>Halk</b>. Her yolda 3 yetenek sırayla açılır; bütün ağacı bitiremezsin, hangi yolda derinleşeceğini sen seçersin.', ...KD.map((k, i) => `${k.ic} <b>${k.nm}</b> (${KDB[Math.floor(i / 3)].nm} ${i % 3 + 1}): ${k.ef}`), '👑 <b>Özel güçler:</b> bir yolun 3 yeteneğini de öğrenince o yolun özel gücü açılır (en erken 15. turda). Her devlet yalnızca <b>ilk</b> tamamladığı yolun özel gücünü alır.', ...KU.map((u, b) => `${u.ic} <b>${u.nm}</b> (${KDB[b].nm} özel gücü): ${u.ef}`), 'Botlar da oyun başında bir yol seçer ve özel güç kazanabilir; bir rakibin bölgesine basılı tutunca yolunu ve özel gücünü görürsün.'] },
       { ic: '💾', nm: 'Kayıt', ul: ['Oyun her an kendiliğinden kaydedilir. Uygulamayı kapatsan da menüdeki <b>Oyuna devam et</b> ile kaldığın yerden sürersin.'] },
     ] },
     { id: 'yp', nm: 'Yapılar', in: `Kendi bölgene basılı tut → <b>Yapılar</b> sekmesi. Bir bölgeye en fazla <b>${BLDMAX} yapı</b> kurulur (sur sayılmaz); dolunca yeni yapı kurulamaz ama yükseltme serbesttir. İsyanlı bölgeye inşa yapılamaz.`, it: [
@@ -21256,10 +21697,17 @@ function kdRender() {
       const k = KD[i];
       const s = st(i);
       return `<button class="kd-n ${s}${kdSel == i ? ' sel' : ''}" data-i="${i}"><i>${k.ic}</i>${k.nm}<small>${s == 'own' ? '✓ öğrenildi' : s == 'can' ? 'öğrenilebilir' : (j ? `önce ${KD[i - 1].nm}` : 'kudret yok')}</small></button>`;
-    }).join('') + '</div>').join('');
+    }).join('') + kuNode(b) + '</div>').join('');
   const dt = box.querySelector('.kd-dt');
   if (kdSel < 0) {
     dt.innerHTML = '<p>Bir yeteneğe dokun: ne işe yaradığı burada görünür.</p>';
+  }
+  else if (kdSel >= 9) {
+    const b = kdSel - 9;
+    const u = KU[b];
+    const n = [0, 1, 2].filter(j => kh(0, b * 3 + j)).length;
+    const stt = ku(0, b) ? `<button class="kd-go" disabled>👑 Özel gücün${b == 2 ? (kuS[0] ? ' · başkent kurtuluşu duruyor' : ' · başkent kurtuluşu kullanıldı') : ''}</button>` : kus[0] >= 0 ? `<button class="kd-go" disabled>Özel gücün ${KU[kus[0]].nm}; yalnızca ilk tamamlanan yolun özel gücü alınır</button>` : `<button class="kd-go" disabled>${KDB[b].nm} yolunun 3 yeteneğini öğren (${n}/3)</button>`;
+    dt.innerHTML = `<h3>${u.ic} ${u.nm} <small style="font-size:12px;color:#ffd36b">${KDB[b].nm} yolu · 👑 özel güç</small></h3><p>${u.ef}</p><p style="font-size:12.5px;color:rgba(244,239,226,.65)">Bir yolun 3 yeteneğini de öğrenince o yolun özel gücü kendiliğinden açılır. Her devlet yalnızca <b>ilk</b> tamamladığı yolun özel gücünü alır.</p>` + stt;
   }
   else {
     const k = KD[kdSel];
@@ -21269,7 +21717,55 @@ function kdRender() {
       (s == 'own' ? '<button class="kd-go" disabled>✓ Öğrenildi</button>' : `<button class="kd-go" data-l="${kdSel}" ${s == 'can' && !busyNow ? '' : 'disabled'}>${s == 'can' ? (busyNow ? 'Sıran gelince öğrenebilirsin' : 'Öğren (1 kudret)') : kdSel % 3 && !kh(0, kdSel - 1) ? `Önce ${KD[kdSel - 1].nm} öğrenilmeli` : 'Kudretin yok'}</button>`);
   }
   const rv = [...Array(P).keys()].filter(q => q > 0 && cnt(q) > 0 && kyol[q] >= 0);
-  box.querySelector('.kd-rv').innerHTML = rv.length ? 'Rakiplerin yolu: ' + rv.map(q => `<span style="--c:${COL[q]}">${PN[q]}: ${KDB[kyol[q]].ic} ${KDB[kyol[q]].nm} (${kdN(q)})</span>`).join('') : '';
+  box.querySelector('.kd-rv').innerHTML = rv.length ? 'Rakiplerin yolu: ' + rv.map(q => `<span style="--c:${COL[q]}">${PN[q]}: ${KDB[kyol[q]].ic} ${KDB[kyol[q]].nm} (${kdN(q)})${kus[q] >= 0 ? ` · 👑 ${KU[kus[q]].nm}` : ''}</span>`).join('') : '';
+}
+// Ağacın dördüncü basamağı: dalın özel gücü.
+function kuNode(b) {
+  const u = KU[b];
+  const n = [0, 1, 2].filter(j => kh(0, b * 3 + j)).length;
+  const st = ku(0, b) ? 'own' : kus[0] >= 0 ? 'gone' : 'lock';
+  return `<button class="kd-n kd-u ${st}${kdSel == 9 + b ? ' sel' : ''}" data-i="${9 + b}"><em>👑 ÖZEL GÜÇ</em><i>${u.ic}</i>${u.nm}<small>${st == 'own' ? (b == 2 && !kuS[0] ? 'senin · kurtuluş kullanıldı' : 'senin!') : st == 'gone' ? 'başka yolu seçtin' : `${n}/3 yetenek`}</small></button>`;
+}
+// Özel güç açılınca ne değişti.
+function kuDiff(b) {
+  return [
+    [['Kazandığın savaşta esir', 'yok', 'öldürülenin üçte biri'], ['Sana yapılan başarısız saldırı', '', 'karşı hücumla bölge senin'], ['Fetih hakkı', '', 'karşı hücumda düşmez']],
+    [['Rüşvetle bölge almak', '', `asker başına ${RSC} altın`], ['Barış satın almak', '', `${PCC} altın · ${PCT} tur`], ['Satın alınan bot', '', 'senin seçtiğin rakibe yüklenir']],
+    [['Başkent düşünce', 'bölünme ya da yıkılış', 'bir kez kurtulursun'], ['Refah %20 altında', 'ülke ikiye bölünür', 'bölünmez'], ['Kötü huylu isyan çıkarma', 'yok', '2 katı fiyat'], ['Bastırılamayan kötü huylu isyan', 'yeni devlet', 'bölgeler sana katılır']]
+  ][b];
+}
+function kuMapFx(b) {
+  const my = [...Array(N).keys()].filter(t => own[t] == 0);
+  const L = b == 2 ? [cap[0]] : b == 1 ? [...Array(N).keys()].filter(t => canBribe(0, t)) : my.filter(t => isBorder(t));
+  const txt = ['🗡️ Kılıç Hakkı', '💰 rüşvet: ' , '🏰 Yıkılmaz Devlet'][b];
+  L.slice(0, 12).forEach((t, k) => setTimeout(() => {
+    pulse(t, '#ffd36b');
+    fl.push({ t, dx: 0, dy: -10, txt: b == 1 ? txt + bribeC(t) : txt, col: '#ffe08a', t0: performance.now() });
+  }, 150 + k * 120));
+}
+function kuCelebrate(b, done) {
+  const u = KU[b];
+  const o = document.createElement('div');
+  o.id = 'kdFx';
+  o.className = 'ult';
+  const sp = Array.from({ length: 28 }, (_, j) => {
+    const a = j / 28 * Math.PI * 2;
+    const r = 100 + (j % 4) * 32;
+    return `<i class="fx-sp" style="--x:${(Math.cos(a) * r).toFixed(0)}px;--y:${(Math.sin(a) * r).toFixed(0)}px;animation-delay:${(.15 + (j % 5) * .06).toFixed(2)}s"></i>`;
+  }).join('');
+  const rows = kuDiff(b).map(([n, a, c]) => `<div class="fx-row"><span>${n}</span>${a ? `<s>${a}</s> →` : ''}<b>${c}</b></div>`).join('');
+  o.innerHTML = `<div class="fx-ray"></div><div class="fx-c"><div class="fx-crown">${crownSVG()}</div><div class="fx-ic">${u.ic}</div><div class="fx-ring"></div><div class="fx-ring r2"></div>${sp}` +
+    `<div class="fx-tag">${KDB[b].ic} ${KDB[b].nm} yolu tamamlandı · özel güç</div><h3>${u.nm}!</h3>` +
+    `<div class="fx-ch"><small>NE DEĞİŞTİ</small>${rows}</div><button class="fx-ok">Muhteşem!</button></div>`;
+  document.body.appendChild(o);
+  try {
+    snd('fetih');
+  }
+  catch (e) { }
+  o.querySelector('.fx-ok').onclick = () => {
+    o.remove();
+    done && done();
+  };
 }
 // İlk kudret kazanılınca bir kez çıkan tanıtım kartı (taç düğmesini de parlatır).
 let kdIntroShown = false;
@@ -21399,7 +21895,9 @@ function openKudret(force) {
           $('log').textContent = `Kudret: ${KD[i].nm} öğrenildi. ${KD[i].ef}`;
           ui();
           kdRender();
-          kdCelebrate(i, () => {
+          const ub = kuPend;
+          kuPend = -1;
+          const fin = () => {
             // Kudret kalmadıysa zorunlu panel kapanır; haritada etkilenen yerler parlar.
             if (!(kdPts(0) > 0 && [...Array(9).keys()].some(j => kdCan(0, j)))) {
               box.classList.remove('force');
@@ -21408,7 +21906,20 @@ function openKudret(force) {
             else
               kdSel = [...Array(9).keys()].find(j => kdCan(0, j)) ?? -1;
             kdRender();
-            kdMapFx(i);
+            if (ub >= 0)
+              kuMapFx(ub);
+            else
+              kdMapFx(i);
+          };
+          kdCelebrate(i, () => {
+            // Yol tamamlandıysa ardından özel güç kutlaması gelir.
+            if (ub >= 0) {
+              $('log').textContent = `👑 Özel güç: ${KU[ub].nm}! ${KU[ub].ef.replace(/<[^>]*>/g, '')}`;
+              ui();
+              kuCelebrate(ub, fin);
+            }
+            else
+              fin();
           });
         }
       }
