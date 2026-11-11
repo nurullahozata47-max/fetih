@@ -20341,30 +20341,52 @@ const Mus = (() => {
     return ROOT + 12 * (oct + o) + sc[k];
   };
   function build(ctx) {
-    ac = ctx || new (window.AudioContext || window.webkitAudioContext)();
+    // Müzik düşük gecikme istemez: 'playback' modu telefonda daha büyük ses tamponu kullanır;
+    // oyun ekranı yoğunken ses akışı kesilip cızırdamaz.
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (ctx)
+      ac = ctx;
+    else {
+      try {
+        ac = new AC({ latencyHint: 'playback' });
+      }
+      catch (e) {
+        ac = new AC();
+      }
+    }
     master = ac.createGain();
     master.gain.value = on ? vol : 0;
-    // Çıkış: telefon hoparlörünün veremediği çok kalın sesler (40 Hz altı) süzülür, ardından sınırlayıcı
-    // tepeleri yumuşakça bastırır; ses hiçbir zaman kırpılıp cızırdamaz.
+    // Çıkış: telefon hoparlörü 100 Hz altını veremez; bu kalın sesler hoparlörü zorlayıp patırtı ve cızırtı yapar.
+    // İki kat yüksek geçiren süzgeç (24 dB/oktav) onları keser; alçak geçiren süzgeç keskin tizleri yumuşatır;
+    // sınırlayıcı tepeleri yavaşça bastırır (hızlı sınırlayıcı kalın seslerde kendisi cızırtı yapar).
     const hpf = ac.createBiquadFilter();
     hpf.type = 'highpass';
-    hpf.frequency.value = 40;
-    hpf.Q.value = .7;
+    hpf.frequency.value = 105;
+    hpf.Q.value = .54;
+    const hpf2 = ac.createBiquadFilter();
+    hpf2.type = 'highpass';
+    hpf2.frequency.value = 105;
+    hpf2.Q.value = 1.31;
+    const lpf = ac.createBiquadFilter();
+    lpf.type = 'lowpass';
+    lpf.frequency.value = 8500;
+    lpf.Q.value = .5;
     const lim = ac.createDynamicsCompressor();
-    lim.threshold.value = -4;
-    lim.knee.value = 4;
-    lim.ratio.value = 20;
-    lim.attack.value = .003;
-    lim.release.value = .25;
-    // Sınırlayıcının kendiliğinden eklediği ses artışı (~2.3 dB) geri alınır: genel ses düzeyi değişmez.
+    lim.threshold.value = -10;
+    lim.knee.value = 8;
+    lim.ratio.value = 8;
+    lim.attack.value = .012;
+    lim.release.value = .3;
     const mk = ac.createGain();
-    mk.gain.value = .77;
+    mk.gain.value = .9;
     master.connect(hpf);
     outIn = hpf;
     sfxM = ac.createGain();
     sfxM.gain.value = sfxOn ? vol : 0;
     sfxM.connect(hpf);
-    hpf.connect(lim);
+    hpf.connect(hpf2);
+    hpf2.connect(lpf);
+    lpf.connect(lim);
     lim.connect(mk);
     mk.connect(ac.destination);
     // Oyun içi marş menüdekinden kısık çalar.
@@ -20555,23 +20577,40 @@ const Mus = (() => {
   }
   // Davullar: kös (derin), def (tef), zil.
   function drum(out, t, v, f0, f1, d) {
+    // Kalın davullar telefon hoparlörünün duyuramadığı frekanslarda kalmasın: bir oktav üstü de çalınır.
     const o = ac.createOscillator();
     o.type = 'sine';
     o.frequency.setValueAtTime(f0, t);
     o.frequency.exponentialRampToValueAtTime(f1, t + d * .6);
     const g = ac.createGain();
-    g.gain.setValueAtTime(v, t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(v, t + .003);
     g.gain.exponentialRampToValueAtTime(.001, t + d);
     o.connect(g);
     g.connect(out);
     o.start(t);
     o.stop(t + d + .05);
+    if (f0 < 160) {
+      const o2 = ac.createOscillator();
+      o2.type = 'sine';
+      o2.frequency.setValueAtTime(f0 * 2, t);
+      o2.frequency.exponentialRampToValueAtTime(f1 * 2, t + d * .5);
+      const g2 = ac.createGain();
+      g2.gain.setValueAtTime(0, t);
+      g2.gain.linearRampToValueAtTime(v * .45, t + .003);
+      g2.gain.exponentialRampToValueAtTime(.001, t + d * .7);
+      o2.connect(g2);
+      g2.connect(out);
+      o2.start(t);
+      o2.stop(t + d + .05);
+    }
     const n = noise();
     const nf = ac.createBiquadFilter();
     nf.type = 'lowpass';
     nf.frequency.value = f0 * 6;
     const ng = ac.createGain();
-    ng.gain.setValueAtTime(v * .5, t);
+    ng.gain.setValueAtTime(0, t);
+    ng.gain.linearRampToValueAtTime(v * .5, t + .002);
     ng.gain.exponentialRampToValueAtTime(.001, t + .08);
     n.connect(nf);
     nf.connect(ng);
@@ -20585,7 +20624,8 @@ const Mus = (() => {
     f.type = 'highpass';
     f.frequency.value = 6500;
     const g = ac.createGain();
-    g.gain.setValueAtTime(v, t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(v, t + .002);
     g.gain.exponentialRampToValueAtTime(.001, t + d);
     n.connect(f);
     f.connect(g);
@@ -20742,7 +20782,8 @@ const Mus = (() => {
       o.type = 'sine';
       o.frequency.value = 520 * r;
       const g = ac.createGain();
-      g.gain.setValueAtTime(v / (k + 1), t);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(v / (k + 1), t + .002);
       g.gain.exponentialRampToValueAtTime(.0005, t + .9 / (k * .5 + 1));
       o.connect(g);
       g.connect(out);
@@ -20759,7 +20800,8 @@ const Mus = (() => {
     f.frequency.value = 1800;
     f.Q.value = .8;
     const g = ac.createGain();
-    g.gain.setValueAtTime(v, t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(v, t + .002);
     g.gain.exponentialRampToValueAtTime(.001, t + .14);
     n.connect(f);
     f.connect(g);
@@ -21098,7 +21140,8 @@ const Mus = (() => {
     if (nextT < now)
       nextT = now + .05;
     const spb = curSpb();
-    while (nextT < now + .25) {
+    // Notalar 0,6 saniye önceden hazırlanır: ekran bir an takılsa da müzik kesilip patlamaz.
+    while (nextT < now + .6) {
       if (on && theme != 'off')
         scheduleStep(step, nextT);
       step++;
