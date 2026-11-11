@@ -20305,6 +20305,13 @@ const Mus = (() => {
   let sfxOn = false;
   let sfxM = null;
   let outIn = null;
+  // Önceden işlenmiş müzik: her parça bir kez arka planda tek bir ses dosyasına işlenir (bounce) ve döngüyle çalar.
+  // Böylece telefon her notada yeni ses düğümleri üretmez; işlemci yükünden doğan cızırtı ve patırtı olmaz.
+  // bufG: işlenmiş parçanın ses düzeyi (musG ile aynı geçişleri yapar). bounce[parça] = { buf, len, spb }.
+  let bufG = null;
+  const bounce = {};
+  let bBusy = null;
+  let cur = null;
   try {
     // Ses efektleri yenilenirken varsayılan olarak kapalı (ayarlardan açılabilir).
     sfxOn = localStorage.getItem('fetih_sfx2') == '1';
@@ -20415,6 +20422,9 @@ const Mus = (() => {
     lp.connect(master);
     musG = ac.createGain();
     musG.gain.value = 1.2;
+    bufG = ac.createGain();
+    bufG.gain.value = 1.2;
+    bufG.connect(master);
     tone = ac.createBiquadFilter();
     tone.type = 'lowshelf';
     tone.frequency.value = 170;
@@ -20431,6 +20441,12 @@ const Mus = (() => {
     sfxG.gain.value = 1;
     sfxG.connect(master);
     sfxG.connect(rev);
+  }
+  // Müzik ses düzeyi geçişi: canlı çalan ve önceden işlenmiş müziğe birlikte uygulanır.
+  function mgT(v, t, tc) {
+    musG.gain.setTargetAtTime(v, t, tc);
+    if (bufG)
+      bufG.gain.setTargetAtTime(v, t, tc);
   }
   // ---- Çalgılar ----
   function env(g, t, a, peak, dec, sus, rel, dur) {
@@ -21016,13 +21032,13 @@ const Mus = (() => {
     if (swap || !ac || last)
       return;
     swap = true;
-    musG.gain.setTargetAtTime(0, ac.currentTime, .5);
+    mgT(0, ac.currentTime, .5);
     setTimeout(() => {
       trk = TRACKS[(TRACKS.indexOf(trk) + 1) % TRACKS.length];
       step = 0;
       nextT = ac.currentTime + .15;
       trkT0 = ac.currentTime;
-      musG.gain.setTargetAtTime(tGain(), ac.currentTime + .1, .6);
+      mgT(tGain(), ac.currentTime + .1, .6);
       swap = false;
     }, 1800);
   }
@@ -21140,6 +21156,20 @@ const Mus = (() => {
     if (nextT < now)
       nextT = now + .05;
     const spb = curSpb();
+    // Parçanın işlenmiş hali hazırsa canlı nota üretilmez, işlenmiş döngü çalar.
+    const play = on && theme != 'off';
+    if (cur && (!play || cur.k != trk))
+      stopBuf();
+    if (play && bounce[trk]) {
+      if (!cur)
+        startBuf(trk, nextT, step == 0 ? .08 : 1.6);
+      // Sıradaki parça önceden işlenir; geçişte hazır olsun.
+      if (mode == 'auto' && !last && now - trkT0 > 20)
+        reqBounce(TRACKS[(TRACKS.indexOf(trk) + 1) % TRACKS.length]);
+      return;
+    }
+    if (play)
+      reqBounce(trk);
     // Notalar 0,6 saniye önceden hazırlanır: ekran bir an takılsa da müzik kesilip patlamaz.
     while (nextT < now + .6) {
       if (on && theme != 'off')
@@ -21147,6 +21177,89 @@ const Mus = (() => {
       step++;
       nextT += spb;
     }
+  }
+  // Parçanın döngü uzunluğu (adım): her parçanın kendi formu bir kez tamamlanır.
+  const LOOP = { march: 256, kusatma: 256, hucum: 96, karanlik: 160, sefer: 384, direnis: 512, diyar: 288 };
+  function reqBounce(k) {
+    if (bounce[k] || bBusy || !ac || typeof OfflineAudioContext == 'undefined' || !LOOP[k])
+      return;
+    bBusy = k;
+    bounceTrack(k).then(b => {
+      // Bellekte en fazla 3 parça tutulur (çalan, sıradaki ve en son biri).
+      const keep = new Set([trk, k, TRACKS[(TRACKS.indexOf(trk) + 1) % TRACKS.length]]);
+      Object.keys(bounce).forEach(x => {
+        if (!keep.has(x))
+          delete bounce[x];
+      });
+      bounce[k] = b;
+      bBusy = null;
+    }).catch(() => {
+      bBusy = 'fail';
+    });
+  }
+  async function bounceTrack(k) {
+    const sv = [ac, master, musG, warG, sfxG, rev, theme, war, tone, toneTrk, sfxM, outIn, bufG, trk, seed, mel];
+    // 24 kHz yeterli: çıkıştaki süzgeç zaten 8,5 kHz üstünü yumuşatıyor; işlem süresi kısalır.
+    const sr = 24000;
+    trk = k;
+    const spb = curSpb();
+    const L = LOOP[k];
+    const len = L * spb;
+    const tail = 4;
+    let oc;
+    try {
+      oc = new OfflineAudioContext(1, Math.ceil(sr * (len + tail)), sr);
+      build(oc);
+      // İşlenmiş parça çıkış süzgeçlerinden geçmez (çalarken canlı çıkıştan geçer).
+      master.disconnect();
+      master.connect(oc.destination);
+      master.gain.value = 1;
+      musG.gain.value = 1;
+      warG.gain.value = 0;
+      war = 0;
+      seed = 11;
+      for (let i = 0; i < L; i++)
+        scheduleStep(i, i * spb);
+    }
+    finally {
+      [ac, master, musG, warG, sfxG, rev, theme, war, tone, toneTrk, sfxM, outIn, bufG, trk, seed, mel] = sv;
+    }
+    const buf = await oc.startRendering();
+    // Döngü dikişsiz olsun: son notaların kuyruğu başa eklenir.
+    const d = buf.getChannelData(0);
+    const n = Math.round(len * sr);
+    const out = ac.createBuffer(1, n, sr);
+    const od = out.getChannelData(0);
+    od.set(d.subarray(0, n));
+    for (let i = n; i < d.length; i++)
+      od[i - n] += d[i];
+    return { buf: out, len: n / sr, spb };
+  }
+  function startBuf(k, when, fade) {
+    const B = bounce[k];
+    if (cur)
+      stopBuf();
+    const src = ac.createBufferSource();
+    src.buffer = B.buf;
+    src.loop = true;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(1, when + fade);
+    src.connect(g);
+    g.connect(bufG);
+    // Canlı çalınan müziğin kaldığı yerden devam eder.
+    const off = ((step * B.spb) % B.len + B.len) % B.len;
+    src.start(when, off);
+    cur = { k, src, g };
+  }
+  function stopBuf() {
+    if (!cur)
+      return;
+    const t = ac.currentTime;
+    cur.g.gain.cancelScheduledValues(t);
+    cur.g.gain.setTargetAtTime(0, t, .12);
+    cur.src.stop(t + 1);
+    cur = null;
   }
   function ensure() {
     if (!ac) {
@@ -21348,7 +21461,7 @@ const Mus = (() => {
       mode = k;
       trk = k == 'auto' ? 'march' : k;
       if (musG && ac)
-        musG.gain.setTargetAtTime(tGain(), ac.currentTime, .3);
+        mgT(tGain(), ac.currentTime, .3);
       step = 0;
       if (ac) {
         nextT = ac.currentTime + .1;
@@ -21367,12 +21480,25 @@ const Mus = (() => {
     get track() {
       return trk;
     },
+    // Test için: bir parçayı işleyip döngü dikişini ölç.
+    async _bstat(k) {
+      ensure();
+      const B = await bounceTrack(k);
+      const d = B.buf.getChannelData(0);
+      let pk = 0;
+      let mj = 0;
+      for (let i = 1; i < d.length; i++) {
+        pk = Math.max(pk, Math.abs(d[i]));
+        mj = Math.max(mj, Math.abs(d[i] - d[i - 1]));
+      }
+      return { len: B.len, pk, mj, edge: Math.abs(d[d.length - 1] - d[0]) };
+    },
     // Test için: sıradaki parçaya hemen geç ve durumu oku.
     _skip() {
       autoNext();
     },
     get playing() {
-      return { mode, trk };
+      return { mode, trk, buf: cur ? cur.k : null, ready: Object.keys(bounce), state: ac ? ac.state : '' };
     },
     // Son direniş parçasını aç/kapat (yumuşak geçişle).
     lastStand(v) {
@@ -21390,13 +21516,13 @@ const Mus = (() => {
         return;
       }
       swap = true;
-      musG.gain.setTargetAtTime(0, ac.currentTime, .35);
+      mgT(0, ac.currentTime, .35);
       setTimeout(() => {
         trk = to;
         step = 0;
         nextT = ac.currentTime + .12;
         trkT0 = ac.currentTime;
-        musG.gain.setTargetAtTime(tGain() * (v ? 1.15 : 1), ac.currentTime + .05, .5);
+        mgT(tGain() * (v ? 1.15 : 1), ac.currentTime + .05, .5);
         swap = false;
       }, 1200);
     },
@@ -21414,7 +21540,7 @@ const Mus = (() => {
     },
     theme(k) {
       if (musG && ac)
-        musG.gain.setTargetAtTime((k == 'game' ? .7 : 1.2) * (trk == 'march' ? 1 : .72), ac.currentTime, .8);
+        mgT((k == 'game' ? .7 : 1.2) * (trk == 'march' ? 1 : .72), ac.currentTime, .8);
       if (swap)
         return void (theme = k);
       if (k == theme || (k != 'off' && theme != 'off' && (k == 'menu' || k == 'game')))
@@ -21458,7 +21584,7 @@ const Mus = (() => {
       const tk0 = trk;
       if (tk)
         trk = tk;
-      const sv = [ac, master, musG, warG, sfxG, rev, theme, flavor, war, on, tone, toneTrk, sfxM, outIn, sfxOn];
+      const sv = [ac, master, musG, warG, sfxG, rev, theme, flavor, war, on, tone, toneTrk, sfxM, outIn, sfxOn, bufG];
       const oc = new OfflineAudioContext(2, 44100 * secs, 44100);
       build(oc);
       master.gain.value = vol;
@@ -21481,7 +21607,7 @@ const Mus = (() => {
         for (let i = 0, t = .05; t < secs - 1; i++, t += spb)
           scheduleStep(i, t);
       const buf = await oc.startRendering();
-      [ac, master, musG, warG, sfxG, rev, theme, flavor, war, on, tone, toneTrk, sfxM, outIn, sfxOn] = sv;
+      [ac, master, musG, warG, sfxG, rev, theme, flavor, war, on, tone, toneTrk, sfxM, outIn, sfxOn, bufG] = sv;
       trk = tk0;
       return buf;
     }
