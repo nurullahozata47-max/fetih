@@ -1011,6 +1011,48 @@ button:focus-visible {
 .mn-map.dim {
   opacity: .35;
 }
+#pzO {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(6, 14, 20, .78);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: pgIn .25s ease-out both;
+}
+#pzO .pz-ic {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 2px auto 6px;
+}
+#pzO .pz-ic i {
+  width: 14px;
+  height: 46px;
+  border-radius: 5px;
+  background: #ffd36b;
+  box-shadow: 0 0 16px rgba(255, 211, 107, .45);
+}
+#pzO #pzGo {
+  background: linear-gradient(180deg, #ffc955, #f2b134 55%, #dc9a1f);
+  color: #12252e;
+  font-size: 18px;
+}
+#pzO .pz-row {
+  display: flex;
+  gap: 10px;
+}
+#pzO .pz-row button,
+#pzO #pzMn {
+  background: rgba(255, 255, 255, .08);
+  border: 2px solid rgba(255, 211, 107, .35);
+  color: #f4efe2;
+  font-size: 15px;
+}
 #alc,
 #txg {
   position: fixed;
@@ -3112,7 +3154,7 @@ input, textarea {
   <!-- Üst bilgi şeridi (haritanın üstünde yüzer) -->
   <div id="hudT">
     <div class="ht-row"><h1 id="ttl">Fetih</h1><button id="optb" aria-label="Menü" aria-expanded="false"><span class="ob-l"></span><span class="ob-l"></span><span class="ob-l"></span><em></em></button></div>
-    <div id="optP" hidden><button id="kdb" class="op-r" aria-label="Kudret"></button><button id="gdb" class="op-r"><i>📖</i><span>Rehber</span></button><button id="camb" class="op-r"><i>🎥</i><span>Savaş kamerası</span><b class="st"></b></button><button id="musb" class="op-r"><i class="mus-tg">🔊</i><span>Müzik</span><b class="st"></b></button><button id="fsb" class="op-r" hidden><i>⛶</i><span>Tam ekran</span></button></div>
+    <div id="optP" hidden><button id="pzb" class="op-r"><i>⏸️</i><span>Duraklat</span></button><button id="kdb" class="op-r" aria-label="Kudret"></button><button id="gdb" class="op-r"><i>📖</i><span>Rehber</span></button><button id="camb" class="op-r"><i>🎥</i><span>Savaş kamerası</span><b class="st"></b></button><button id="musb" class="op-r"><i class="mus-tg">🔊</i><span>Müzik</span><b class="st"></b></button><button id="fsb" class="op-r" hidden><i>⛶</i><span>Tam ekran</span></button></div>
     <!-- Üst kutucuklar: devletler, bölge sayıları, altın -->
     <div id="chips"></div>
   </div>
@@ -3251,7 +3293,15 @@ const c = cv.getContext('2d');
 cv.width = W * S;
 cv.height = H * S;
 const $ = id => document.getElementById(id) || { style: {} };
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+// Duraklatma: oyun duraklatılınca bekleyen bütün adımlar (bot hamleleri, savaş ve animasyon beklemeleri)
+// "Devam et"e basılana kadar durur. Yeni oyun başlarsa eski beklemeler hiç devam etmez.
+let paused = false;
+let pauseQ = [];
+function pauseGate() {
+  if (paused)
+    return new Promise(r => pauseQ.push(r));
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms)).then(pauseGate);
 // ======================================================================
 // 2. OYUN DURUMU — değişkenler sözlüğü
 // ======================================================================
@@ -8864,6 +8914,11 @@ function init(noDraft, seed) {
   pcR = Array(PM).fill(-99);
   rin = Array(N).fill(-1);
   kuPend = -1;
+  paused = false;
+  pauseQ = [];
+  const pzo = document.getElementById('pzO');
+  if (pzo)
+    pzo.remove();
   sdk = Array(N).fill(-1);
   sdkR = Array(N).fill(0);
   bsp = [];
@@ -9046,7 +9101,7 @@ const LATE = 20 * 60e3;
 let playMs = 0;
 let lateOn = false;
 setInterval(() => {
-  if (over || dr || demo || TUT || ONLINE || document.hidden || !cap || cap[0] < 0 || (menuEl && !menuEl.hidden) || phase != 'r')
+  if (over || dr || demo || TUT || ONLINE || paused || document.hidden || !cap || cap[0] < 0 || (menuEl && !menuEl.hidden) || phase != 'r')
     return;
   playMs += 1000;
   if (!lateOn && playMs >= LATE) {
@@ -18743,10 +18798,69 @@ function hideMenu(then) {
     zapply();
     menuEl.hidden = true;
     menuEl.classList.remove('leaving');
+    // Duraklatma menüsünden ana menüye gidildiyse oyuna dönünce kaldığı yerden sürer.
+    setPause(false);
     if (then)
       then();
   }, 560);
 }
+// ---- Duraklatma menüsü ----
+const pauseOK = () => !ONLINE && !demo && !over && cen && menuEl.hidden;
+function setPause(v) {
+  if (v == paused)
+    return;
+  if (v && !pauseOK())
+    return;
+  paused = v;
+  if (v) {
+    try {
+      if (saveOK())
+        saveGame();
+    }
+    catch (e) { }
+    Mus.hold(true);
+    pauseUI();
+  }
+  else {
+    const o = document.getElementById('pzO');
+    if (o)
+      o.remove();
+    Mus.hold(false);
+    const q = pauseQ;
+    pauseQ = [];
+    q.forEach(r => r());
+  }
+}
+function pauseUI() {
+  let o = document.getElementById('pzO');
+  if (o)
+    o.remove();
+  o = document.createElement('div');
+  o.id = 'pzO';
+  const who = dr ? 'bölge seçimi' : turn == 0 ? 'senin sıran' : `${PN[turn]} oynuyordu`;
+  o.innerHTML = `<div class="alc-in pz-in" role="dialog" aria-label="Oyun duraklatıldı"><div class="pz-ic"><i></i><i></i></div><h2>Oyun duraklatıldı</h2>` +
+    `<p>${dr ? 'Bölge seçimi' : `Tur ${rd}`} · ${who}.<br>Sen dönene kadar hiçbir şey ilerlemez: botlar, süre ve savaşlar bekler.</p>` +
+    `<button id="pzGo">▶ Devam et</button><div class="pz-row"><button id="pzGd">📖 Rehber</button><button id="pzMs">${Mus.on ? '🔇 Müziği kapat' : '🔊 Müziği aç'}</button></div><button id="pzMn">🏠 Ana menü</button></div>`;
+  document.body.appendChild(o);
+  o.querySelector('#pzGo').onclick = () => setPause(false);
+  o.querySelector('#pzGd').onclick = () => openGuide();
+  o.querySelector('#pzMs').onclick = e => {
+    Mus.toggle();
+    Mus.hold(true);
+    e.currentTarget.textContent = Mus.on ? '🔇 Müziği kapat' : '🔊 Müziği aç';
+  };
+  o.querySelector('#pzMn').onclick = () => {
+    // Oyun duraklatılmış halde kalır; ana menüden "Oyuna devam et" ile dönülür.
+    o.remove();
+    Mus.hold(false);
+    showMenu(true);
+  };
+}
+// Uygulama arka plana geçince (telefon kilitlendi, başka uygulamaya geçildi) oyun kendiliğinden duraklar.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && !paused && pauseOK() && !TUT)
+    setPause(true);
+});
 document.querySelectorAll('.mn-dif').forEach(b => b.onclick = () => {
   DIF = +b.dataset.d;
   tutSel = false;
@@ -19810,7 +19924,7 @@ setInterval(() => {
   const now = performance.now();
   const dt = now - soloLast;
   soloLast = now;
-  const act = soloOn && !TUT && !over && !dr && cen && turn == 0 && soloLeft > 0 && menuEl.hidden && !document.getElementById('alc') && !document.getElementById('eov');
+  const act = soloOn && !paused && !TUT && !over && !dr && cen && turn == 0 && soloLeft > 0 && menuEl.hidden && !document.getElementById('alc') && !document.getElementById('eov');
   if (!act) {
     el.hidden = !(soloOn && !TUT && !over && !dr && cen && menuEl.hidden && turn != 0 && !document.getElementById('eov'));
     if (!el.hidden) {
@@ -20323,6 +20437,7 @@ const Mus = (() => {
   catch (e) { }
   let theme = 'menu';
   let flavor = 'orch';
+  let held = false;
   let step = 0;
   let nextT = 0;
   let timer = null;
@@ -21428,7 +21543,7 @@ const Mus = (() => {
   // İlk dokunuşta ses açılır (tarayıcılar sesi kullanıcı dokunmadan başlatmaz).
   // Telefonlarda ses ancak dokunma bitince (pointerup / touchend / click) açılabilir.
   const unlock = () => {
-    if (!on && !sfxOn)
+    if ((!on && !sfxOn) || held)
       return;
     ensure();
     if (ac && ac.state != 'running')
@@ -21440,10 +21555,20 @@ const Mus = (() => {
       return;
     if (document.hidden)
       ac.suspend();
-    else if (on)
+    else if (on && !held)
       ac.resume();
   });
   return {
+    // Oyun duraklatılınca müzik de durur, devam edince kaldığı yerden sürer.
+    hold(v) {
+      held = !!v;
+      if (!ac)
+        return;
+      if (held)
+        ac.suspend();
+      else if ((on || sfxOn) && !document.hidden)
+        ac.resume();
+    },
     get on() {
       return on;
     },
@@ -22128,6 +22253,7 @@ document.getElementById('kdb').onclick = () => openKudret();
 }
 document.getElementById('mnGuide').onclick = () => openGuide();
 document.getElementById('gdb').onclick = () => openGuide();
+document.getElementById('pzb').onclick = () => setPause(true);
 (() => {
   const sp = document.getElementById('mnSetP');
   document.getElementById('mnSet').onclick = () => {
