@@ -2742,10 +2742,48 @@ input, textarea {
   50% { box-shadow: 0 0 0 6px rgba(255, 211, 107, .55); transform: scale(1.12); }
 }
 /* ===== Üst şerit: tek menü düğmesi (Kudret, Rehber, kamera, müzik, tam ekran) ===== */
+/* Duraklat düğmesi: bir dokunuş durdurur, bir dokunuş devam ettirir. Duraklatılınca üst şerit karartmanın üstünde kalır. */
+#pzb {
+  flex: none;
+  margin-left: auto;
+  width: 40px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 8px;
+}
+#pzb .pz-b {
+  display: block;
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: currentColor;
+}
+#pzb.on {
+  background: linear-gradient(180deg, #ffc955, #f2b134 55%, #dc9a1f);
+  color: #12252e;
+  box-shadow: 0 0 14px rgba(255, 211, 107, .6);
+}
+#pzb.on .pz-b {
+  display: none;
+}
+#pzb.on::before {
+  content: '';
+  margin-left: 3px;
+  border-left: 13px solid currentColor;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+}
+body.pzd #hudT {
+  z-index: 112;
+}
 #optb {
   position: relative;
   flex: none;
-  margin-left: auto;
+  margin-left: 6px;
   width: 40px;
   height: 32px;
   padding: 0;
@@ -3153,8 +3191,8 @@ input, textarea {
 <main>
   <!-- Üst bilgi şeridi (haritanın üstünde yüzer) -->
   <div id="hudT">
-    <div class="ht-row"><h1 id="ttl">Fetih</h1><button id="optb" aria-label="Menü" aria-expanded="false"><span class="ob-l"></span><span class="ob-l"></span><span class="ob-l"></span><em></em></button></div>
-    <div id="optP" hidden><button id="pzb" class="op-r"><i>⏸️</i><span>Duraklat</span></button><button id="kdb" class="op-r" aria-label="Kudret"></button><button id="gdb" class="op-r"><i>📖</i><span>Rehber</span></button><button id="camb" class="op-r"><i>🎥</i><span>Savaş kamerası</span><b class="st"></b></button><button id="musb" class="op-r"><i class="mus-tg">🔊</i><span>Müzik</span><b class="st"></b></button><button id="fsb" class="op-r" hidden><i>⛶</i><span>Tam ekran</span></button></div>
+    <div class="ht-row"><h1 id="ttl">Fetih</h1><button id="pzb" aria-label="Duraklat" title="Duraklat"><span class="pz-b"></span><span class="pz-b"></span></button><button id="optb" aria-label="Menü" aria-expanded="false"><span class="ob-l"></span><span class="ob-l"></span><span class="ob-l"></span><em></em></button></div>
+    <div id="optP" hidden><button id="kdb" class="op-r" aria-label="Kudret"></button><button id="gdb" class="op-r"><i>📖</i><span>Rehber</span></button><button id="camb" class="op-r"><i>🎥</i><span>Savaş kamerası</span><b class="st"></b></button><button id="musb" class="op-r"><i class="mus-tg">🔊</i><span>Müzik</span><b class="st"></b></button><button id="fsb" class="op-r" hidden><i>⛶</i><span>Tam ekran</span></button></div>
     <!-- Üst kutucuklar: devletler, bölge sayıları, altın -->
     <div id="chips"></div>
   </div>
@@ -3863,14 +3901,15 @@ function blkSpot(u, x) {
 const CANH = .6;
 // Tek bir geminin bir isabetinde en fazla bu kadar asker ölür (kalabalık bölgeler bir atışta erimesin).
 const SHIPMAX = 10;
-function shipVolley(t, n) {
+// Kıyı bombardımanı (strong) daha ağırdır: isabette askerlerin yarısı kadarı vurulur, tek atışta en fazla 12.
+function shipVolley(t, n, strong) {
   let a0 = arm[t];
   let k = 0;
   let hits = 0;
   for (let i = 0; i < n; i++)
     if (Math.random() < CANH) {
       hits++;
-      const d = Math.min(SHIPMAX, Math.ceil(a0 * R(.34, .48)));
+      const d = Math.min(strong ? 12 : SHIPMAX, Math.ceil(a0 * (strong ? R(.48, .6) : R(.34, .48))));
       const h = Math.max(0, Math.min(d, a0 - 1));
       a0 -= h;
       k += h;
@@ -3880,7 +3919,9 @@ function shipVolley(t, n) {
 // Bombardıman gemisinin gizli dayanıklılığı: her düello ya da top isabeti 1 eksiltir, 0 olunca batar.
 const SHIPHP = 2;
 // Bombardımanda gemi başına kıyıdaki bir yapıyı (kışla, maden, kule, sandık) yıkma ihtimali.
-const BLDHIT = .15;
+const BLDHIT = .3;
+// Bombardımanda surlara isabet ihtimali.
+const BLKWALL = .65;
 // Bir devletin (oyuncu ya da bot) en fazla 2 büyük savaş gemisi olabilir (bütün iskeleleri toplamı).
 const SLMAX = 2;
 const bigN = p => { let k = 0; for (let u = 0; u < N; u++) if (own[u] == p && dk[u]) k += shL[u] || 0; return k; };
@@ -3970,12 +4011,12 @@ async function blkBomb(s) {
   const p = b.p;
   const dur = 1600;
   const nS = blkN(b);
-  const vol = wall[t] > 0 ? null : shipVolley(t, nS);
-  // Surlara her gemi ayrı %50 şansla işler.
+  const vol = wall[t] > 0 ? null : shipVolley(t, nS, true);
+  // Surlara her gemi ayrı %65 şansla işler.
   let wh = 0;
   if (!vol)
     for (let i = 0; i < nS; i++)
-      if (Math.random() < .5)
+      if (Math.random() < BLKWALL)
         wh++;
   const shp = [[b.x, b.y]];
   if (nS > 1 && b.x2 != null)
@@ -4021,7 +4062,7 @@ async function blkBomb(s) {
     if (k > 0)
       fl.push({ t, dx: 0, txt: visSet().has(t) ? `-${k} vuruldu` : 'Vuruldu!', col: '#ff6b6b', t0: performance.now() });
   }
-  // Gülleler kıyıdaki yapıları da vurur: surla korunmayan bölgede isabet ettiren her gemi %15 ihtimalle bir yapıyı yıkar
+  // Gülleler kıyıdaki yapıları da vurur: surla korunmayan bölgede isabet ettiren her gemi %30 ihtimalle bir yapıyı yıkar
   // (kışla, maden, okçu kulesi ya da başkent dışındaki sandık).
   if (!wall[t] && vol)
     for (let i = 0; i < vol.hits; i++) {
@@ -4514,7 +4555,7 @@ function botNavy(p) {
     return;
   }
   const bWant = DIF == 0 ? 1 : DIF == 1 ? (rd >= 12 ? 2 : 1) : 2;
-  if (dk[u] >= 2 && bTot < Math.min(SLMAX, bWant) && room && gold[p] >= SLC && Math.random() < [.25, .55, .85][DIF]) {
+  if (dk[u] >= 2 && bTot < Math.min(SLMAX, bWant) && room && gold[p] >= SLC && Math.random() < [.4, .7, .9][DIF]) {
     shL[u]++;
     pk(u, SLC);
     return;
@@ -6965,6 +7006,16 @@ function drawBlk(s) {
     g.fillText('💣', ax, ay + .5);
   }
 }
+// Gemi gövdesinin kapladığı yer (yatay hw yarı boy, dikey ±8 piksel) tamamen deniz mi?
+function seaClear(x, y, hw) {
+  for (const [ox, oy] of [[-hw, 0], [hw, 0], [0, -8], [0, 6], [-hw * .6, -6], [hw * .6, -6]]) {
+    const xi = Math.floor((x + ox) / S);
+    const yi = Math.floor((y + oy) / S);
+    if (xi < 0 || yi < 0 || xi >= W || yi >= H || cell[yi * W + xi] != -1)
+      return false;
+  }
+  return true;
+}
 function drawDockShips(s) {
   drawBlk(s);
   for (let t = 0; t < N; t++) {
@@ -6984,13 +7035,21 @@ function drawDockShips(s) {
       list.push(0);
     // Gemiler yatay duruyor: dizi yatay giderse boyları kadar, dikey giderse daha sık aralık bırakılır.
     const horiz = Math.abs(dx) < Math.abs(dy);
-    const len = b => horiz ? (b ? 30 : 20) : (b ? 17 : 13);
+    const len = b => horiz ? (b ? 34 : 22) : (b ? 26 : 18);
     const tot = list.reduce((a, b) => a + len(b), 0);
     let acc = -tot / 2;
     list.forEach((big, i) => {
       const off = acc + len(big) / 2;
       acc += len(big);
-      drawShip(bx - dy * off, by + dx * off, dx >= 0 ? 1 : -1, !!big, COL[own[t]], s, t * 3 + i);
+      // Gemi karaya ya da başka bir gemiye binmesin: tamamen denizde kalana kadar kıyıdan açığa itilir.
+      let x = bx - dy * off;
+      let y = by + dx * off;
+      const hw = big ? 15 : 10;
+      for (let k = 0; k < 14 && !seaClear(x, y, hw); k++) {
+        x += dx * S;
+        y += dy * S;
+      }
+      drawShip(x, y, dx >= 0 ? 1 : -1, !!big, COL[own[t]], s, t * 3 + i);
     });
   }
 }
@@ -8919,6 +8978,12 @@ function init(noDraft, seed) {
   const pzo = document.getElementById('pzO');
   if (pzo)
     pzo.remove();
+  document.body.classList.remove('pzd');
+  const pzb = document.getElementById('pzb');
+  if (pzb) {
+    pzb.classList.remove('on');
+    pzb.hidden = !!ONLINE;
+  }
   sdk = Array(N).fill(-1);
   sdkR = Array(N).fill(0);
   bsp = [];
@@ -18369,11 +18434,11 @@ async function ai0(p) {
   ui();
   await sleep(400);
   for (const u of mine()) {
-    if (dk[u] && bigFree(u) > 0 && !sfire[u] && Math.random() < [.2, .4, .8][DIF]) {
+    if (dk[u] && bigFree(u) > 0 && !sfire[u] && Math.random() < [.5, .75, .95][DIF]) {
       let bt3 = null;
-      let bv3 = 2.5;
+      let bv3 = 1.5;
       for (let t = 0; t < N; t++) {
-        if (!abOK(u, t) || est(p, t) < 3)
+        if (!abOK(u, t) || est(p, t) < 2 || pcNo(p, own[t]))
           continue;
         const v = tax[t] + mn[t] * MI + bar[t] * 2 + (dk[t] ? 2 : 0) + (own[t] == 0 ? .5 : 0) + Math.min(6, est(p, t) / 4) - HD[u][t] * .05;
         if (v > bv3) {
@@ -18812,6 +18877,12 @@ function setPause(v) {
   if (v && !pauseOK())
     return;
   paused = v;
+  document.body.classList.toggle('pzd', v);
+  const pb = document.getElementById('pzb');
+  if (pb) {
+    pb.classList.toggle('on', v);
+    pb.setAttribute('aria-label', v ? 'Devam et' : 'Duraklat');
+  }
   if (v) {
     try {
       if (saveOK())
@@ -18839,15 +18910,17 @@ function pauseUI() {
   o.id = 'pzO';
   const who = dr ? 'bölge seçimi' : turn == 0 ? 'senin sıran' : `${PN[turn]} oynuyordu`;
   o.innerHTML = `<div class="alc-in pz-in" role="dialog" aria-label="Oyun duraklatıldı"><div class="pz-ic"><i></i><i></i></div><h2>Oyun duraklatıldı</h2>` +
-    `<p>${dr ? 'Bölge seçimi' : `Tur ${rd}`} · ${who}.<br>Sen dönene kadar hiçbir şey ilerlemez: botlar, süre ve savaşlar bekler.</p>` +
-    `<button id="pzGo">▶ Devam et</button><div class="pz-row"><button id="pzGd">📖 Rehber</button><button id="pzMs">${Mus.on ? '🔇 Müziği kapat' : '🔊 Müziği aç'}</button></div><button id="pzMn">🏠 Ana menü</button></div>`;
-  document.body.appendChild(o);
+    `<p>${dr ? 'Bölge seçimi' : `Tur ${rd}`} · ${who}.<br>Sen dönene kadar hiçbir şey ilerlemez: botlar, süre ve savaşlar bekler. Yukarıdaki ▶ düğmesiyle de devam edebilirsin.</p>` +
+    `<button id="pzGo">▶ Devam et</button><div class="pz-row"><button id="pzGd">📖 Rehber</button><button id="pzMs">${Mus.on ? '🔊 Müzik açık' : '🔇 Müzik kapalı'}</button></div><button id="pzMn">🏠 Ana menü</button></div>`;
+  // Üst şeritle aynı katmana eklenir: duraklat düğmesi karartmanın üstünde kalır ve tek dokunuşla devam ettirir.
+  const hd = document.getElementById('hudT');
+  (hd && hd.parentNode ? hd.parentNode : document.body).appendChild(o);
   o.querySelector('#pzGo').onclick = () => setPause(false);
   o.querySelector('#pzGd').onclick = () => openGuide();
   o.querySelector('#pzMs').onclick = e => {
     Mus.toggle();
     Mus.hold(true);
-    e.currentTarget.textContent = Mus.on ? '🔇 Müziği kapat' : '🔊 Müziği aç';
+    e.currentTarget.textContent = Mus.on ? '🔊 Müzik açık' : '🔇 Müzik kapalı';
   };
   o.querySelector('#pzMn').onclick = () => {
     // Oyun duraklatılmış halde kalır; ana menüden "Oyuna devam et" ile dönülür.
@@ -21820,7 +21893,7 @@ function gdData() {
     { id: 'dz', nm: 'Deniz', in: 'Kıyıdaki bölgene basılı tut → <b>Deniz</b> sekmesi. Bir iskelede en fazla 4 gemi olur.', it: [
       { ic: '⚓', nm: 'İskele', pr: DC, lv: [['Sv1', 'küçük gemi'], [`Sv2 (${DC2})`, 'büyük savaş gemisi'], [`Sv3 (${DC3})`, 'mayın, otomatik onarım']] },
       { ic: '⛵', nm: 'Küçük gemi', pr: SSC, ul: [`${CAPS} yer taşır: asker ve okçu 1, süvari ${CAVS}, mancınık ${CATS} yer.`, 'Çıkarma: bölgeyi seçip denizin ötesindeki bir kıyıya dokun.', `Deniz aşırı fetihte +${LOOT} altın yağma.`, '<b>Keşif seferi:</b> menzildeki bir kıyıya gider; oradaki asker ve binalar 2 tur görünür.'] },
-      { ic: '🚢', nm: 'Büyük savaş gemisi', pr: SLC, rq: 'iskele sv2', ul: [`Devlet başına en fazla ${SLMAX}.`, '<b>Top ateşi:</b> menzildeki düşman kıyısına ya da gemisine ateş eder.', '<b>💣 Kıyı bombardımanı:</b> seçtiğin düşman kıyısından başlayıp yanındaki kıyılarda devriye gezer, her tur birini bombalar, surları döver, bazen binaları yıkar. İki gemin varsa her biri ayrı kıyıya gider; geri çağırana kadar sürer.', '<b>⚔️ Gemi savaşı:</b> düşman gemisinin yanına gidip top düellosuna girer.', '<b>🛡 Koruma:</b> iskelesinin yakınını bombalayan düşman gemisine kendiliğinden saldırır.', 'Çıkarmalarda küçük gemilere eşlik eder, mayınları temizler.'] },
+      { ic: '🚢', nm: 'Büyük savaş gemisi', pr: SLC, rq: 'iskele sv2', ul: [`Devlet başına en fazla ${SLMAX}.`, '<b>Top ateşi:</b> menzildeki düşman kıyısına ya da gemisine ateş eder.', '<b>💣 Kıyı bombardımanı:</b> seçtiğin düşman kıyısından başlayıp yanındaki kıyılarda devriye gezer, her tur birini bombalar: %60 isabetle oradaki askerlerin yarısı kadarını vurur, surlara %65 isabet eder, %30 ihtimalle bir binayı yıkar. İki gemin varsa her biri ayrı kıyıya gider; geri çağırana kadar sürer.', '<b>⚔️ Gemi savaşı:</b> düşman gemisinin yanına gidip top düellosuna girer.', '<b>🛡 Koruma:</b> iskelesinin yakınını bombalayan düşman gemisine kendiliğinden saldırır.', 'Çıkarmalarda küçük gemilere eşlik eder, mayınları temizler.'] },
       { ic: '💣', nm: 'Mayın', pr: MNC, rq: 'iskele sv3', ul: ['Bu bölgenin ve yanındaki 2 kıyının açıklarını korur; gelen düşman gemileri batar.', 'Mayın tarlası bir kez patlar.'] },
       { ic: '🔧', nm: 'Onarım', ul: [`Sv3 iskelede, gemi savaşında hasar alan bombardıman gemin %35 ihtimalle ${REPAIRC} altına kendiliğinden onarılır.`, 'Hasarlı gemi dönüş yolunda batabilir.'] },
     ] },
@@ -22253,7 +22326,7 @@ document.getElementById('kdb').onclick = () => openKudret();
 }
 document.getElementById('mnGuide').onclick = () => openGuide();
 document.getElementById('gdb').onclick = () => openGuide();
-document.getElementById('pzb').onclick = () => setPause(true);
+document.getElementById('pzb').onclick = () => setPause(!paused);
 (() => {
   const sp = document.getElementById('mnSetP');
   document.getElementById('mnSet').onclick = () => {
