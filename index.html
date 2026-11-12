@@ -3821,6 +3821,14 @@ let pcT = [];
 let pcU = [];
 let pcR = [];
 let rin = [];
+// İsyan haracı: rinA[t] = t bölgesinde isyanı çıkaran devlet (kışkırtılan her isyan). Bağımsızlığını ilan eden bölgeler
+// isyanı çıkarana 3 tur haraç öder: harQ[r] alıcı, harA[r] tur başına miktar, harL[r] kalan tur. spP[r]: r'nin koptuğu devlet.
+const HARN = 3;
+let rinA = [];
+let harQ = [];
+let harA = [];
+let harL = [];
+let spP = [];
 // sdk[t]: Sadık halk isyanı: bastırılamazsa bölgenin döneceği eski sahibi (-1 yok, -2 sadık isyandan sıçrayan: dönecek yer yok).
 // sdkR[t]: bu bölgede sonraki Sadık halk ayaklanmasının en erken turu (aynı bölge sürekli el değiştirmesin diye).
 let sdk;
@@ -9167,6 +9175,11 @@ function init(noDraft, seed) {
   pcU = Array(PM).fill(-1);
   pcR = Array(PM).fill(-99);
   rin = Array(N).fill(-1);
+  rinA = Array(N).fill(-1);
+  harQ = Array(PM).fill(-1);
+  harA = Array(PM).fill(0);
+  harL = Array(PM).fill(0);
+  spP = Array(PM).fill(-1);
   kuPend = -1;
   paused = false;
   pauseQ = [];
@@ -9236,6 +9249,25 @@ function start(p) {
     spyMade = 0;
   }
   sup[p] = 0;
+  // İsyan haracı: isyanını çıkardığın ve bağımsız olan devletler sana tur başında altın öder.
+  for (let r = 0; r < P; r++)
+    if (harQ[r] == p && harL[r] > 0) {
+      if (cnt(r) <= 0) {
+        harL[r] = 0;
+        continue;
+      }
+      const a = harA[r];
+      gold[r] = Math.max(0, gold[r] - a);
+      gold[p] += a;
+      clampGold(p);
+      harL[r]--;
+      if (p == 0) {
+        hl += ` 💰 ${PN[r]} haraç ödedi: +${a} altın${harL[r] ? ` (${harL[r]} tur daha)` : ' (son ödeme)'}.`;
+        const t0 = cap[0];
+        if (t0 >= 0)
+          fl.push({ t: t0, dx: 0, dy: -26, txt: `+${a} haraç`, col: '#ffd36b', t0: performance.now() + 600 });
+      }
+    }
   blkClean();
   for (let t = 0; t < N; t++)
     if (ruin[t] && ruin[t].by == p)
@@ -10266,6 +10298,8 @@ function startRevolt(t, kind, org, why, stay) {
   rwhy[t] = why || '';
   if (p == 0)
     rnew.add(t);
+  if ((org == null || org < 0) && rinA)
+    rinA[t] = -1;
   if (kind == 2) {
     if (org == null || org < 0) {
       org = t;
@@ -11531,10 +11565,12 @@ function incite(p, t, kind = 1) {
     }
   }
   startRevolt(t, kind, null, `${PN[p]} krallığı para dağıtıp halkı kışkırttı.`);
+  if (inc[t] > 0)
+    rinA[t] = p;
   if (kind == 2 && inc[t] > 0)
     rin[t] = p;
   if (p == 0)
-    lg(kind == 2 ? `${NM[t]} bölgesinde kötü huylu isyan çıktı! ${PN[q]} bastıramazsa her tur yayılır; isyan sonuna varınca isyandaki bölgeler sana katılır.` : `${NM[t]} bölgesinde isyan çıktı. ${PN[q]} 2 tur içinde bastıramazsa bölge bağımsız bir devlet olur.`);
+    lg(kind == 2 ? `${NM[t]} bölgesinde kötü huylu isyan çıktı! ${PN[q]} bastıramazsa her tur yayılır; isyan sonuna varınca isyandaki bölgeler sana katılır.` : `${NM[t]} bölgesinde isyan çıktı. ${PN[q]} 2 tur içinde bastıramazsa bölge bağımsız bir devlet olur; bağımsız olursa sana 3 tur haraç öder.`);
   else
     hl += kind == 2 ? ` ${PN[p]} ${NM[t]} bölgende KÖTÜ HUYLU isyan çıkardı! Bastıramazsan yayılır ve bölgeler ${PN[p]} tarafına geçer.` : ` ${PN[p]} ${NM[t]} bölgende isyan çıkardı! 2 tur içinde oraya asker gönder.`;
 }
@@ -11701,21 +11737,44 @@ function loyalRise(t, old) {
     hl += ` ✊ ${NM[t]} bölgendeki halk ${PN[own[t]]} işgaline karşı ayaklandı! İsyan bastırılamazsa bölge sana döner.`;
 }
 // Süresi dolan isyanlı bölgeler bağımsızlığını ilan eder. Aynı isyandan çıkanlar tek devlet olur.
+// İsyanı kim çıkardı: doğrudan kışkırtılan bölge ya da kışkırtılmış kötü huylu isyanın yayıldığı bölge.
+const revBy = t => rinA[t] >= 0 ? rinA[t] : (ik[t] == 2 && rcl[t] >= 0 && rin[rcl[t]] >= 0 ? rin[rcl[t]] : -1);
 function secede(p, list) {
+  // Aynı isyandan çıkanlar ve birbirine bitişik bölgeler tek devlet olur.
+  const par = new Map(list.map(t => [t, t]));
+  const fnd = x => par.get(x) == x ? x : (par.set(x, fnd(par.get(x))), par.get(x));
+  const uni = (a, b) => par.set(fnd(a), fnd(b));
+  for (const a of list)
+    for (const b of list)
+      if (a < b && (adj[a].has(b) || (ik[a] == 2 && ik[b] == 2 && rcl[a] >= 0 && rcl[a] == rcl[b])))
+        uni(a, b);
   const groups = new Map();
   for (const t of list) {
-    const key = ik[t] == 2 && rcl[t] >= 0 ? 'k' + rcl[t] : 't' + t;
-    if (!groups.has(key))
-      groups.set(key, []);
-    groups.get(key).push(t);
+    const k = fnd(t);
+    if (!groups.has(k))
+      groups.set(k, []);
+    groups.get(k).push(t);
   }
-  for (const [key, G] of groups) {
-    const o = key[0] == 'k' ? +key.slice(1) : -1;
-    // Aynı isyandan daha önce doğmuş ve hâlâ yaşayan devlet varsa ona katılır.
+  for (const G of groups.values()) {
+    const o = G.map(t => ik[t] == 2 ? rcl[t] : -1).find(x => x >= 0) ?? -1;
+    // İsyanı çıkaran (haraç alacak) devlet: grupta en çok geçen.
+    const ins = G.map(revBy).filter(q => q >= 0 && q < P && q != p && cnt(q) > 0);
+    const q0 = ins.sort((a, b) => ins.filter(x => x == b).length - ins.filter(x => x == a).length)[0] ?? -1;
+    // Aynı isyandan daha önce doğmuş ya da aynı ülkeden kopup bitişikte duran, hâlâ yaşayan devlet varsa ona katılır.
     let r = o >= 0 && rst[o] >= 0 && cnt(rst[o]) > 0 ? rst[o] : -1;
     if (r < 0) {
+      const nb = [...new Set(G.flatMap(t => [...adj[t]]).map(u => own[u]))].filter(x => x != p && x >= 0 && x < P && x != NEU && spl[x] && spP[x] == p && cnt(x) > 0);
+      if (nb.length)
+        r = nb[0];
+    }
+    if (r < 0) {
       if (P >= PM) {
-        G.forEach(t => neutralize(t, p));
+        // Yeni devlete yer kalmadı: bölge bağımsız kalır, isyancılar orada askerleriyle bekler (bedava alınamaz).
+        G.forEach(t => {
+          const n = Math.max(2, ib[t]);
+          neutralize(t, p);
+          arm[t] = n;
+        });
         continue;
       }
       r = P++;
@@ -11728,8 +11787,17 @@ function secede(p, list) {
       gold[r] = 15;
       ref[r] = 75;
       cap[r] = G[0];
+      spP[r] = p;
+      harQ[r] = -1;
+      harL[r] = 0;
       if (o >= 0)
         rst[o] = r;
+    }
+    // İsyan haracı: yeni devlet, bağımsızlığını borçlu olduğu devlete 3 tur altın öder.
+    if (q0 >= 0 && q0 != r) {
+      harQ[r] = q0;
+      harA[r] = Math.max(harL[r] > 0 && harQ[r] == q0 ? harA[r] : 0, G.length >= 2 ? 20 : 10);
+      harL[r] = HARN;
     }
     G.forEach(t => {
       own[t] = r;
@@ -11750,6 +11818,8 @@ function secede(p, list) {
     fl.push({ t: tm, dx: 0, txt: 'Bağımsızlık!', col: '#ffb38a', t0: performance.now() + 200 });
     const nm = G.map(t => NM[t]).join(', ');
     hl += p == 0 ? ` İsyan bastırılamadı: ${nm} bağımsızlığını ilan etti, ${PN[r]} devleti kuruldu!` : (G.some(t => Vg.has(t)) ? ` ${PN[p]} ülkesinde isyancılar ${PN[r]} devletini kurdu.` : '');
+    if (harQ[r] == 0 && harL[r] == HARN)
+      hl += ` 💰 ${PN[r]} bağımsızlığını sana borçlu: ${HARN} tur boyunca sana turda ${harA[r]} altın haraç ödeyecek.`;
     if (p == 0)
       setTimeout(() => banner(`${PN[r]} devleti kuruldu!`, COL[r]), 300);
   }
@@ -11775,7 +11845,7 @@ function neutralize(t, old) {
   spy[t] = 0;
   shS[t] = 0;
   shL[t] = 0;
-  hl += old == 0 ? ` ${NM[t]} bölgen boş alana düştü!` : ` ${PN[old]} ${NM[t]} bölgesini kaybetti, orada şimdi boş alan var.`;
+  hl += old == 0 ? ` ${NM[t]} bölgen bağımsız oldu; isyancılar bölgeyi tutuyor!` : ` ${PN[old]} ${NM[t]} bölgesini kaybetti; orası artık isyancıların elinde bağımsız bir bölge.`;
   fadeTo(t, old);
 }
 async function fadeTo(t, old, n = 14, ms = 40) {
@@ -19662,7 +19732,7 @@ const SAVE_KEY = 'fetih_save';
 const SAVE_VARS = ['P', 'turn', 'phase', 'pool', 'rd', 'dr', 'dnx', 'over', 'NI', 'spyXp', 'spyMade', 'taxEvery', 'taxAuto', 'taxTip', 'taxMode', 'durL', 'durLP', 'durLN', 'playMs', 'lateOn', 'ext', 'mvCount', 'allyAsked', 'lastRef', 'lastCq',
   'own', 'arm', 'cap', 'wall', 'bar', 'dep', 'tax', 'gold', 'ally', 'mn', 'att', 'won', 'pen', 'cat', 'catCd', 'archV', 'catXp', 'arch', 'shot', 'wt0', 'bp', 'tru', 'hp', 'hb', 'tcd', 'dk',
   'inc', 'ib', 'ik', 'rwhy', 'ord', 'ordT', 'ocd', 'rqcd', 'rqcd2', 'aspy', 'rcl', 'rcm', 'rst', 'rev', 'bt', 'tw', 'spy', 'miss', 'rv', 'twp', 'shS', 'shL', 'shUsed', 'sfire', 'away', 'awayL',
-  'blk', 'mine', 'trA', 'tbm', 'tba', 'dmR', 'grT', 'grU', 'mvd', 'spl', 'ref', 'sup', 'ruin', 'incN', 'incR', 'NM', 'rfMark', 'gz', 'cav', 'cvU', 'bsp', 'bkn', 'bse', 'inv', 'kd', 'kyol', 'sdk', 'sdkR', 'kus', 'kuS', 'rsR', 'rsN', 'pcB', 'pcT', 'pcU', 'pcR', 'rin'];
+  'blk', 'mine', 'trA', 'tbm', 'tba', 'dmR', 'grT', 'grU', 'mvd', 'spl', 'ref', 'sup', 'ruin', 'incN', 'incR', 'NM', 'rfMark', 'gz', 'cav', 'cvU', 'bsp', 'bkn', 'bse', 'inv', 'kd', 'kyol', 'sdk', 'sdkR', 'kus', 'kuS', 'rsR', 'rsN', 'pcB', 'pcT', 'pcU', 'pcR', 'rin', 'rinA', 'harQ', 'harA', 'harL', 'spP'];
 const SAVE_SETS = ['foc', 'kc'];
 const svGet = {};
 const svSet = {};
@@ -22120,10 +22190,10 @@ function gdData() {
       { ic: '🪙', nm: 'Gelir', ul: [`Her tur: bölgelerinden temel gelir (en fazla ${INC0}), madenler ve vergi.`, 'Bir turda saldırıp hiç bölge alamazsan sonraki tur gelirin yarıya düşer.', `Herkes ${START_G} altınla başlar.`] },
       { ic: '💰', nm: 'Vergi', ul: ['Kendi bölgene basılı tut → <b>Vergi</b>. Normalde 2 turda bir toplanır.', 'İç bölgeler 2 altın verebilir; sınır bölgelerinden 2 altın istersen halk kızar: refah düşer, isyan çıkabilir.', 'Vergiyi her tur toplamak daha çok altın getirir ama isyan riskini artırır.'] },
       { ic: '😊', nm: 'Refah', ul: ['Saldırmadığın her tur <b>+8</b>.', 'Başarısız her saldırı <b>−4</b>, bir turda 3\'ten fazla her fetih <b>−10</b>.', { w: '%50\'nin altında kendiliğinden isyanlar çıkar; %20\'nin altında ülke ikiye bölünür.' }] },
-      { ic: '🔥', nm: 'İsyan', ul: ['İsyan çıkınca oradaki askerler en yakın güvenli bölgeye çekilir.', 'Bastırmak için isyancılardan fazla asker taşı (bir fetih hakkı harcar). Süresi dolarsa bölge bağımsız bir devlet olur.', '<b>Kötü huylu isyan</b> her tur komşu bölgelere yayılır (en fazla 4 bölge).'] },
+      { ic: '🔥', nm: 'İsyan', ul: ['İsyan çıkınca oradaki askerler en yakın güvenli bölgeye çekilir.', 'Bastırmak için isyancılardan fazla asker taşı (bir fetih hakkı harcar). Süresi dolarsa bölge bağımsız bir devlet olur.', 'Aynı anda bağımsız olan bitişik bölgeler tek devlet olur; aynı ülkeden daha önce kopmuş bir devlete bitişikse ona katılır.', '<b>Kötü huylu isyan</b> her tur komşu bölgelere yayılır (en fazla 4 bölge).'] },
       { ic: '🤝', nm: 'İttifak', pr: ALC ? ALC : 'ücretsiz', ul: ['Rakip bölgesine basılı tut → diplomasi. Bot reddedebilir.', 'Müttefikinden asker, okçu ya da casus isteyebilir, ona saldırı emri verebilirsin.', `Müttefikine kendi askerinden takviye yollamak ücretsizdir (altınla ${SUP}).`, 'İttifaktan çıkmak ücretsizdir.'] },
       { ic: '👑', nm: 'Haraç', ul: [`Bir botun panelinde miktarı (${TRMIN}–${TRMAX} altın) ve süreyi (${TTMIN}–${TTMAX} tur) seçersin; ne kadar az istersen o kadar kolay kabul eder.`, 'Haraç her turunda ödeyenin gelirinden kesilir.', { w: 'Güçlü botlar da senden haraç isteyebilir; reddedersen sana yüklenirler.' }] },
-      { ic: '📣', nm: 'İsyan çıkarma', pr: `${INC1} / ${INC2}`, ul: [`Rakibin 1–3 askerli bir bölgesinde para dağıtıp isyan çıkarırsın; turda en fazla ${INCMAX} (ilki ${INC1}, sonrakiler ${INC2} altın).`, 'Başkentlerde ve kalabalık bölgelerde işe yaramaz; altın boşa gider.'] },
+      { ic: '📣', nm: 'İsyan çıkarma', pr: `${INC1} / ${INC2}`, ul: ['💰 <b>İsyan haracı:</b> çıkardığın isyan bağımsızlığını ilan ederse yeni devlet sana 3 tur boyunca turda 10 altın (2+ bölgeyse 20) haraç öder. Botlar da senin topraklarında çıkardıkları isyandan haraç alır.', `Rakibin 1–3 askerli bir bölgesinde para dağıtıp isyan çıkarırsın; turda en fazla ${INCMAX} (ilki ${INC1}, sonrakiler ${INC2} altın).`, 'Başkentlerde ve kalabalık bölgelerde işe yaramaz; altın boşa gider.'] },
     ] },
   ];
 }
