@@ -2847,6 +2847,319 @@ input, textarea {
   width: 30px;
   height: 26px;
 }
+/* Kudret: ilk kazanılınca çıkan tanıtım kartı */
+#kdIn {
+  position: fixed;
+  inset: 0;
+  z-index: 116;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(4, 10, 14, .55);
+  color: #f4efe2;
+  font-family: Bahnschrift, "Segoe UI", system-ui, sans-serif;
+}
+#kdIn .ki-c {
+  width: min(380px, 100%);
+  padding: 22px 20px 18px;
+  border-radius: 20px;
+  text-align: center;
+  background: radial-gradient(120% 70% at 50% 0%, #3a3012 0%, #16303c 55%, #0d1d25 100%);
+  border: 1px solid rgba(255, 211, 107, .45);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .6), 0 0 40px rgba(255, 190, 60, .15);
+  animation: kiIn .35s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+@keyframes kiIn {
+  from { transform: scale(.85); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+#kdIn .ki-c svg {
+  width: 74px;
+  height: 63px;
+  filter: drop-shadow(0 4px 14px rgba(255, 190, 60, .45));
+  animation: kiCr 2.4s ease-in-out infinite;
+}
+@keyframes kiCr {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+#kdIn h3 {
+  margin: 8px 0 6px;
+  font-size: 23px;
+  color: #ffd36b;
+}
+#kdIn p {
+  margin: 0 0 12px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: rgba(244, 239, 226, .88);
+}
+#kdIn .ki-y {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+#kdIn .ki-y span {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .12);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+#kdIn button {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 13px;
+  border-radius: 12px;
+  border: 0;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+}
+#kdIn .ki-go {
+  background: #ffd36b;
+  color: #12252e;
+}
+#kdIn .ki-no {
+  background: rgba(255, 255, 255, .08);
+  color: #f4efe2;
+}
+#kdb.kd-hl {
+  animation: kdHl 1s ease-in-out infinite;
+}
+@keyframes kdHl {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 211, 107, 0); transform: scale(1); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 211, 107, .55); transform: scale(1.12); }
+}
+/* ===== Üst şerit: tek menü düğmesi (Kudret, Rehber, kamera, müzik, tam ekran) ===== */
+/* Duraklat düğmesi: bir dokunuş durdurur, bir dokunuş devam ettirir. Duraklatılınca üst şerit karartmanın üstünde kalır. */
+#pzb {
+  flex: none;
+  margin-left: auto;
+  width: 40px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 8px;
+}
+#pzb .pz-b {
+  display: block;
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: currentColor;
+}
+#pzb.on {
+  background: linear-gradient(180deg, #ffc955, #f2b134 55%, #dc9a1f);
+  color: #12252e;
+  box-shadow: 0 0 14px rgba(255, 211, 107, .6);
+}
+#pzb.on .pz-b {
+  display: none;
+}
+#pzb.on::before {
+  content: '';
+  margin-left: 3px;
+  border-left: 13px solid currentColor;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+}
+body.pzd #hudT {
+  z-index: 112;
+}
+#optb {
+  position: relative;
+  flex: none;
+  margin-left: 6px;
+  width: 40px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 8px;
+}
+#optb .ob-l {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  transition: transform .2s, opacity .2s;
+}
+#optb[aria-expanded="true"] .ob-l:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+#optb[aria-expanded="true"] .ob-l:nth-child(2) {
+  opacity: 0;
+}
+#optb[aria-expanded="true"] .ob-l:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+#optb em, #kdb em {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #e5566d;
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  box-shadow: 0 0 0 2px #10222b;
+}
+#kdb em {
+  position: static;
+  margin-left: auto;
+  box-shadow: none;
+}
+#optb em:empty, #kdb em:empty {
+  display: none;
+}
+#optb.has {
+  animation: kdGlow 1.6s ease-in-out infinite;
+}
+#optP {
+  position: absolute;
+  right: calc(env(safe-area-inset-right, 0px) + 10px);
+  top: calc(100% + 4px);
+  z-index: 12;
+  width: 220px;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(16, 34, 43, .97);
+  border: 1px solid rgba(255, 211, 107, .25);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
+  animation: opIn .16s ease-out both;
+}
+#optP[hidden] {
+  display: none;
+}
+/* Menü açıkken üst şerit, sıra yazılarının da üstünde dursun */
+#hudT:has(#optP:not([hidden])) {
+  z-index: 13;
+}
+@keyframes opIn {
+  from { opacity: 0; transform: translateY(-6px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+#optP .op-r, #optP #kdb, #optP #gdb, #optP #camb, #optP #musb, #optP #fsb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 11px 10px;
+  border-radius: 10px;
+  background: transparent;
+  border: 0;
+  color: #f4efe2;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  line-height: 1.1;
+}
+#optP .op-r + .op-r {
+  margin-top: 2px;
+}
+#optP .op-r:active {
+  background: rgba(255, 255, 255, .08);
+}
+#optP .op-r[hidden], #optP #fsb[hidden] {
+  display: none;
+}
+#optP .op-r i {
+  flex: none;
+  width: 26px;
+  font-style: normal;
+  font-size: 19px;
+  text-align: center;
+}
+#optP .op-r svg {
+  flex: none;
+  width: 26px;
+  height: 22px;
+}
+#optP .op-r .st {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(63, 185, 138, .2);
+  color: #7fe0b8;
+  font-size: 12px;
+  font-weight: 700;
+}
+#optP .op-r .st::after {
+  content: 'Açık';
+}
+#optP #camb.off {
+  opacity: 1;
+  text-decoration: none;
+}
+#camb.off .st, #musb.off .st {
+  background: rgba(255, 255, 255, .08);
+  color: rgba(244, 239, 226, .55);
+}
+#camb.off .st::after, #musb.off .st::after {
+  content: 'Kapalı';
+}
+#kdb.has {
+  background: rgba(255, 211, 107, .1);
+}
+/* Kudret: dördüncü basamak (özel güç) */
+#kdFx.ult .fx-ic {
+  width: 132px;
+  height: 132px;
+  font-size: 70px;
+  border-width: 4px;
+  box-shadow: 0 0 0 8px rgba(255, 211, 107, .2), 0 0 80px rgba(255, 200, 80, .8);
+}
+#kdFx.ult .fx-crown {
+  width: 64px;
+  height: 46px;
+  margin: 0 auto -10px;
+  position: relative;
+  z-index: 2;
+  animation: fxPop .7s cubic-bezier(.2, 1.6, .4, 1) .25s both;
+}
+#kdFx.ult .fx-crown svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 10px rgba(255, 211, 107, .9));
+}
+#kdFx.ult .fx-ring {
+  top: 102px;
+  width: 132px;
+  height: 132px;
+  margin-left: -66px;
+}
+#kdFx.ult .fx-ring.r2 {
+  animation-delay: .5s;
+}
+#kdFx.ult .fx-sp {
+  top: 168px;
+}
+#kdFx.ult h3 {
+  font-size: 30px;
+  color: #ffd36b;
+  text-shadow: 0 0 18px rgba(255, 211, 107, .6);
+}
+/* Kudret: zorunlu seçim ve öğrenme kutlaması */
 #kdFx {
   position: fixed;
   inset: 0;
