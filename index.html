@@ -2427,6 +2427,7 @@ input, textarea {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255, 211, 107, 0); }
   50% { box-shadow: 0 0 0 4px rgba(255, 211, 107, .45); }
 }
+/* ---- Kudret paneli (sığdırılmış tasarım): her şey tek ekranda, kaydırma gerekmez ---- */
 #kdp {
   position: fixed;
   inset: 0;
@@ -2441,585 +2442,410 @@ input, textarea {
   display: none;
 }
 #kdp .kd-sh {
+  position: relative;
   display: flex;
   flex-direction: column;
-  width: min(560px, 100%);
+  width: min(520px, 100%);
   height: 100%;
-  background: radial-gradient(120% 60% at 50% 0%, #2a2410 0%, #16303c 45%, #0b171d 100%);
-  border-left: 1px solid rgba(255, 211, 107, .18);
-  border-right: 1px solid rgba(255, 211, 107, .18);
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px calc(env(safe-area-inset-bottom, 0px) + 10px);
+  box-sizing: border-box;
+  background:
+    radial-gradient(90% 38% at 50% 0%, rgba(255, 196, 80, .2), transparent 70%),
+    radial-gradient(70% 50% at 50% 100%, rgba(30, 90, 110, .35), transparent 70%),
+    linear-gradient(180deg, #14232b, #0b171d);
+  border-left: 1px solid rgba(255, 211, 107, .16);
+  border-right: 1px solid rgba(255, 211, 107, .16);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   animation: gdIn .22s ease-out both;
 }
 #kdp .kd-hd {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 6px;
+  gap: 8px;
+  min-height: 44px;
 }
 #kdp .kd-hd svg {
   flex: none;
-  width: 38px;
-  height: 33px;
-  filter: drop-shadow(0 2px 6px rgba(255, 190, 60, .35));
+  width: 32px;
+  height: 28px;
+  filter: drop-shadow(0 2px 6px rgba(255, 190, 60, .4));
 }
 #kdp .kd-hd h2 {
-  flex: 1;
   margin: 0;
-  font-size: 22px;
+  font-size: 21px;
+  letter-spacing: .5px;
   color: #ffd36b;
 }
-#kdp .kd-hd h2 small {
-  display: block;
-  margin-top: 2px;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: rgba(244, 239, 226, .65);
+#kdp .kd-pt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 4px 10px 4px 5px;
+  border-radius: 999px;
+  background: rgba(255, 211, 107, .1);
+  border: 1px solid rgba(255, 211, 107, .35);
+  font-size: 11.5px;
+  line-height: 1.15;
+  color: rgba(244, 239, 226, .75);
+}
+#kdp .kd-pt > b {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffe9a8, #f2b134 60%, #b97a10);
+  color: #3a2400;
+  font-size: 15px;
+}
+#kdp .kd-pt.has > b {
+  animation: kdGlow 1.6s ease-in-out infinite;
+}
+#kdp .kd-pt span b {
+  color: #ffd36b;
 }
 #kdp .kd-x {
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border-radius: 50%;
   background: rgba(255, 255, 255, .08);
   border: 1px solid rgba(255, 255, 255, .14);
   color: #f4efe2;
-  font-size: 17px;
+  font-size: 15px;
 }
-#kdp .kd-pt {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 6px 16px 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(255, 211, 107, .08);
-  border: 1px solid rgba(255, 211, 107, .25);
-  font-size: 13.5px;
+#kdp.force .kd-x {
+  visibility: hidden;
+}
+#kdp .kd-force {
+  margin: 6px 0 2px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(255, 211, 107, .25), rgba(255, 211, 107, .06));
+  border: 1px solid rgba(255, 211, 107, .5);
+  font-size: 12.5px;
   line-height: 1.35;
 }
-#kdp .kd-pt b {
-  font-size: 26px;
+#kdp .kd-force b {
   color: #ffd36b;
-  min-width: 26px;
-  text-align: center;
-}
-#kdp .kd-bd {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
-  overscroll-behavior: contain;
 }
 #kdp .kd-tree {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: 6px;
+  margin-top: 8px;
 }
 #kdp .kd-col {
+  --bc: #ffd36b;
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 14px;
-}
-#kdp .kd-col::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 34px;
-  bottom: 30px;
-  width: 2px;
-  margin-left: -1px;
-  background: rgba(255, 211, 107, .18);
+  align-items: center;
+  gap: 3px;
+  padding: 0 0 6px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bc) 13%, transparent), rgba(255, 255, 255, .02) 40%);
+  border: 1px solid color-mix(in srgb, var(--bc) 28%, transparent);
 }
 #kdp .kd-bh {
-  position: relative;
-  text-align: center;
-  font-size: 14px;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 0;
+  border-radius: 13px 13px 0 0;
+  background: color-mix(in srgb, var(--bc) 24%, transparent);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .3px;
+  color: #fff;
+}
+#kdp .kd-bh em {
+  font-style: normal;
+  font-size: 10.5px;
   font-weight: 700;
-  color: rgba(244, 239, 226, .9);
-  padding: 6px 0;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, .25);
+  color: rgba(255, 255, 255, .8);
 }
 #kdp .kd-n {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 10px 4px 9px;
-  border-radius: 14px;
-  background: #10222b;
-  border: 1.5px solid rgba(255, 255, 255, .1);
+  gap: 2px;
+  width: 100%;
+  padding: 4px 2px 0;
+  background: none;
+  border: 0;
   color: #f4efe2;
   font: inherit;
-  font-size: 12.5px;
-  font-weight: 700;
-  line-height: 1.15;
-  text-align: center;
+  -webkit-tap-highlight-color: transparent;
 }
-#kdp .kd-n i {
+/* Basamakları birleştiren çizgi: öğrenildikçe dal rengiyle dolar. */
+#kdp .kd-n + .kd-n::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  width: 3px;
+  height: 12px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, .12);
+}
+#kdp .kd-n.own + .kd-n::before,
+#kdp .kd-n.own + .kd-n.own::before {
+  background: var(--bc);
+  box-shadow: 0 0 6px var(--bc);
+}
+#kdp .kd-n .md {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #22404c, #0e1c23 75%);
+  border: 2px solid rgba(255, 255, 255, .14);
+  box-shadow: inset 0 -3px 6px rgba(0, 0, 0, .35);
+  transition: transform .15s;
+}
+#kdp .kd-n:active .md {
+  transform: scale(.93);
+}
+#kdp .kd-n .md i {
   font-style: normal;
-  font-size: 24px;
+  font-size: 25px;
   line-height: 1;
 }
-#kdp .kd-n small {
+#kdp .kd-n .md u {
+  position: absolute;
+  right: -4px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+  border-radius: 9px;
+  text-decoration: none;
   font-size: 10.5px;
-  font-weight: 600;
-  color: rgba(244, 239, 226, .55);
+  font-weight: 800;
+  line-height: 1;
+  background: #10222b;
+  border: 1.5px solid rgba(255, 255, 255, .25);
+  color: rgba(255, 255, 255, .7);
 }
-#kdp .kd-n.own {
+#kdp .kd-n .nm {
+  max-width: 100%;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.12;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 26px;
+}
+#kdp .kd-n.own .md {
+  border-color: var(--bc);
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--bc) 55%, #fff 10%), color-mix(in srgb, var(--bc) 25%, #0e1c23) 75%);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--bc) 55%, transparent), inset 0 -3px 6px rgba(0, 0, 0, .3);
+}
+#kdp .kd-n.own .md u {
+  background: var(--bc);
+  border-color: #fff;
+  color: #10222b;
+}
+#kdp .kd-n.can .md {
   border-color: #ffd36b;
-  background: linear-gradient(180deg, #3a3012, #1b2a24);
-  box-shadow: 0 0 14px rgba(255, 211, 107, .25);
-}
-#kdp .kd-n.own small {
-  color: #ffd36b;
-}
-#kdp .kd-n.can {
-  border-color: rgba(255, 211, 107, .7);
   animation: kdGlow 1.6s ease-in-out infinite;
 }
-#kdp .kd-n.lock {
-  color: rgba(244, 239, 226, .4);
-  background: #0f1d24;
+#kdp .kd-n.can .md u {
+  background: #ffd36b;
+  border-color: #fff;
+  color: #3a2400;
 }
-#kdp .kd-n.lock i {
+#kdp .kd-n.can .nm {
+  color: #ffe6a6;
+}
+#kdp .kd-n.lock .md i {
   filter: grayscale(1);
+  opacity: .4;
+}
+#kdp .kd-n.lock .nm {
+  color: rgba(244, 239, 226, .45);
+}
+#kdp .kd-n.sel .md {
+  outline: 2.5px solid #8fd3ff;
+  outline-offset: 3px;
+}
+#kdp .kd-n.sel .nm {
+  color: #8fd3ff;
+}
+/* Dördüncü basamak: dalın özel gücü (taç biçimli rozet). */
+#kdp .kd-n.kd-u {
+  margin-top: 4px;
+}
+#kdp .kd-n.kd-u .md {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  transform: rotate(45deg);
+  border: 2px dashed rgba(255, 211, 107, .5);
+  background: linear-gradient(135deg, #2a2410, #0f1d24);
+}
+#kdp .kd-n.kd-u .md i {
+  transform: rotate(-45deg);
+  font-size: 26px;
+}
+#kdp .kd-n.kd-u .md u {
+  transform: rotate(-45deg);
+  right: -6px;
+  bottom: auto;
+  top: -6px;
+}
+#kdp .kd-n.kd-u:active .md {
+  transform: rotate(45deg) scale(.93);
+}
+#kdp .kd-n.kd-u .nm {
+  margin-top: 6px;
+  color: #ffd36b;
+}
+#kdp .kd-n.kd-u.own .md {
+  border: 2px solid #ffd36b;
+  background: radial-gradient(circle at 50% 40%, #8a6a18, #2a2410 75%);
+  box-shadow: 0 0 22px rgba(255, 211, 107, .65);
+  animation: kdGlow 2.2s ease-in-out infinite;
+}
+#kdp .kd-n.kd-u.lock .md i,
+#kdp .kd-n.kd-u.gone .md i {
+  filter: grayscale(.7);
+  opacity: .5;
+}
+#kdp .kd-n.kd-u.gone {
   opacity: .45;
 }
-#kdp .kd-n.lock small {
-  color: rgba(244, 239, 226, .3);
+#kdp .kd-n.kd-u.gone .nm,
+#kdp .kd-n.kd-u.lock .nm {
+  color: rgba(255, 211, 107, .55);
 }
-#kdp .kd-n.sel {
-  outline: 2px solid #8fd3ff;
-  outline-offset: 2px;
-}
+/* Seçilen yeteneğin açıklaması: kalan alanı doldurur, gerekirse yalnızca kendi içinde kayar. */
 #kdp .kd-dt {
-  margin-top: 14px;
-  padding: 12px 14px;
+  flex: 1;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+  padding: 10px 12px;
   border-radius: 14px;
   background: rgba(255, 255, 255, .05);
   border: 1px solid rgba(255, 255, 255, .1);
-  font-size: 14px;
-  line-height: 1.45;
+}
+#kdp .kd-dt .dh {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+#kdp .kd-dt .dh i {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-style: normal;
+  font-size: 21px;
+  background: color-mix(in srgb, var(--bc, #ffd36b) 22%, #0e1c23);
+  border: 1.5px solid var(--bc, #ffd36b);
 }
 #kdp .kd-dt h3 {
-  margin: 0 0 4px;
-  font-size: 17px;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.15;
   color: #ffd36b;
 }
-#kdp .kd-dt p {
-  margin: 0;
-  color: rgba(244, 239, 226, .88);
+#kdp .kd-dt h3 small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(244, 239, 226, .55);
+}
+#kdp .kd-dt .db {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.42;
+  color: rgba(244, 239, 226, .9);
+  overscroll-behavior: contain;
+}
+#kdp .kd-dt .db p {
+  margin: 0 0 4px;
+}
+#kdp .kd-dt .db .sub {
+  font-size: 12px;
+  color: rgba(244, 239, 226, .6);
+}
+#kdp .kd-dt .hint {
+  margin: auto 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(244, 239, 226, .65);
 }
 #kdp .kd-go {
+  flex: none;
   display: block;
   width: 100%;
-  margin-top: 10px;
-  padding: 12px;
+  margin-top: 8px;
+  padding: 11px;
   border-radius: 12px;
   border: 0;
-  background: #ffd36b;
+  background: linear-gradient(180deg, #ffc955, #f2b134 55%, #dc9a1f);
   color: #12252e;
   font: inherit;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 15.5px;
+  font-weight: 800;
+  box-shadow: 0 3px 0 #9a6a10;
 }
 #kdp .kd-go:disabled {
-  background: rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .08);
   color: rgba(244, 239, 226, .55);
+  box-shadow: none;
 }
 #kdp .kd-rv {
-  margin-top: 14px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: rgba(244, 239, 226, .72);
+  display: flex;
+  gap: 5px;
+  margin-top: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+  font-size: 11.5px;
+  color: rgba(244, 239, 226, .65);
+}
+#kdp .kd-rv:empty {
+  display: none;
 }
 #kdp .kd-rv span {
-  display: inline-block;
-  margin: 3px 6px 0 0;
-  padding: 3px 8px;
-  border-radius: 8px;
+  flex: none;
+  padding: 3px 7px;
+  border-radius: 7px;
   background: rgba(255, 255, 255, .06);
-  border-left: 4px solid var(--c);
-}
-#kdp .kd-nt {
-  margin-top: 12px;
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: rgba(244, 239, 226, .55);
+  border-left: 3px solid var(--c);
 }
 #guide .gd-ic svg {
   width: 30px;
   height: 26px;
-}
-/* Kudret: ilk kazanılınca çıkan tanıtım kartı */
-#kdIn {
-  position: fixed;
-  inset: 0;
-  z-index: 116;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: rgba(4, 10, 14, .55);
-  color: #f4efe2;
-  font-family: Bahnschrift, "Segoe UI", system-ui, sans-serif;
-}
-#kdIn .ki-c {
-  width: min(380px, 100%);
-  padding: 22px 20px 18px;
-  border-radius: 20px;
-  text-align: center;
-  background: radial-gradient(120% 70% at 50% 0%, #3a3012 0%, #16303c 55%, #0d1d25 100%);
-  border: 1px solid rgba(255, 211, 107, .45);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .6), 0 0 40px rgba(255, 190, 60, .15);
-  animation: kiIn .35s cubic-bezier(.2, 1.4, .4, 1) both;
-}
-@keyframes kiIn {
-  from { transform: scale(.85); opacity: 0; }
-  to { transform: none; opacity: 1; }
-}
-#kdIn .ki-c svg {
-  width: 74px;
-  height: 63px;
-  filter: drop-shadow(0 4px 14px rgba(255, 190, 60, .45));
-  animation: kiCr 2.4s ease-in-out infinite;
-}
-@keyframes kiCr {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-#kdIn h3 {
-  margin: 8px 0 6px;
-  font-size: 23px;
-  color: #ffd36b;
-}
-#kdIn p {
-  margin: 0 0 12px;
-  font-size: 14.5px;
-  line-height: 1.5;
-  color: rgba(244, 239, 226, .88);
-}
-#kdIn .ki-y {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  margin-bottom: 16px;
-}
-#kdIn .ki-y span {
-  padding: 6px 10px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, .07);
-  border: 1px solid rgba(255, 255, 255, .12);
-  font-size: 13.5px;
-  font-weight: 700;
-}
-#kdIn button {
-  display: block;
-  width: 100%;
-  margin-top: 8px;
-  padding: 13px;
-  border-radius: 12px;
-  border: 0;
-  font: inherit;
-  font-size: 16px;
-  font-weight: 700;
-}
-#kdIn .ki-go {
-  background: #ffd36b;
-  color: #12252e;
-}
-#kdIn .ki-no {
-  background: rgba(255, 255, 255, .08);
-  color: #f4efe2;
-}
-#kdb.kd-hl {
-  animation: kdHl 1s ease-in-out infinite;
-}
-@keyframes kdHl {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 211, 107, 0); transform: scale(1); }
-  50% { box-shadow: 0 0 0 6px rgba(255, 211, 107, .55); transform: scale(1.12); }
-}
-/* ===== Üst şerit: tek menü düğmesi (Kudret, Rehber, kamera, müzik, tam ekran) ===== */
-/* Duraklat düğmesi: bir dokunuş durdurur, bir dokunuş devam ettirir. Duraklatılınca üst şerit karartmanın üstünde kalır. */
-#pzb {
-  flex: none;
-  margin-left: auto;
-  width: 40px;
-  height: 32px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  border-radius: 8px;
-}
-#pzb .pz-b {
-  display: block;
-  width: 4px;
-  height: 14px;
-  border-radius: 2px;
-  background: currentColor;
-}
-#pzb.on {
-  background: linear-gradient(180deg, #ffc955, #f2b134 55%, #dc9a1f);
-  color: #12252e;
-  box-shadow: 0 0 14px rgba(255, 211, 107, .6);
-}
-#pzb.on .pz-b {
-  display: none;
-}
-#pzb.on::before {
-  content: '';
-  margin-left: 3px;
-  border-left: 13px solid currentColor;
-  border-top: 8px solid transparent;
-  border-bottom: 8px solid transparent;
-}
-body.pzd #hudT {
-  z-index: 112;
-}
-#optb {
-  position: relative;
-  flex: none;
-  margin-left: 6px;
-  width: 40px;
-  height: 32px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  border-radius: 8px;
-}
-#optb .ob-l {
-  display: block;
-  width: 18px;
-  height: 2px;
-  border-radius: 2px;
-  background: currentColor;
-  transition: transform .2s, opacity .2s;
-}
-#optb[aria-expanded="true"] .ob-l:nth-child(1) {
-  transform: translateY(6px) rotate(45deg);
-}
-#optb[aria-expanded="true"] .ob-l:nth-child(2) {
-  opacity: 0;
-}
-#optb[aria-expanded="true"] .ob-l:nth-child(3) {
-  transform: translateY(-6px) rotate(-45deg);
-}
-#optb em, #kdb em {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 4px;
-  border-radius: 9px;
-  background: #e5566d;
-  color: #fff;
-  font-size: 11px;
-  font-style: normal;
-  font-weight: 700;
-  line-height: 17px;
-  text-align: center;
-  box-shadow: 0 0 0 2px #10222b;
-}
-#kdb em {
-  position: static;
-  margin-left: auto;
-  box-shadow: none;
-}
-#optb em:empty, #kdb em:empty {
-  display: none;
-}
-#optb.has {
-  animation: kdGlow 1.6s ease-in-out infinite;
-}
-#optP {
-  position: absolute;
-  right: calc(env(safe-area-inset-right, 0px) + 10px);
-  top: calc(100% + 4px);
-  z-index: 12;
-  width: 220px;
-  padding: 6px;
-  border-radius: 14px;
-  background: rgba(16, 34, 43, .97);
-  border: 1px solid rgba(255, 211, 107, .25);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
-  animation: opIn .16s ease-out both;
-}
-#optP[hidden] {
-  display: none;
-}
-/* Menü açıkken üst şerit, sıra yazılarının da üstünde dursun */
-#hudT:has(#optP:not([hidden])) {
-  z-index: 13;
-}
-@keyframes opIn {
-  from { opacity: 0; transform: translateY(-6px) scale(.97); }
-  to { opacity: 1; transform: none; }
-}
-#optP .op-r, #optP #kdb, #optP #gdb, #optP #camb, #optP #musb, #optP #fsb {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  margin: 0;
-  padding: 11px 10px;
-  border-radius: 10px;
-  background: transparent;
-  border: 0;
-  color: #f4efe2;
-  font: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  text-align: left;
-  line-height: 1.1;
-}
-#optP .op-r + .op-r {
-  margin-top: 2px;
-}
-#optP .op-r:active {
-  background: rgba(255, 255, 255, .08);
-}
-#optP .op-r[hidden], #optP #fsb[hidden] {
-  display: none;
-}
-#optP .op-r i {
-  flex: none;
-  width: 26px;
-  font-style: normal;
-  font-size: 19px;
-  text-align: center;
-}
-#optP .op-r svg {
-  flex: none;
-  width: 26px;
-  height: 22px;
-}
-#optP .op-r .st {
-  margin-left: auto;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(63, 185, 138, .2);
-  color: #7fe0b8;
-  font-size: 12px;
-  font-weight: 700;
-}
-#optP .op-r .st::after {
-  content: 'Açık';
-}
-#optP #camb.off {
-  opacity: 1;
-  text-decoration: none;
-}
-#camb.off .st, #musb.off .st {
-  background: rgba(255, 255, 255, .08);
-  color: rgba(244, 239, 226, .55);
-}
-#camb.off .st::after, #musb.off .st::after {
-  content: 'Kapalı';
-}
-#kdb.has {
-  background: rgba(255, 211, 107, .1);
-}
-/* Kudret: dördüncü basamak (özel güç) */
-#kdp .kd-n.kd-u {
-  padding-top: 18px;
-  border-width: 2px;
-  border-style: dashed;
-  border-color: rgba(255, 211, 107, .45);
-  background: linear-gradient(180deg, #1d1a0e, #0f1d24);
-}
-#kdp .kd-n.kd-u em {
-  position: absolute;
-  top: -8px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 1px 7px;
-  border-radius: 8px;
-  background: #ffd36b;
-  color: #3a2400;
-  font-style: normal;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: .5px;
-  white-space: nowrap;
-}
-#kdp .kd-n.kd-u.own {
-  border-style: solid;
-  border-color: #ffd36b;
-  background: radial-gradient(circle at 50% 30%, #6b5212, #2a2410 70%);
-  box-shadow: 0 0 22px rgba(255, 211, 107, .55), inset 0 0 12px rgba(255, 211, 107, .25);
-  animation: kdGlow 2.2s ease-in-out infinite;
-}
-#kdp .kd-n.kd-u.lock i,
-#kdp .kd-n.kd-u.gone i {
-  filter: grayscale(.6);
-  opacity: .55;
-}
-#kdp .kd-n.kd-u.gone {
-  opacity: .5;
-}
-#kdFx.ult .fx-ic {
-  width: 132px;
-  height: 132px;
-  font-size: 70px;
-  border-width: 4px;
-  box-shadow: 0 0 0 8px rgba(255, 211, 107, .2), 0 0 80px rgba(255, 200, 80, .8);
-}
-#kdFx.ult .fx-crown {
-  width: 64px;
-  height: 46px;
-  margin: 0 auto -10px;
-  position: relative;
-  z-index: 2;
-  animation: fxPop .7s cubic-bezier(.2, 1.6, .4, 1) .25s both;
-}
-#kdFx.ult .fx-crown svg {
-  width: 100%;
-  height: 100%;
-  filter: drop-shadow(0 0 10px rgba(255, 211, 107, .9));
-}
-#kdFx.ult .fx-ring {
-  top: 102px;
-  width: 132px;
-  height: 132px;
-  margin-left: -66px;
-}
-#kdFx.ult .fx-ring.r2 {
-  animation-delay: .5s;
-}
-#kdFx.ult .fx-sp {
-  top: 168px;
-}
-#kdFx.ult h3 {
-  font-size: 30px;
-  color: #ffd36b;
-  text-shadow: 0 0 18px rgba(255, 211, 107, .6);
-}
-/* Kudret: zorunlu seçim ve öğrenme kutlaması */
-#kdp .kd-force {
-  margin: 0 16px 10px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, rgba(255, 211, 107, .22), rgba(255, 211, 107, .06));
-  border: 1px solid rgba(255, 211, 107, .55);
-  font-size: 14px;
-  line-height: 1.45;
-}
-#kdp .kd-force b {
-  display: block;
-  margin-bottom: 3px;
-  font-size: 17px;
-  color: #ffd36b;
-}
-#kdp.force .kd-x {
-  visibility: hidden;
 }
 #kdFx {
   position: fixed;
@@ -22119,6 +21945,8 @@ function crownSVG() {
     `<circle cx="13" cy="13" r="1.5" fill="#3fb98a" stroke="#4a2f06" stroke-width=".7"/><circle cx="8.6" cy="14" r="1" fill="#8fd3ff" stroke="#4a2f06" stroke-width=".6"/><circle cx="17.4" cy="14" r="1" fill="#8fd3ff" stroke="#4a2f06" stroke-width=".6"/></svg>`;
 }
 let kdSel = -1;
+// Dal renkleri: Ordu kırmızı, Hazine altın, Halk yeşil.
+const KDC = ['#e0604f', '#f2b134', '#5cc27a'];
 function kdRender() {
   const box = document.getElementById('kdp');
   if (!box || box.hidden)
@@ -22130,48 +21958,57 @@ function kdRender() {
     if (!fn) {
       fn = document.createElement('div');
       fn.className = 'kd-force';
-      box.querySelector('.kd-pt').before(fn);
+      box.querySelector('.kd-tree').before(fn);
     }
-    fn.innerHTML = `<b>👑 Yeni kudret kazandın!</b>Her ${KDR_EVERY} turda 1 kudret gelir. Devam etmek için bir yetenek seç: parlayan bir yeteneğe dokun, sonra <b style="display:inline;font-size:inherit">Öğren</b>. Bütün ağacı bitiremezsin; hangi yolda derinleşeceğini sen seçersin.`;
+    fn.innerHTML = `<b>👑 Yeni kudret kazandın!</b> Parlayan bir yeteneğe dokun ve öğren; devam etmek için seçmen gerek.`;
   }
   else if (fn)
     fn.remove();
-  box.querySelector('.kd-pt').innerHTML = `<b>${pt}</b><span>${pt ? `Harcanacak kudretin var. Parlayan bir yeteneğe dokun.` : 'Harcanacak kudretin yok.'}<br>Sonraki kudret: <b style="font-size:inherit">tur ${nxt}</b> (${nxt - rd} tur sonra).</span>`;
+  const pe = box.querySelector('.kd-pt');
+  pe.classList.toggle('has', pt > 0);
+  pe.innerHTML = `<b>${pt}</b><span>${pt ? 'kudretin var' : 'kudret yok'}<br>sonraki: <b>tur ${nxt}</b></span>`;
   const st = i => kh(0, i) ? 'own' : kdCan(0, i) ? 'can' : 'lock';
-  box.querySelector('.kd-tree').innerHTML = KDB.map((B, b) => `<div class="kd-col"><div class="kd-bh">${B.ic} ${B.nm}</div>` +
-    [0, 1, 2].map(j => {
-      const i = b * 3 + j;
-      const k = KD[i];
-      const s = st(i);
-      return `<button class="kd-n ${s}${kdSel == i ? ' sel' : ''}" data-i="${i}"><i>${k.ic}</i>${k.nm}<small>${s == 'own' ? '✓ öğrenildi' : s == 'can' ? 'öğrenilebilir' : (j ? `önce ${KD[i - 1].nm}` : 'kudret yok')}</small></button>`;
-    }).join('') + kuNode(b) + '</div>').join('');
+  const bdg = { own: '✓', can: '+', lock: '🔒' };
+  box.querySelector('.kd-tree').innerHTML = KDB.map((B, b) => {
+    const n = [0, 1, 2].filter(j => kh(0, b * 3 + j)).length;
+    return `<div class="kd-col" style="--bc:${KDC[b]}"><div class="kd-bh">${B.ic} ${B.nm} <em>${n}/3</em></div>` +
+      [0, 1, 2].map(j => {
+        const i = b * 3 + j;
+        const k = KD[i];
+        const s = st(i);
+        return `<button class="kd-n ${s}${kdSel == i ? ' sel' : ''}" data-i="${i}" aria-label="${k.nm}"><span class="md"><i>${k.ic}</i><u>${s == 'lock' ? (j && !kh(0, i - 1) ? '🔒' : j + 1) : bdg[s]}</u></span><span class="nm">${k.nm}</span></button>`;
+      }).join('') + kuNode(b) + '</div>';
+  }).join('');
   const dt = box.querySelector('.kd-dt');
   if (kdSel < 0) {
-    dt.innerHTML = '<p>Bir yeteneğe dokun: ne işe yaradığı burada görünür.</p>';
+    dt.style.removeProperty('--bc');
+    dt.innerHTML = `<p class="hint">Bir yeteneğe dokun, ne işe yaradığı burada görünür.<br>Her ${KDR_EVERY} turda 1 kudret gelir; yetenekler her kolda yukarıdan aşağı açılır. Bir yolun 3 yeteneğini bitirince altındaki <b style="color:#ffd36b">👑 özel güç</b> senin olur.</p>`;
   }
   else if (kdSel >= 9) {
     const b = kdSel - 9;
     const u = KU[b];
     const n = [0, 1, 2].filter(j => kh(0, b * 3 + j)).length;
-    const stt = ku(0, b) ? `<button class="kd-go" disabled>👑 Özel gücün${b == 2 ? (kuS[0] ? ' · başkent kurtuluşu duruyor' : ' · başkent kurtuluşu kullanıldı') : ''}</button>` : kus[0] >= 0 ? `<button class="kd-go" disabled>Özel gücün ${KU[kus[0]].nm}; yalnızca ilk tamamlanan yolun özel gücü alınır</button>` : `<button class="kd-go" disabled>${KDB[b].nm} yolunun 3 yeteneğini öğren (${n}/3)</button>`;
-    dt.innerHTML = `<h3>${u.ic} ${u.nm} <small style="font-size:12px;color:#ffd36b">${KDB[b].nm} yolu · 👑 özel güç</small></h3><p>${u.ef}</p><p style="font-size:12.5px;color:rgba(244,239,226,.65)">Bir yolun 3 yeteneğini de öğrenince o yolun özel gücü kendiliğinden açılır. Her devlet yalnızca <b>ilk</b> tamamladığı yolun özel gücünü alır.</p>` + stt;
+    dt.style.setProperty('--bc', KDC[b]);
+    const stt = ku(0, b) ? `<button class="kd-go" disabled>👑 Özel gücün${b == 2 ? (kuS[0] ? ' · başkent kurtuluşu duruyor' : ' · başkent kurtuluşu kullanıldı') : ''}</button>` : kus[0] >= 0 ? `<button class="kd-go" disabled>Özel gücün zaten ${KU[kus[0]].nm}</button>` : `<button class="kd-go" disabled>${KDB[b].nm} yolunun 3 yeteneğini öğren (${n}/3)</button>`;
+    dt.innerHTML = `<div class="dh"><i>${u.ic}</i><h3>${u.nm}<small>${KDB[b].nm} yolu · 👑 özel güç</small></h3></div><div class="db"><p>${u.ef}</p><p class="sub">Yalnızca ilk tamamladığın yolun özel gücünü alırsın.</p></div>` + stt;
   }
   else {
     const k = KD[kdSel];
     const s = st(kdSel);
     const busyNow = turn != 0 || busy || over || dr;
-    dt.innerHTML = `<h3>${k.ic} ${k.nm} <small style="font-size:12px;color:rgba(244,239,226,.6)">${KDB[Math.floor(kdSel / 3)].nm} yolu · ${kdSel % 3 + 1}. basamak</small></h3><p>${k.ef}</p>` +
-      (s == 'own' ? '<button class="kd-go" disabled>✓ Öğrenildi</button>' : `<button class="kd-go" data-l="${kdSel}" ${s == 'can' && !busyNow ? '' : 'disabled'}>${s == 'can' ? (busyNow ? 'Sıran gelince öğrenebilirsin' : 'Öğren (1 kudret)') : kdSel % 3 && !kh(0, kdSel - 1) ? `Önce ${KD[kdSel - 1].nm} öğrenilmeli` : 'Kudretin yok'}</button>`);
+    dt.style.setProperty('--bc', KDC[Math.floor(kdSel / 3)]);
+    dt.innerHTML = `<div class="dh"><i>${k.ic}</i><h3>${k.nm}<small>${KDB[Math.floor(kdSel / 3)].nm} yolu · ${kdSel % 3 + 1}. basamak</small></h3></div><div class="db"><p>${k.ef}</p></div>` +
+      (s == 'own' ? '<button class="kd-go" disabled>✓ Öğrenildi</button>' : `<button class="kd-go" data-l="${kdSel}" ${s == 'can' && !busyNow ? '' : 'disabled'}>${s == 'can' ? (busyNow ? 'Sıran gelince öğrenebilirsin' : 'Öğren · 1 kudret') : kdSel % 3 && !kh(0, kdSel - 1) ? `Önce ${KD[kdSel - 1].nm} öğrenilmeli` : 'Kudretin yok'}</button>`);
   }
   const rv = [...Array(P).keys()].filter(q => q > 0 && cnt(q) > 0 && kyol[q] >= 0);
-  box.querySelector('.kd-rv').innerHTML = rv.length ? 'Rakiplerin yolu: ' + rv.map(q => `<span style="--c:${COL[q]}">${PN[q]}: ${KDB[kyol[q]].ic} ${KDB[kyol[q]].nm} (${kdN(q)})${kus[q] >= 0 ? ` · 👑 ${KU[kus[q]].nm}` : ''}</span>`).join('') : '';
+  box.querySelector('.kd-rv').innerHTML = rv.map(q => `<span style="--c:${COL[q]}">${PN[q]} ${KDB[kyol[q]].ic} ${kdN(q)}${kus[q] >= 0 ? ` · 👑 ${KU[kus[q]].ic}` : ''}</span>`).join('');
 }
 // Ağacın dördüncü basamağı: dalın özel gücü.
 function kuNode(b) {
   const u = KU[b];
   const n = [0, 1, 2].filter(j => kh(0, b * 3 + j)).length;
   const st = ku(0, b) ? 'own' : kus[0] >= 0 ? 'gone' : 'lock';
-  return `<button class="kd-n kd-u ${st}${kdSel == 9 + b ? ' sel' : ''}" data-i="${9 + b}"><em>👑 ÖZEL GÜÇ</em><i>${u.ic}</i>${u.nm}<small>${st == 'own' ? (b == 2 && !kuS[0] ? 'senin · kurtuluş kullanıldı' : 'senin!') : st == 'gone' ? 'başka yolu seçtin' : `${n}/3 yetenek`}</small></button>`;
+  return `<button class="kd-n kd-u ${st}${kdSel == 9 + b ? ' sel' : ''}" data-i="${9 + b}" aria-label="Özel güç: ${u.nm}"><span class="md"><i>${u.ic}</i><u>${st == 'own' ? '👑' : st == 'gone' ? '✕' : `${n}/3`}</u></span><span class="nm">${u.nm}</span></button>`;
 }
 // Özel güç açılınca ne değişti.
 function kuDiff(b) {
@@ -22315,9 +22152,8 @@ function openKudret(force) {
     box = document.createElement('div');
     box.id = 'kdp';
     box.hidden = true;
-    box.innerHTML = `<div class="kd-sh" role="dialog" aria-label="Kudret"><div class="kd-hd">${crownSVG()}<h2>Kudret<small>Devlet yolu: her ${KDR_EVERY} turda 1 kudret kazanırsın</small></h2><button class="kd-x" aria-label="Kapat">✕</button></div>` +
-      `<div class="kd-pt"></div><div class="kd-bd"><div class="kd-tree"></div><div class="kd-dt"></div><div class="kd-rv"></div>` +
-      `<p class="kd-nt">Her kolda yetenekler yukarıdan aşağıya sırayla açılır. Bütün ağacı bitiremezsin: hangi yolda derinleşeceğini sen seçersin. Botlar da oyun başında bir yol seçer.</p></div></div>`;
+    box.innerHTML = `<div class="kd-sh" role="dialog" aria-label="Kudret"><div class="kd-hd">${crownSVG()}<h2>Kudret</h2><div class="kd-pt"></div><button class="kd-x" aria-label="Kapat">✕</button></div>` +
+      `<div class="kd-tree"></div><div class="kd-dt"></div><div class="kd-rv"></div></div>`;
     document.body.appendChild(box);
     box.querySelector('.kd-x').onclick = () => {
       if (!box.classList.contains('force'))
