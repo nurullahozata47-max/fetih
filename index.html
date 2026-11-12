@@ -3456,12 +3456,15 @@ const KD = [
 // kuS[p]: Yıkılmaz Devlet'in tek seferlik başkent kurtuluşu duruyor mu. rsR[p]: rüşvetin verildiği son tur.
 // pcB/pcT/pcU[q]: q botundan barış satın alan, q'nun yükleneceği hedef ve barışın son turu. pcR[p]: son barış alımı.
 // rin[o]: o kaynaklı kötü huylu isyanı çıkaran devlet (Yıkılmaz Devlet: isyan olgunlaşınca bölgeler ona geçer).
-const RSC = 15;
+const RSC = 20;
+// Botlar bir insan oyuncunun bölgesine en fazla 2 turda bir rüşvet verir.
+const RSHGAP = 2;
+const rsH = [];
 const PCC = 50;
 const PCT = 3;
 const PCCD = 5;
 const KU = [
-  { ic: '🗡️', nm: 'Kılıç Hakkı', ef: 'Kazandığın her savaşta öldürdüğün düşman askerlerinin üçte biri esir düşer ve fethettiğin bölgede senin için savaşır. Bir rakip sana saldırıp başaramazsa, savunan askerlerinin yarısı karşı hücuma geçer ve saldırının geldiği bölgeyi alır; fetih hakkından düşmez (başkent, surlu ve isyandaki bölgeler alınmaz).' },
+  { ic: '🗡️', nm: 'Kılıç Hakkı', ef: 'Kazandığın her savaşta öldürdüğün düşman askerlerinin yarısı esir düşer ve fethettiğin bölgede senin için savaşır. Bir rakip sana saldırıp başaramazsa, savunan askerlerinin yarısı karşı hücuma geçer ve saldırının geldiği bölgeyi alır; fetih hakkından düşmez (başkent, surlu ve isyandaki bölgeler alınmaz).' },
   { ic: '⚖️', nm: 'Altının Gücü', ef: `<b>Rüşvet:</b> rakibin sınırındaki bir bölgenin komutanına asker başına ${RSC} altın verirsin; bölge savaşmadan, askerleriyle birlikte sana geçer (turda 1, fetih hakkından düşmez; başkent ve surlu bölgeler satın alınamaz). <b>Barış satın al:</b> bir bota ${PCC} altın verirsin; ${PCT} tur sana saldırmaz ve senin seçtiğin rakibe yüklenir (${PCCD} turda bir).` },
   { ic: '🏰', nm: 'Yıkılmaz Devlet', ef: 'Başkentin düşerse devletin bölünmez ve yıkılmaz; başkent kendiliğinden en güvenli bölgene taşınır (oyunda bir kez). Refah %20\'nin altına inse de ülken ikiye bölünmez. Rakip bölgesinde iki katı fiyatına <b>kötü huylu isyan</b> çıkarabilirsin; isyan bastırılamazsa isyandaki bölgeler bağımsız devlet kurmaz, sana katılır.' }
 ];
@@ -3572,6 +3575,64 @@ let tcd;
 let dock;
 let dk;
 let wbase;
+// Deniz zemininin ham verisi (bellekte kalır): telefon arka plandan dönünce tuval içerikleri silinirse
+// deniz zemini bundan yeniden çizilir.
+let seaSrc = null;
+function seaCompose(sim, shim, rim) {
+  const mk = () => {
+    const cv0 = document.createElement('canvas');
+    cv0.width = W;
+    cv0.height = H;
+    return cv0;
+  };
+  const sea = mk();
+  sea.getContext('2d').putImageData(sim, 0, 0);
+  const sh = mk();
+  sh.getContext('2d').putImageData(shim, 0, 0);
+  const rings = rim.map(im => {
+    const r = mk();
+    r.getContext('2d').putImageData(im, 0, 0);
+    return r;
+  });
+  const wb = document.createElement('canvas');
+  wb.width = W * S;
+  wb.height = H * S;
+  const wc = wb.getContext('2d');
+  wc.imageSmoothingEnabled = false;
+  wc.drawImage(sea, 0, 0, W * S, H * S);
+  wc.drawImage(sh, 3, 4, W * S, H * S);
+  return { wb, rings };
+}
+// Harita tuvallerini baştan çiz: Android, uygulama arka plana geçince ya da ekran kilitlenince tuvallerin
+// içeriğini silebiliyor (harita boş deniz gibi görünür). Dönüşte bütün ara katmanlar yeniden üretilir.
+function mapRefresh() {
+  if (!cell || !cen)
+    return;
+  try {
+    if (seaSrc) {
+      const r = seaCompose(seaSrc.sim, seaSrc.shim, seaSrc.rim);
+      wbase = r.wb;
+      rpath = r.rings;
+    }
+    bordCell = null;
+    forCell = null;
+    durMK = null;
+    lastWave = 0;
+    ui();
+  }
+  catch (e) {
+    console.error(e);
+  }
+}
+function mapRefreshSoon() {
+  [60, 400, 1200].forEach(d => setTimeout(mapRefresh, d));
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden)
+    mapRefreshSoon();
+});
+addEventListener('pageshow', mapRefreshSoon);
+addEventListener('focus', mapRefreshSoon);
 let rpath;
 let sparks;
 let straits;
@@ -6368,17 +6429,8 @@ function mapFinish(cl, ctn, am) {
     if (d >= 3 && Math.random() < .006)
       spk.push([i % W, (i / W) | 0, Math.random() * 6.28]);
   }
-  sx0.putImageData(sim, 0, 0);
-  shx.putImageData(shim, 0, 0);
-  rings.forEach((r, k) => r.getContext('2d').putImageData(rim[k], 0, 0));
-  const wb = document.createElement('canvas');
-  wb.width = W * S;
-  wb.height = H * S;
-  const wc = wb.getContext('2d');
-  wc.imageSmoothingEnabled = false;
-  wc.drawImage(sea, 0, 0, W * S, H * S);
-  wc.drawImage(sh, 3, 4, W * S, H * S);
-  const rp = rings;
+  const { wb, rings: rp } = seaCompose(sim, shim, rim);
+  seaSrc = { sim, shim, rim };
   HD = ad.map((_, s0) => {
     const d = Array(N).fill(99);
     d[s0] = 0;
@@ -9407,7 +9459,7 @@ async function battle(a, t, sea, F) {
   let A = F != null ? F : arm[a] - 1;
   let D = arm[t];
   const sent = A;
-  // Kılıç Hakkı: savaşın başındaki savunan sayısı (kazanılırsa üçte biri esir düşer).
+  // Kılıç Hakkı: savaşın başındaki savunan sayısı (kazanılırsa yarısı esir düşer).
   const D0k = D;
 
   // Dayanıklılık (savaş zarları): Yüksek bölgenin askeri her kayıpta DURB ihtimalle kurtulur, Zayıf bölgeninki DURB ihtimalle bir asker fazla kaybeder.
@@ -9533,9 +9585,9 @@ async function battle(a, t, sea, F) {
         $('log').textContent += ` Süvarilerin ${NM[t]} bölgesini yağmaladı: +${yg} altın.`;
     }
     arm[t] = A;
-    // Kılıç Hakkı (Ordu özel gücü): öldürülen savunanların üçte biri esir düşüp fatihin ordusuna katılır.
-    if (ku(me, 0) && D0k >= 3) {
-      const pr = Math.floor(D0k / 3);
+    // Kılıç Hakkı (Ordu özel gücü): öldürülen savunanların yarısı esir düşüp fatihin ordusuna katılır.
+    if (ku(me, 0) && D0k >= 2) {
+      const pr = Math.floor(D0k / 2);
       arm[t] += pr;
       if (me == 0 || old == 0 || Vg.has(t))
         fl.push({ t, dx: 0, dy: 16, txt: `🗡️ +${pr} esir`, col: '#ffe08a', t0: performance.now() + 700 });
@@ -13393,6 +13445,8 @@ if (wg) {
   wvc.height = H * S / 2;
 }
 const fxc = $('fxc');
+// Tarayıcı tuvalin çizim bağlamını kaybedip geri verirse harita baştan çizilir.
+[cv, wvc, fxc].forEach(el => el && el.addEventListener && el.addEventListener('contextrestored', mapRefreshSoon));
 const g = fxc.getContext ? fxc.getContext('2d') : null;
 if (g) {
   fxc.width = W * S;
@@ -18101,8 +18155,10 @@ async function kuBot(p) {
   if (!ku(p, 1) || ONLINE)
     return;
   if (rsR[p] != rd && Math.random() < .75) {
-    const L = [...Array(N).keys()].filter(t => canBribe(p, t) && !pcNo(p, own[t]) && bribeC(t) <= gold[p] * .8).sort((x, y) => ((HUM.has(own[y]) ? 1 : 0) - (HUM.has(own[x]) ? 1 : 0)) || (arm[y] - arm[x]));
+    const L = [...Array(N).keys()].filter(t => canBribe(p, t) && !pcNo(p, own[t]) && bribeC(t) <= gold[p] * .8 && !(HUM.has(own[t]) && rd - (rsH[p] ?? -99) < RSHGAP)).sort((x, y) => ((HUM.has(own[y]) ? 1 : 0) - (HUM.has(own[x]) ? 1 : 0)) || (arm[y] - arm[x]));
     if (L.length) {
+      if (HUM.has(own[L[0]]))
+        rsH[p] = rd;
       await bribe(p, L[0]);
       await sleep(300);
     }
@@ -18897,6 +18953,7 @@ function setPause(v) {
     if (o)
       o.remove();
     Mus.hold(false);
+    mapRefresh();
     const q = pauseQ;
     pauseQ = [];
     q.forEach(r => r());
@@ -22096,7 +22153,7 @@ function kuNode(b) {
 // Özel güç açılınca ne değişti.
 function kuDiff(b) {
   return [
-    [['Kazandığın savaşta esir', 'yok', 'öldürülenin üçte biri'], ['Sana yapılan başarısız saldırı', '', 'karşı hücumla bölge senin'], ['Fetih hakkı', '', 'karşı hücumda düşmez']],
+    [['Kazandığın savaşta esir', 'yok', 'öldürülenin yarısı'], ['Sana yapılan başarısız saldırı', '', 'karşı hücumla bölge senin'], ['Fetih hakkı', '', 'karşı hücumda düşmez']],
     [['Rüşvetle bölge almak', '', `asker başına ${RSC} altın`], ['Barış satın almak', '', `${PCC} altın · ${PCT} tur`], ['Satın alınan bot', '', 'senin seçtiğin rakibe yüklenir']],
     [['Başkent düşünce', 'bölünme ya da yıkılış', 'bir kez kurtulursun'], ['Refah %20 altında', 'ülke ikiye bölünür', 'bölünmez'], ['Kötü huylu isyan çıkarma', 'yok', '2 katı fiyat'], ['Bastırılamayan kötü huylu isyan', 'yeni devlet', 'bölgeler sana katılır']]
   ][b];
