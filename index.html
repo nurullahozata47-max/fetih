@@ -4222,6 +4222,14 @@ async function blkBomb(s) {
   const p = b.p;
   const dur = 1600;
   const nS = blkN(b);
+  // Bu gemi kıyını ilk kez bombalıyorsa kamera gemiye gider: düşman gemisini ilk seferde fark edersin.
+  if (own[t] == 0 && p != 0 && !b.seen0) {
+    b.seen0 = 1;
+    banner(`💣 ${PN[p]} gemisi ${NM[t]} kıyını bombalıyor!`, COL[p]);
+    await camFocusPx(b.x, b.y);
+    await sleep(300);
+  }
+  let bldX = false;
   const vol = wall[t] > 0 ? null : shipVolley(t, nS, true);
   // Surlara her gemi ayrı %65 şansla işler.
   let wh = 0;
@@ -4313,8 +4321,16 @@ async function blkBomb(s) {
       nav.push({ k: 'dust', x: cen[t][0] * S, y: cen[t][1] * S, big: 1, t0: performance.now(), dur: 900 });
       fl.push({ t, dx: 0, dy: 18, txt: `${nm[0].toUpperCase() + nm.slice(1)} yıkıldı!`, col: '#ffb04a', t0: performance.now() + 300 });
       txt += `, ${nm} yıkıldı`;
+      bldX = true;
     }
   const msg = (p == 0 ? (nS > 1 ? 'Bombardıman gemilerin' : 'Bombardıman gemin') : `${PN[p]} ${nS > 1 ? 'gemileri' : 'gemisi'}`) + ` ${NM[t]} kıyısını bombaladı: ${txt}.`;
+  // Bombardımanla bir bina yıkıldıysa (senin ya da senin gemin yıktıysa) kamera oraya gider.
+  if (bldX && (p == 0 || own[t] == 0)) {
+    camFocusPx(cen[t][0] * S, cen[t][1] * S);
+    if (own[t] == 0)
+      banner(`🏚 ${NM[t]}: bina yıkıldı!`, COL[p]);
+    await sleep(700);
+  }
   if (p == 0 || own[t] == 0 || Vg.has(t)) {
     $('log').textContent = msg;
     if (turn != 0 && own[t] == 0)
@@ -4492,10 +4508,18 @@ async function shipDuel(a, ub) {
       P0.push([sx, sy]);
   }
   const camOK = p == 0 || q == 0 || Vg.has(b.t);
-  if (camOK)
+  // Senin gemin savaşıyorsa (saldıran ya da saldırılan) kamera gemiyi düelloya kadar izler.
+  const imp = p == 0 || q == 0;
+  if (camOK && !imp)
     camShow(a, b.t);
+  if (q == 0 && p != 0)
+    banner(`⚔️ ${PN[p]} gemisi bombardıman gemine saldırıyor!`, COL[p]);
   const d1 = pathNav(P0, COL[p], true, 3400);
+  if (imp)
+    camTrack(nav[nav.length - 1], p, true);
   await sleep(d1);
+  if (imp)
+    camFocusPx((sx + b.x) / 2, (sy + b.y) / 2, 300);
   if (!blk[ub]) {
     await shipHome(a, P0, false, COL[p], PN[p]);
     return;
@@ -4848,6 +4872,12 @@ async function blockade(u, t) {
   const mm = minedBy(t, p);
   const dur = Math.min(4200, Math.max(1400, L * 5));
   awayL[u] += nF;
+  // İlk sefer: senin gemin ya da senin kıyına gelen düşman gemisi yol boyunca kamerayla izlenir.
+  const imp = p == 0 || own[t] == 0;
+  if (own[t] == 0 && p != 0) {
+    banner(`⚠ ${PN[p]} büyük gemisi kıyına geliyor!`, COL[p]);
+    $('log').textContent = `${PN[p]} bir büyük gemiyi ${NM[t]} kıyını bombalamaya gönderdi!`;
+  }
   if (mm >= 0) {
     const kb = boomPoint(mm, P0, .8);
     const P1 = P0.slice(0, kb + 1);
@@ -4856,6 +4886,7 @@ async function blockade(u, t) {
     const d1 = Math.min(3600, Math.max(1200, L1 * 5));
     const [bx, by] = P1[P1.length - 1];
     nav.push({ k: 'sail', pts: P1, cum: c1, L: L1, n: nF, big: true, cx: bx, cy: by, col: COL[p], t0: performance.now(), dur: d1, mode: 'x', noLand: 1 });
+    camTrack(nav[nav.length - 1], p, imp);
     await sleep(d1);
     nav.push({ k: 'sink', x: bx, y: by, n: 1, big: true, col: COL[p], t0: performance.now(), dur: 2600 });
     sinkMsg(mm, u, 1, 0, t);
@@ -4870,14 +4901,18 @@ async function blockade(u, t) {
   const [ex, ey] = farSpot(ex0, ey0);
   const [dx0, dy0] = dockSea(u);
   const RT = seaRoute(dx0, dy0, ex, ey);
-  if (RT)
-    await sleep(pathNav(RT, COL[p], true, 4200));
+  if (RT) {
+    const dR = pathNav(RT, COL[p], true, 4200);
+    camTrack(nav[nav.length - 1], p, imp);
+    await sleep(dR);
+  }
   else {
     nav.push({ k: 'sail', pts: P0, cum, L, n: nF, big: true, cx: sp0.cx, cy: sp0.cy, col: COL[p], t0: performance.now(), dur, mode: 'x', noLand: 1 });
+    camTrack(nav[nav.length - 1], p, imp);
     await sleep(dur);
   }
   const route = blkRoute(u, t, p);
-  blk[s] = { t, p, route, k: 0, x: ex, y: ey, hp: SHIPHP, n: 1 };
+  blk[s] = { t, p, route, k: 0, x: ex, y: ey, hp: SHIPHP, n: 1, seen0: own[t] == 0 ? 1 : 0 };
   const q = own[t];
   pulse(t, COL[p]);
   fl.push({ t, dx: 0, dy: -20, txt: '💣 Bombardıman', col: '#cfe3ea', t0: performance.now() });
@@ -8989,10 +9024,26 @@ function sailPos(e, now) {
   const f = cum[j] > cum[j - 1] ? (d - cum[j - 1]) / (cum[j] - cum[j - 1]) : 0;
   return [P0[j - 1][0] + (P0[j][0] - P0[j - 1][0]) * f, P0[j - 1][1] + (P0[j][1] - P0[j - 1][1]) * f];
 }
-function camTrack(e, p) {
+// Seni ilgilendiren önemli bir olayda (kıyına bombardıman, gemi savaşı, yıkılan bina) kamera olay yerine gider;
+// savaş kamerası kapalı olsa ve senin sıran olsa bile. x, y harita pikseli.
+async function camFocusPx(x, y, ms = 520) {
+  if (!cen || over || dr || demo || document.body.classList.contains('mbg') || zk <= zmin() * 1.08)
+    return;
+  const G = zins();
+  const cw = G.w * zk;
+  const ch = G.w * H / W * zk;
+  const px = zx + x / S / W * cw;
+  const py = zy + y / S / H * ch;
+  if (px > G.fw * .18 && px < G.fw * .82 && py > G.t + G.fh * .2 && py < G.t + G.fh * .8)
+    return;
+  if (turn != 0 && !camSaved)
+    camSaved = { zx, zy, zk };
+  await camGlide(G.fw / 2 - x / S / W * cw, G.t + G.fh / 2 - y / S / H * ch, ms);
+}
+function camTrack(e, p, force) {
   if (!e || !cen || over || dr || demo || document.body.classList.contains('mbg') || zk <= zmin() * 1.08)
     return;
-  if (p != 0 && !(camFollow && !ONLINE))
+  if (p != 0 && !force && !(camFollow && !ONLINE))
     return;
   if (turn != 0 && !camSaved)
     camSaved = { zx, zy, zk };
