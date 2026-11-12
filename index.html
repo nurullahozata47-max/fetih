@@ -3457,6 +3457,8 @@ const KD = [
 // pcB/pcT/pcU[q]: q botundan barış satın alan, q'nun yükleneceği hedef ve barışın son turu. pcR[p]: son barış alımı.
 // rin[o]: o kaynaklı kötü huylu isyanı çıkaran devlet (Yıkılmaz Devlet: isyan olgunlaşınca bölgeler ona geçer).
 const RSC = 20;
+// Bir devlet aynı rakipten oyun boyunca en fazla RSMAX bölge rüşvetle alabilir. rsN[p][q]: p'nin q'dan aldığı.
+const RSMAX = 5;
 // Botlar bir insan oyuncunun bölgesine en fazla 2 turda bir rüşvet verir.
 const RSHGAP = 2;
 const rsH = [];
@@ -3465,7 +3467,7 @@ const PCT = 3;
 const PCCD = 5;
 const KU = [
   { ic: '🗡️', nm: 'Kılıç Hakkı', ef: 'Kazandığın her savaşta öldürdüğün düşman askerlerinin yarısı esir düşer ve fethettiğin bölgede senin için savaşır. Bir rakip sana saldırıp başaramazsa, savunan askerlerinin yarısı karşı hücuma geçer ve saldırının geldiği bölgeyi alır; fetih hakkından düşmez (başkent, surlu ve isyandaki bölgeler alınmaz).' },
-  { ic: '⚖️', nm: 'Altının Gücü', ef: `<b>Rüşvet:</b> rakibin sınırındaki bir bölgenin komutanına asker başına ${RSC} altın verirsin; bölge savaşmadan, askerleriyle birlikte sana geçer (turda 1, fetih hakkından düşmez; başkent ve surlu bölgeler satın alınamaz). <b>Barış satın al:</b> bir bota ${PCC} altın verirsin; ${PCT} tur sana saldırmaz ve senin seçtiğin rakibe yüklenir (${PCCD} turda bir).` },
+  { ic: '⚖️', nm: 'Altının Gücü', ef: `<b>Rüşvet:</b> rakibin sınırındaki bir bölgenin komutanına asker başına ${RSC} altın verirsin; komutan vali olarak kalır ve bölgeyi savaşmadan sana teslim eder, öbür askerler kendi ülkelerine çekilir (turda 1, fetih hakkından düşmez; başkent ve surlu bölgeler satın alınamaz; her rakipten en fazla ${RSMAX} bölge). <b>Barış satın al:</b> bir bota ${PCC} altın verirsin; ${PCT} tur sana saldırmaz ve senin seçtiğin rakibe yüklenir (${PCCD} turda bir).` },
   { ic: '🏰', nm: 'Yıkılmaz Devlet', ef: 'Başkentin düşerse devletin bölünmez ve yıkılmaz; başkent kendiliğinden en güvenli bölgene taşınır (oyunda bir kez). Refah %20\'nin altına inse de ülken ikiye bölünmez. Rakip bölgesinde iki katı fiyatına <b>kötü huylu isyan</b> çıkarabilirsin; isyan bastırılamazsa isyandaki bölgeler bağımsız devlet kurmaz, sana katılır.' }
 ];
 const ku = (p, b) => !!(kus && kus[p] == b);
@@ -3674,6 +3676,7 @@ let kyol;
 let kus = [];
 let kuS = [];
 let rsR = [];
+let rsN = [];
 let pcB = [];
 let pcT = [];
 let pcU = [];
@@ -9019,6 +9022,7 @@ function init(noDraft, seed) {
   kus = Array(PM).fill(-1);
   kuS = Array(PM).fill(0);
   rsR = Array(PM).fill(-1);
+  rsN = Array.from({ length: PM }, () => Array(PM).fill(0));
   pcB = Array(PM).fill(-1);
   pcT = Array(PM).fill(-1);
   pcU = Array(PM).fill(-1);
@@ -11233,7 +11237,9 @@ const canInc2 = (p, t) => {
 };
 // ---- Altının Gücü (Hazine özel gücü): rüşvet ve barış satın alma ----
 // Rüşvet: rakibin sınırındaki bölgenin komutanı asker başına RSC altına bölgeyi askerleriyle birlikte teslim eder.
-const canBribe = (p, t) => {
+const rsLeft = (p, q) => RSMAX - ((rsN[p] && rsN[p][q]) || 0);
+const canBribe = (p, t) => canBribe0(p, t) && rsLeft(p, own[t]) > 0;
+const canBribe0 = (p, t) => {
   const q = own[t];
   return ku(p, 1) && q != p && q != NEU && q >= 0 && q < P && !friend(p, q) && !wall[t] && !(inc[t] > 0) && !prot(t) && (p == 0 ? !(cap[q] == t && capVis(t)) : cap[q] != t) && [...adj[t]].some(u => own[u] == p);
 };
@@ -11256,8 +11262,24 @@ async function bribe(p, t) {
   }
   gold[p] -= c;
   rsR[p] = rd;
+  if (!rsN[p])
+    rsN[p] = Array(PM).fill(0);
+  rsN[p][q] = (rsN[p][q] || 0) + 1;
   if (q == 0 || Vg.has(t))
     await camShow(t, t);
+  // Rüşveti alan komutan vali olarak kalır (1 asker); geri kalan askerler ülkelerine, komşu bir bölgelerine çekilir.
+  const n0 = arm[t];
+  const back = [...adj[t]].filter(u => own[u] == q && !(inc[u] > 0)).sort((x, y) => arm[y] - arm[x])[0];
+  const go = Math.max(0, n0 - 1);
+  if (back != null && go > 0) {
+    arm[back] += go;
+    if (cav[t] > 0)
+      cav[back] = Math.min(CAVMAX, cav[back] + cav[t]);
+    if (p == 0 || q == 0 || Vg.has(t))
+      nav.push({ k: 'march', x0: cen[t][0] * S, y0: cen[t][1] * S, x1: cen[back][0] * S, y1: cen[back][1] * S, n: Math.min(10, go), col: COL[q], t0: performance.now(), dur: 900 });
+  }
+  cav[t] = 0;
+  arm[t] = 1;
   own[t] = p;
   tax[t] = 1;
   inc[t] = 0;
@@ -11276,7 +11298,7 @@ async function bribe(p, t) {
     pulse(t, '#ffd36b', null, 3);
     nav.push({ k: 'burst', t, col: '#ffd36b', t0: performance.now(), dur: 1100 });
     fl.push({ t, dx: 0, dy: -14, txt: `💰 Rüşvet: −${c}`, col: '#ffd36b', t0: performance.now() });
-    fl.push({ t, dx: 0, dy: 14, txt: 'Komutan teslim oldu!', col: '#fff', t0: performance.now() + 400 });
+    fl.push({ t, dx: 0, dy: 14, txt: 'Vali teslim oldu!', col: '#fff', t0: performance.now() + 400 });
     try {
       snd('coin', null, .6);
     }
@@ -11285,10 +11307,10 @@ async function bribe(p, t) {
   await fadeTo(t, q, 12, 40);
   if (p == 0) {
     banner(`💰 ${NM[t]} rüşvetle senin!`, COL[0]);
-    lg(`${NM[t]} komutanına ${c} altın rüşvet verdin: bölge ${arm[t]} askeriyle birlikte savaşmadan sana geçti.`);
+    lg(`${NM[t]} komutanına ${c} altın rüşvet verdin: komutan vali olarak kaldı ve bölgeyi sana teslim etti${go > 0 ? `; ${go} asker ${back != null ? PN[q] + ' topraklarına çekildi' : 'dağıldı'}` : ''}. ${PN[q]} krallığından rüşvetle alabileceğin bölge: ${rsLeft(0, q)}/${RSMAX}.`);
   }
   else if (q == 0) {
-    hl += ` 💰 ${PN[p]}, ${NM[t]} komutanına rüşvet verdi: bölgen askerleriyle birlikte ${PN[p]} tarafına geçti!`;
+    hl += ` 💰 ${PN[p]}, ${NM[t]} komutanına rüşvet verdi: komutan bölgeyi ${PN[p]} tarafına teslim etti${go > 0 && back != null ? `, ${go} askerin komşu bölgene çekildi` : ''}!`;
     setTimeout(() => banner(`💰 ${PN[p]} ${NM[t]} bölgeni rüşvetle aldı!`, COL[p]), 400);
   }
   else if (vis)
@@ -16786,9 +16808,10 @@ function openPop(cx, cy) {
       info += ` 👑 Özel güç: ${KU[kus[q]].ic} <b>${KU[kus[q]].nm}</b>.`;
     if (pcU[q] >= rd && pcB[q] == 0)
       info += ` 🕊️ Satın aldığın barış: ${pcU[q] - rd + 1} tur daha sana saldırmaz, ${PN[pcT[q]]} topraklarına yükleniyor.`;
-    if (ku(0, 1) && canBribe(0, t)) {
-      o.push(['rs', rsR[0] == rd ? 'Rüşvet (bu tur verildi)' : `💰 Rüşvet ver (${bribeC(t)} altın)`, rsR[0] != rd && gold[0] >= bribeC(t)]);
-      info += ` 💰 Rüşvet: komutan ${bribeC(t)} altına (asker başına ${RSC}) ${NM[t]} bölgesini askerleriyle birlikte sana teslim eder; fetih hakkından düşmez, turda bir kez.`;
+    if (ku(0, 1) && canBribe0(0, t)) {
+      const lf = rsLeft(0, q);
+      o.push(['rs', lf <= 0 ? `Rüşvet sınırı doldu (${RSMAX}/${RSMAX})` : rsR[0] == rd ? 'Rüşvet (bu tur verildi)' : `💰 Rüşvet ver (${bribeC(t)} altın)`, lf > 0 && rsR[0] != rd && gold[0] >= bribeC(t)]);
+      info += lf <= 0 ? ` 💰 ${PN[q]} krallığından rüşvetle alabileceğin ${RSMAX} bölgenin hepsini aldın.` : ` 💰 Rüşvet: ${bribeC(t)} altın (asker başına ${RSC}). Komutan vali olarak kalır ve ${NM[t]} bölgesini sana teslim eder; öbür askerleri ${PN[q]} topraklarına çekilir. Fetih hakkından düşmez, turda bir kez. ${PN[q]} krallığından kalan hakkın: ${lf}/${RSMAX}.`;
     }
     if (ku(0, 1) && q > 0 && !HUM.has(q) && !friend(0, q)) {
       const w = PCCD - (rd - pcR[0]);
@@ -18155,7 +18178,7 @@ async function kuBot(p) {
   if (!ku(p, 1) || ONLINE)
     return;
   if (rsR[p] != rd && Math.random() < .75) {
-    const L = [...Array(N).keys()].filter(t => canBribe(p, t) && !pcNo(p, own[t]) && bribeC(t) <= gold[p] * .8 && !(HUM.has(own[t]) && rd - (rsH[p] ?? -99) < RSHGAP)).sort((x, y) => ((HUM.has(own[y]) ? 1 : 0) - (HUM.has(own[x]) ? 1 : 0)) || (arm[y] - arm[x]));
+    const L = [...Array(N).keys()].filter(t => canBribe(p, t) && !pcNo(p, own[t]) && bribeC(t) <= gold[p] * .8 && !(HUM.has(own[t]) && rd - (rsH[p] ?? -99) < RSHGAP)).sort((x, y) => ((HUM.has(own[y]) ? 1 : 0) - (HUM.has(own[x]) ? 1 : 0)) || (arm[x] - arm[y]));
     if (L.length) {
       if (HUM.has(own[L[0]]))
         rsH[p] = rd;
@@ -19500,7 +19523,7 @@ const SAVE_KEY = 'fetih_save';
 const SAVE_VARS = ['P', 'turn', 'phase', 'pool', 'rd', 'dr', 'dnx', 'over', 'NI', 'spyXp', 'spyMade', 'taxEvery', 'taxAuto', 'taxTip', 'taxMode', 'durL', 'durLP', 'durLN', 'playMs', 'lateOn', 'ext', 'mvCount', 'allyAsked', 'lastRef', 'lastCq',
   'own', 'arm', 'cap', 'wall', 'bar', 'dep', 'tax', 'gold', 'ally', 'mn', 'att', 'won', 'pen', 'cat', 'catCd', 'archV', 'catXp', 'arch', 'shot', 'wt0', 'bp', 'tru', 'hp', 'hb', 'tcd', 'dk',
   'inc', 'ib', 'ik', 'rwhy', 'ord', 'ordT', 'ocd', 'rqcd', 'rqcd2', 'aspy', 'rcl', 'rcm', 'rst', 'rev', 'bt', 'tw', 'spy', 'miss', 'rv', 'twp', 'shS', 'shL', 'shUsed', 'sfire', 'away', 'awayL',
-  'blk', 'mine', 'trA', 'tbm', 'tba', 'dmR', 'grT', 'grU', 'mvd', 'spl', 'ref', 'sup', 'ruin', 'incN', 'incR', 'NM', 'rfMark', 'gz', 'cav', 'cvU', 'bsp', 'bkn', 'bse', 'inv', 'kd', 'kyol', 'sdk', 'sdkR', 'kus', 'kuS', 'rsR', 'pcB', 'pcT', 'pcU', 'pcR', 'rin'];
+  'blk', 'mine', 'trA', 'tbm', 'tba', 'dmR', 'grT', 'grU', 'mvd', 'spl', 'ref', 'sup', 'ruin', 'incN', 'incR', 'NM', 'rfMark', 'gz', 'cav', 'cvU', 'bsp', 'bkn', 'bse', 'inv', 'kd', 'kyol', 'sdk', 'sdkR', 'kus', 'kuS', 'rsR', 'rsN', 'pcB', 'pcT', 'pcU', 'pcR', 'rin'];
 const SAVE_SETS = ['foc', 'kc'];
 const svGet = {};
 const svSet = {};
@@ -22154,7 +22177,7 @@ function kuNode(b) {
 function kuDiff(b) {
   return [
     [['Kazandığın savaşta esir', 'yok', 'öldürülenin yarısı'], ['Sana yapılan başarısız saldırı', '', 'karşı hücumla bölge senin'], ['Fetih hakkı', '', 'karşı hücumda düşmez']],
-    [['Rüşvetle bölge almak', '', `asker başına ${RSC} altın`], ['Barış satın almak', '', `${PCC} altın · ${PCT} tur`], ['Satın alınan bot', '', 'senin seçtiğin rakibe yüklenir']],
+    [['Rüşvetle bölge almak', '', `asker başına ${RSC} altın · rakip başına ${RSMAX}`], ['Barış satın almak', '', `${PCC} altın · ${PCT} tur`], ['Satın alınan bot', '', 'senin seçtiğin rakibe yüklenir']],
     [['Başkent düşünce', 'bölünme ya da yıkılış', 'bir kez kurtulursun'], ['Refah %20 altında', 'ülke ikiye bölünür', 'bölünmez'], ['Kötü huylu isyan çıkarma', 'yok', '2 katı fiyat'], ['Bastırılamayan kötü huylu isyan', 'yeni devlet', 'bölgeler sana katılır']]
   ][b];
 }
